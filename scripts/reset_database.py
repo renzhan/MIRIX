@@ -66,6 +66,7 @@ def parse_pg_uri(uri: str) -> Dict[str, str]:
         'host': parsed.hostname or 'localhost',
         'port': str(parsed.port or 5432),
         'user': parsed.username or 'mirix',
+        'password': parsed.password,  # 添加密码解析
         'database': parsed.path.lstrip('/') or 'mirix'
     }
 
@@ -85,6 +86,7 @@ def get_pg_connection_details() -> Dict[str, str]:
                 'host': getattr(settings, 'pg_host', None) or 'localhost',
                 'port': str(getattr(settings, 'pg_port', None) or 5432),
                 'user': getattr(settings, 'pg_user', None) or 'mirix',
+                'password': getattr(settings, 'pg_password', None),  # 添加密码处理
                 'database': getattr(settings, 'pg_db', None) or 'mirix'
             }
     
@@ -93,6 +95,7 @@ def get_pg_connection_details() -> Dict[str, str]:
         'host': os.getenv('MIRIX_PG_HOST', 'localhost'),
         'port': os.getenv('MIRIX_PG_PORT', '5432'),
         'user': os.getenv('MIRIX_PG_USER', 'mirix'),
+        'password': os.getenv('MIRIX_PG_PASSWORD'),  # 添加密码环境变量
         'database': os.getenv('MIRIX_PG_DB', 'mirix')
     }
 
