@@ -156,11 +156,10 @@ class AgentWrapper():
         print(f"✅ LLM配置创建完成 (耗时: {time.time() - llm_config_start:.2f}s)")
         print(f"📊 LLM配置: {llm_config.model} ({llm_config.model_endpoint_type})")
         
+        tool_start = time.time()
         if len(self.client.list_agents()) > 0:
 
             print("🛠️ 初始化基础工具...")
-            tool_start = time.time()
-            
             self.client.server.tool_manager.upsert_base_tools(self.client.user)
             
             print(f"✅ 基础工具初始化完成 (耗时: {time.time() - tool_start:.2f}s)")
