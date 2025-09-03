@@ -366,10 +366,11 @@ class AgentWrapper():
         print(f"  - 配置文件加载: {time.time() - config_start:.2f}s")
         print(f"  - 客户端连接: {time.time() - client_start:.2f}s")
         print(f"  - LLM配置创建: {time.time() - llm_config_start:.2f}s")
-        if len(self.client.list_agents()) > 0:
+        if 'tool_start' in locals():
             print(f"  - 基础工具初始化: {time.time() - tool_start:.2f}s")
+        if 'agent_load_start' in locals():
             print(f"  - Agents配置加载: {time.time() - agent_load_start:.2f}s")
-        else:
+        if 'create_all_start' in locals():
             print(f"  - 所有agents创建: {time.time() - create_all_start:.2f}s")
         print(f"  - 工具初始化: {time.time() - tool_init_start:.2f}s")
         print(f"  - 其他开销: {total_init_time - (time.time() - config_start) - (time.time() - client_start) - (time.time() - llm_config_start) - (time.time() - tool_init_start):.2f}s")
