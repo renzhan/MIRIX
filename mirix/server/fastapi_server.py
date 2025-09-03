@@ -1,4 +1,5 @@
 import os
+import time
 import traceback
 import base64
 import tempfile
@@ -7,7 +8,7 @@ import yaml
 from pathlib import Path
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, File, UploadFile, Form
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Request
 from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -18,6 +19,18 @@ from ..agent.agent_wrapper import AgentWrapper
 from ..functions.mcp_client import get_mcp_client_manager, StdioServerConfig
 from ..services.mcp_tool_registry import get_mcp_tool_registry
 from ..services.mcp_marketplace import get_mcp_marketplace
+from ..prompts import gpt_system
+from ..embeddings import embedding_model
+from ..constants import MAX_EMBEDDING_DIM
+import numpy as np
+import json
+import os
+import psycopg2
+from urllib.parse import urlparse
+from dotenv import load_dotenv
+
+# 加载.env文件中的环境变量
+load_dotenv()
 import logging
 
 logger = logging.getLogger(__name__)
@@ -207,9 +220,18 @@ To fix it, install FFmpeg:
 The warning doesn't affect functionality as pydub falls back gracefully.
 """
 
+# 创建 FastAPI 应用实例
+logger.info("🔧 开始创建 FastAPI 应用...")
+app_creation_start = time.time()
+
 app = FastAPI(title="Mirix Agent API", version="0.1.3")
 
+logger.info(f"✅ FastAPI 应用创建完成 (耗时: {time.time() - app_creation_start:.2f}s)")
+
 # Add CORS middleware
+logger.info("🔧 添加 CORS 中间件...")
+middleware_start = time.time()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -217,6 +239,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+logger.info(f"✅ CORS 中间件添加完成 (耗时: {time.time() - middleware_start:.2f}s)")
 
 def register_mcp_tools_for_restored_connections():
     """Register tools for MCP connections that were restored on startup"""
@@ -256,32 +280,94 @@ def register_mcp_tools_for_restored_connections():
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize and restore MCP connections on startup"""
+    """Initialize agent and restore MCP connections on startup"""
+    global agent
+    
+    startup_start_time = time.time()
+    logger.info("🚀 开始 FastAPI 启动事件...")
+    
     try:
         logger.info("Starting up Mirix FastAPI server...")
         
-        # Initialize the MCP client manager (this will auto-restore connections)
-        print("🚀 Initializing MCP client manager...")
+        # 1. Initialize the agent first
+        logger.info("🤖 开始初始化 Agent...")
+        agent_start_time = time.time()
+        
+        import sys
+        import os
+        from pathlib import Path
+        
+        if getattr(sys, 'frozen', False):
+            # Running in PyInstaller bundle
+            bundle_dir = Path(sys._MEIPASS)
+            config_path = bundle_dir / 'mirix' / 'configs' / 'mirix_monitor.yaml'
+            logger.info(f"📦 运行在 PyInstaller 打包环境中，配置文件: {config_path}")
+        else:
+            # Running in development
+            config_path = Path('mirix/configs/mirix_gpt4.yaml')
+            logger.info(f"🔧 运行在开发环境中，配置文件: {config_path}")
+        
+        # 检查配置文件是否存在
+        if not os.path.exists(config_path):
+            logger.error(f"❌ 配置文件不存在: {config_path}")
+            raise FileNotFoundError(f"配置文件不存在: {config_path}")
+        
+        logger.info(f"📋 使用配置文件: {config_path}")
+        agent = AgentWrapper(str(config_path))
+        
+        agent_init_time = time.time() - agent_start_time
+        logger.info(f"✅ Agent 初始化完成 (耗时: {agent_init_time:.2f}s)")
+        print("✅ Agent initialized successfully")
+        
+        # 2. Initialize the MCP client manager (this will auto-restore connections)
+        logger.info("🚀 开始初始化 MCP 客户端管理器...")
+        mcp_start_time = time.time()
+        
         mcp_manager = get_mcp_client_manager()
         connected_servers = mcp_manager.list_servers()
+        
+        mcp_init_time = time.time() - mcp_start_time
+        logger.info(f"✅ MCP 客户端管理器初始化完成 (耗时: {mcp_init_time:.2f}s)")
         logger.info(f"MCP client manager initialized with {len(connected_servers)} restored connections: {connected_servers}")
         print(f"🔄 MCP Manager: Restored {len(connected_servers)} connections: {connected_servers}")
         
         # Debug: Check if the configuration file exists
-        import os
         config_file = os.path.expanduser("~/.mirix/mcp_connections.json")
         if os.path.exists(config_file):
             with open(config_file, 'r') as f:
                 import json
                 configs = json.load(f)
+                logger.info(f"📋 找到 MCP 配置文件，包含 {len(configs)} 个条目: {list(configs.keys())}")
                 print(f"📋 Found MCP config file with {len(configs)} entries: {list(configs.keys())}")
         else:
+            logger.info(f"📋 未找到 MCP 配置文件: {config_file}")
             print(f"📋 No MCP config file found at {config_file}")
         
-        # Tool registration will happen later when agent is available
+        # 3. 注册 MCP 工具
+        logger.info("🔧 开始注册 MCP 工具...")
+        tool_registration_start = time.time()
+        
+        try:
+            register_mcp_tools_for_restored_connections()
+            tool_registration_time = time.time() - tool_registration_start
+            logger.info(f"✅ MCP 工具注册完成 (耗时: {tool_registration_time:.2f}s)")
+        except Exception as e:
+            logger.warning(f"⚠️ MCP 工具注册失败: {str(e)}")
+        
+        # 4. 启动完成统计
+        total_startup_time = time.time() - startup_start_time
+        logger.info(f"🎉 FastAPI 启动完成，总耗时: {total_startup_time:.2f}s")
+        logger.info(f"📊 启动时间分解:")
+        logger.info(f"  - Agent 初始化: {agent_init_time:.2f}s")
+        logger.info(f"  - MCP 管理器初始化: {mcp_init_time:.2f}s")
+        logger.info(f"  - MCP 工具注册: {tool_registration_time:.2f}s")
+        logger.info(f"  - 其他开销: {total_startup_time - agent_init_time - mcp_init_time - tool_registration_time:.2f}s")
         
     except Exception as e:
-        logger.error(f"Error during startup: {str(e)}")
+        logger.error(f"❌ 启动过程中发生错误: {str(e)}")
+        logger.error(f"详细错误信息: {traceback.format_exc()}")
+        print(f"❌ Startup failed: {e}")
+        raise
 
 # Global agent instance
 agent = None
@@ -491,26 +577,7 @@ class ReflexionResponse(BaseModel):
 
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize the agent when the server starts"""
-    global agent
-    
-    # Handle PyInstaller bundled resources
-    import sys
-    import os
-    from pathlib import Path
-    
-    if getattr(sys, 'frozen', False):
-        # Running in PyInstaller bundle
-        bundle_dir = Path(sys._MEIPASS)
-        config_path = bundle_dir / 'mirix' / 'configs' / 'mirix_monitor.yaml'
-    else:
-        # Running in development
-        config_path = Path('mirix/configs/mirix_monitor.yaml')
-    
-    agent = AgentWrapper(str(config_path))
-    print("Agent initialized successfully")
+# Duplicate startup function removed - agent initialization is now in the first startup_event
 
 @app.get("/health")
 async def health_check():
@@ -547,10 +614,12 @@ async def send_message_endpoint(request: MessageRequest):
     
     try:
         # Handle user context switching if user_id is provided
-        if request.user_id:
-            switch_user_context(agent, request.user_id)
+        user_id = getattr(request, 'user_id', None)
+        if user_id:
+            switch_user_context(agent, user_id)
         
-        print(f"Starting agent.send_message (non-streaming) with: message='{request.message}', memorizing={request.memorizing}, user_id={request.user_id}")
+        memorizing = getattr(request, 'memorizing', False)
+        print(f"Starting agent.send_message (non-streaming) with: message='{request.message}', memorizing={memorizing}, user_id={user_id}")
         
         # Run the blocking agent.send_message() in a background thread to avoid blocking other requests
         loop = asyncio.get_event_loop()
@@ -558,11 +627,11 @@ async def send_message_endpoint(request: MessageRequest):
             None,  # Use default ThreadPoolExecutor
             lambda: agent.send_message(
                 message=request.message,
-                image_uris=request.image_uris,
-                sources=request.sources,  # Pass sources to agent
-                voice_files=request.voice_files,  # Pass voice files to agent
-                memorizing=request.memorizing,
-                user_id=request.user_id
+                image_uris=getattr(request, 'image_uris', None),
+                sources=getattr(request, 'sources', None),  # Pass sources to agent
+                voice_files=getattr(request, 'voice_files', None),  # Pass voice files to agent
+                memorizing=memorizing,
+                user_id=user_id
             )
         )
         
@@ -573,7 +642,7 @@ async def send_message_endpoint(request: MessageRequest):
         
         # Handle case where agent returns None
         if response is None:
-            if request.memorizing:
+            if memorizing:
                 # When memorizing=True, None response is expected (no response needed)
                 response = ""
             else:
@@ -1977,6 +2046,323 @@ async def create_user(request: CreateUserRequest):
             success=False,
             message=f"Error creating user: {str(e)}"
         )
+
+# =====================================================================
+# EMAIL ASSISTANT API - 邮件助手接口
+# =====================================================================
+
+def parse_database_uri(uri):
+    """解析数据库URI"""
+    parsed = urlparse(uri)
+    return {
+        'host': parsed.hostname,
+        'port': parsed.port or 5432,
+        'database': parsed.path.lstrip('/'),
+        'user': parsed.username,
+        'password': parsed.password
+    }
+
+def get_company_email_db_connection():
+    """获取公司邮件数据库连接"""
+    # 公司邮件数据库配置
+    conn_params = {
+        'host': os.getenv('DB_HOST', 'ec2-35-85-97-177.us-west-2.compute.amazonaws.com'),
+        'port': int(os.getenv('DB_PORT', 5432)),
+        'database': os.getenv('DB_NAME', 'email'),
+        'user': os.getenv('DB_USER', 'postgres'),
+        'password': os.getenv('DB_PASSWORD', 'aiop123456')
+    }
+    return psycopg2.connect(**conn_params)
+
+def fetch_email_by_entry_id(entry_id: str):
+    """根据entry_id获取指定邮件"""
+    try:
+        conn = get_company_email_db_connection()
+        cursor = conn.cursor()
+        
+        # 查询指定entry_id的邮件
+        cursor.execute("""
+            SELECT id, entry_id, subject, body, sender_email, sender_name, 
+                   recipients, mail_time, conversation_id, category
+            FROM emails 
+            WHERE entry_id = %s
+        """, (entry_id,))
+        
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if row:
+            return {
+                "id": row[0],
+                "entry_id": row[1], 
+                "subject": row[2],
+                "content": row[3],  # body字段
+                "sender_email": row[4],
+                "sender_name": row[5],
+                "recipients": row[6],
+                "mail_time": row[7].isoformat() if row[7] else None,
+                "conversation_id": row[8],
+                "category": row[9]
+            }
+        else:
+            return None
+            
+    except Exception as e:
+        print(f"❌ 获取指定邮件失败: {e}")
+        raise e
+
+
+
+def extract_key_fields_from_analysis(agent_response: str):
+    """从智能体分析结果中提取关键字段"""
+    try:
+        # 简化版本：基于关键词提取
+        # 在实际部署中，可以让智能体返回结构化JSON
+        
+        intent = "unknown"
+        urgency = "medium"
+        sentiment = "neutral"
+        key_entities = []
+        
+        response_lower = agent_response.lower()
+        
+        # 意图识别
+        if any(word in response_lower for word in ["审批", "批准", "approval"]):
+            intent = "approval_request"
+        elif any(word in response_lower for word in ["通知", "notification"]):
+            intent = "notification"
+        elif any(word in response_lower for word in ["咨询", "问题", "inquiry"]):
+            intent = "inquiry"
+        elif any(word in response_lower for word in ["投诉", "complaint"]):
+            intent = "complaint"
+        
+        # 紧急程度识别
+        if any(word in response_lower for word in ["紧急", "urgent", "重要", "立即"]):
+            urgency = "high"
+        elif any(word in response_lower for word in ["一般", "常规", "正常"]):
+            urgency = "medium"
+        else:
+            urgency = "low"
+        
+        # 情感识别
+        if any(word in response_lower for word in ["积极", "positive", "满意", "高兴"]):
+            sentiment = "positive"
+        elif any(word in response_lower for word in ["消极", "negative", "不满", "问题"]):
+            sentiment = "negative"
+        else:
+            sentiment = "neutral"
+        
+        return {
+            "intent": intent,
+            "urgency": urgency, 
+            "sentiment": sentiment,
+            "key_entities": key_entities
+        }
+        
+    except Exception as e:
+        print(f"⚠️ 字段提取失败: {e}")
+        return {
+            "intent": "unknown",
+            "urgency": "medium", 
+            "sentiment": "neutral",
+            "key_entities": []
+        }
+
+
+
+
+@app.post("/api/process_email_by_entry_id")
+async def process_email_by_entry_id(request: dict):
+    """
+    根据entry_id处理指定邮件，使用原始Mirix框架进行记忆协调
+    
+    请求格式: {"entry_id": "AAMkADJmZmVhZGYy..."}
+    
+    功能：
+    1. 根据entry_id从公司邮件数据库获取指定邮件
+    2. 使用Meta Memory Agent智能协调分析
+    3. 由各Memory Agent自动存储到原始Mirix系统表
+    4. 返回处理结果和Memory Agent触发情况
+    
+    存储方式：通过Meta Memory Agent协调，由各Memory Agent存储到原始系统表
+    (episodic_memory, semantic_memory, knowledge_vault等)
+    """
+    try:
+        # 检查agent是否已初始化
+        global agent
+        if agent is None or not hasattr(agent, 'agent_states'):
+            return {
+                "status": "error",
+                "message": "Agent未初始化"
+            }
+        
+        # 验证参数
+        if not request or 'entry_id' not in request:
+            return {
+                "status": "error",
+                "message": "缺少required参数: entry_id"
+            }
+        
+        entry_id = request['entry_id']
+        
+        # 获取邮件数据
+        email_data = fetch_email_by_entry_id(entry_id)
+        if not email_data:
+            return {
+                "status": "error",
+                "message": f"未找到entry_id为 {entry_id} 的邮件"
+            }
+        
+        # 加载提示词并构造消息
+        email_analysis_prompt = gpt_system.get_system_text("base/meta_memory_agent")
+        email_content_message = f"""
+邮件内容分析请求：
+
+📧 邮件基本信息：
+- ID: {email_data['id']}
+- Entry ID: {email_data['entry_id']}
+- 主题: {email_data['subject']}
+- 发件人: {email_data['sender_name']} ({email_data['sender_email']})
+- 收件人: {email_data['recipients']}
+- 时间: {email_data['mail_time']}
+- 对话ID: {email_data['conversation_id']}
+- 分类: {email_data['category']}
+
+📝 邮件正文：
+{email_data['content']}
+
+🎯 请根据上述邮件内容，作为Meta Memory Manager进行分析并协调相应的记忆管理器。
+"""
+
+        # 调用Meta Memory Agent
+        agent_states = agent.agent_states
+
+        
+        # 构造完整的分析消息（提示词 + 邮件数据）
+        full_analysis_message = f"{email_analysis_prompt}\n\n{email_content_message}"
+        
+        # 调用Meta Memory Agent处理
+        if agent_states.meta_memory_agent_state is None:
+            return {
+                "status": "error",
+                "message": "Meta Memory Agent not initialized",
+                "entry_id": entry_id
+            }
+        
+        meta_agent_id = agent_states.meta_memory_agent_state.id
+        
+        start_time = datetime.now()
+        meta_response = ""
+        
+        try:
+            loop = asyncio.get_event_loop()
+            
+            # 创建消息队列以启用Memory Agent并发处理
+            from mirix.agent.message_queue import MessageQueue
+            message_queue = MessageQueue()
+            agent_client = agent.client
+            
+            meta_response = await loop.run_in_executor(
+                None,
+                lambda: agent_client.send_message(
+                    agent_id=meta_agent_id,
+                    message=full_analysis_message,
+                    role='user',
+                    message_queue=message_queue,  # 🔑 关键：启用并发处理
+                    chaining=True  # 启用链式调用（依赖系统默认保护机制）
+                )
+            )
+            
+        except Exception as e:
+            meta_response = ""
+        
+        # 检查Memory Agent触发情况
+        
+        memory_agent_status = {}
+        triggered_memory_agents = []
+        
+        try:
+            if meta_response:
+                function_calls_info = []
+                
+                if hasattr(meta_response, 'messages') and meta_response.messages:
+                    # 遍历所有消息，查找function calls
+                    for msg in meta_response.messages:
+                        # 检查是否有tool_calls信息
+                        if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                            for tool_call in msg.tool_calls:
+                                function_calls_info.append({
+                                    'function': tool_call.function.name if hasattr(tool_call, 'function') else 'unknown',
+                                    'arguments': tool_call.function.arguments if hasattr(tool_call, 'function') and hasattr(tool_call.function, 'arguments') else '{}'
+                                })
+                
+                # 解析trigger_memory_update的参数
+                for call in function_calls_info:
+                    if call['function'] == 'trigger_memory_update':
+                        try:
+                            import json
+                            args = json.loads(call['arguments'])
+                            if 'memory_types' in args:
+                                memory_types = args['memory_types']
+                                triggered_memory_agents.extend(memory_types)
+                        except Exception as e:
+                            pass
+                
+                memory_agent_status = {
+                    "function_calls": function_calls_info,
+                    "triggered_agents": triggered_memory_agents,
+                    "total_triggered": len(triggered_memory_agents),
+                    "analysis_method": "function_calls_only"
+                }
+                
+            else:
+                memory_agent_status = {
+                    "triggered_agents": [],
+                    "total_triggered": 0,
+                    "error": "meta_response_empty"
+                }
+                
+        except Exception as e:
+            memory_agent_status = {"error": str(e)}
+        
+        # 提取关键字段
+        extracted_fields = extract_key_fields_from_analysis(meta_response or "")
+        
+        # 返回结果
+        triggered_count = memory_agent_status.get('total_triggered', 0)
+        processing_time = (datetime.now() - start_time).total_seconds()
+        
+        # 处理完成日志
+        print(f"✅ 邮件处理完成：{entry_id[:20]}... | 触发{triggered_count}个Agent | {processing_time:.2f}s")
+        
+        return {
+            "status": "success",
+            "message": f"邮件处理完成：entry_id={entry_id}",
+            "entry_id": entry_id,
+            "agents_triggered": triggered_count,
+            "processing_time": f"{processing_time:.2f}s"
+        }
+        
+    except Exception as e:
+        processing_time = (datetime.now() - start_time).total_seconds()
+        entry_id_display = entry_id[:20] + "..." if 'entry_id' in locals() else "unknown"
+        
+        # 处理失败日志
+        print(f"❌ 邮件处理失败：{entry_id_display} | {str(e)} | {processing_time:.2f}s")
+        
+        return {
+            "status": "error",
+            "message": f"指定邮件处理失败: {str(e)}",
+            "error_type": type(e).__name__
+        }
+
+
+
+# =====================================================================
+# EMAIL ASSISTANT API - 邮件助手接口 (精简版)
+# 只保留一个核心接口：process_email_by_entry_id - 根据指定ID处理邮件
+# =====================================================================
 
 if __name__ == "__main__":
     import uvicorn

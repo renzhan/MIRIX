@@ -88,6 +88,8 @@ from mirix.utils import (
     validate_function_response,
     convert_timezone_to_utc,
     log_telemetry,
+    log_llm_request,
+    log_llm_response,
 )
 from mirix.services.file_manager import FileManager
 
@@ -445,6 +447,18 @@ class Agent(BaseAgent):
                 )
 
                 if llm_client and not stream:
+                    # Log LLM request parameters (truncated)
+                    log_llm_request(
+                        logger=self.logger,
+                        operation_name="Main Agent",
+                        llm_config=self.agent_state.llm_config,
+                        messages=message_sequence,
+                        tools=allowed_functions,
+                        force_tool_call=force_tool_call,
+                        stream=stream,
+                        put_inner_thoughts_first=put_inner_thoughts_first
+                    )
+                    
                     response = llm_client.send_llm_request(
                         messages=message_sequence,
                         tools=allowed_functions,
@@ -452,6 +466,13 @@ class Agent(BaseAgent):
                         force_tool_call=force_tool_call,
                         get_input_data_for_debugging=get_input_data_for_debugging,
                         existing_file_uris=existing_file_uris,
+                    )
+                    
+                    # Log response (truncated)
+                    log_llm_response(
+                        logger=self.logger,
+                        operation_name="Main Agent",
+                        response=response
                     )
 
                     if get_input_data_for_debugging:
@@ -1089,6 +1110,17 @@ class Agent(BaseAgent):
                         put_inner_thoughts_first=True,
                     )
                     
+                    # Log LLM request parameters (truncated)
+                    log_llm_request(
+                        logger=self.logger,
+                        operation_name="Topic Extraction",
+                        llm_config=self.agent_state.llm_config,
+                        messages=temporary_messages,
+                        tools=functions,
+                        force_tool_call='update_topic',
+                        stream=False
+                    )
+                    
                     if llm_client:
                         response = llm_client.send_llm_request(
                             messages=temporary_messages,
@@ -1104,6 +1136,13 @@ class Agent(BaseAgent):
                             functions=functions,
                             force_tool_call='update_topic',
                         )
+                    
+                    # Log response (truncated)
+                    log_llm_response(
+                        logger=self.logger,
+                        operation_name="Topic Extraction",
+                        response=response
+                    )
 
                     # Extract topics from the response
                     for choice in response.choices:

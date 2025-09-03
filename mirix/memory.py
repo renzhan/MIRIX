@@ -1,4 +1,5 @@
 from typing import Callable, Dict, List, Optional
+import json
 
 from mirix.constants import MESSAGE_SUMMARY_REQUEST_ACK
 from mirix.llm_api.llm_api_tools import create
@@ -9,7 +10,7 @@ from mirix.schemas.memory import Memory
 from mirix.schemas.message import Message
 from mirix.schemas.mirix_message_content import TextContent
 from mirix.settings import summarizer_settings
-from mirix.utils import count_tokens, printd
+from mirix.utils import count_tokens, printd, log_llm_request, log_llm_response
 from mirix.llm_api.llm_client import LLMClient
 
 def get_memory_functions(cls: Memory) -> Dict[str, Callable]:
@@ -93,9 +94,27 @@ def summarize_messages(
     llm_client = LLMClient.create(
         llm_config=llm_config_no_inner_thoughts,
     )
+    
+    # Log LLM request parameters (truncated)
+    log_llm_request(
+        logger=None,  # Use printd for memory operations
+        operation_name="Memory Summarization",
+        llm_config=llm_config_no_inner_thoughts,
+        messages=message_sequence,
+        existing_file_uris_count=len(existing_file_uris) if existing_file_uris else 0
+    )
+    
     response = llm_client.send_llm_request(
         messages=message_sequence,
         existing_file_uris=existing_file_uris,
+    )
+    
+    # Log response (truncated)
+    log_llm_response(
+        logger=None,  # Use printd for memory operations
+        operation_name="Memory Summarization",
+        response=response,
+        summary_length=len(response.choices[0].message.content) if response and hasattr(response, 'choices') and response.choices else 0
     )
 
     printd(f"summarize_messages gpt reply: {response.choices[0]}")

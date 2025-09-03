@@ -1478,3 +1478,131 @@ def generate_unique_short_id(session_maker, model_class, prefix="id", length=4, 
     
     # If we can't find a unique ID after max_attempts, fall back to longer ID
     return generate_short_id(prefix, length + 2) 
+
+
+def log_llm_request(logger, operation_name, llm_config, messages, tools=None, **kwargs):
+    """
+    Log LLM request parameters with truncated content.
+    
+    Args:
+        logger: Logger instance (None to use printd)
+        operation_name: Name of the operation (e.g., "Main Agent", "Topic Extraction")
+        llm_config: LLM configuration object
+        messages: List of messages
+        tools: List of tools (optional)
+        **kwargs: Additional parameters to log
+    """
+    def truncate_content(content, max_chars=100):
+        if isinstance(content, str) and len(content) > max_chars:
+            return content[:max_chars//2] + "..." + content[-max_chars//2:]
+        return content
+    
+    # Log request parameters
+    request_log = {
+        'llm_config': {
+            'model': llm_config.model,
+            'provider': llm_config.provider,
+            'temperature': llm_config.temperature
+        },
+        'messages_count': len(messages),
+        'operation': operation_name
+    }
+    
+    # Add tools info if provided
+    if tools:
+        request_log['tools_count'] = len(tools)
+    
+    # Add additional kwargs
+    for key, value in kwargs.items():
+        if value is not None:
+            request_log[key] = value
+    
+    # Log first and last message content (truncated)
+    if messages:
+        if isinstance(messages[0], dict):
+            request_log['first_message'] = {
+                'role': messages[0].get('role', 'unknown'),
+                'content': truncate_content(messages[0].get('content', ''))
+            }
+            if len(messages) > 1:
+                request_log['last_message'] = {
+                    'role': messages[-1].get('role', 'unknown'),
+                    'content': truncate_content(messages[-1].get('content', ''))
+                }
+        else:
+            # Handle Message objects
+            request_log['first_message'] = {
+                'role': messages[0].role,
+                'content': truncate_content(str(messages[0].content))
+            }
+            if len(messages) > 1:
+                request_log['last_message'] = {
+                    'role': messages[-1].role,
+                    'content': truncate_content(str(messages[-1].content))
+                }
+    
+    log_message = f"🔍 LLM Request - {operation_name}: {json.dumps(request_log, ensure_ascii=False, indent=2)}"
+    if logger:
+        logger.info(log_message)
+    else:
+        printd(log_message)
+
+
+def log_llm_response(logger, operation_name, response, **kwargs):
+    """
+    Log LLM response with truncated content.
+    
+    Args:
+        logger: Logger instance (None to use printd)
+        operation_name: Name of the operation (e.g., "Main Agent", "Topic Extraction")
+        response: LLM response object
+        **kwargs: Additional parameters to log
+    """
+    def truncate_content(content, max_chars=100):
+        if isinstance(content, str) and len(content) > max_chars:
+            return content[:max_chars//2] + "..." + content[-max_chars//2:]
+        return content
+    
+    # Log response (truncated)
+    response_log = {
+        'status': 'success' if response else 'failed',
+        'choices_count': len(response.choices) if response and hasattr(response, 'choices') else 0,
+        'operation': operation_name
+    }
+    
+    # Add finish reason if available
+    if response and hasattr(response, 'choices') and response.choices:
+        response_log['finish_reason'] = response.choices[0].finish_reason if hasattr(response.choices[0], 'finish_reason') else 'unknown'
+    
+    # Add usage statistics if available
+    if response and hasattr(response, 'usage'):
+        response_log['usage'] = {
+            'prompt_tokens': response.usage.prompt_tokens if hasattr(response.usage, 'prompt_tokens') else 0,
+            'completion_tokens': response.usage.completion_tokens if hasattr(response.usage, 'completion_tokens') else 0,
+            'total_tokens': response.usage.total_tokens if hasattr(response.usage, 'total_tokens') else 0
+        }
+    
+    # Log tool calls if present
+    if response and hasattr(response, 'choices') and response.choices:
+        choice = response.choices[0]
+        if hasattr(choice, 'message') and hasattr(choice.message, 'tool_calls'):
+            tool_calls = choice.message.tool_calls
+            if tool_calls:
+                response_log['tool_calls'] = []
+                for tool_call in tool_calls:
+                    tool_call_log = {
+                        'function_name': tool_call.function.name if hasattr(tool_call, 'function') else 'unknown',
+                        'arguments': truncate_content(tool_call.function.arguments if hasattr(tool_call, 'function') else '{}')
+                    }
+                    response_log['tool_calls'].append(tool_call_log)
+    
+    # Add additional kwargs
+    for key, value in kwargs.items():
+        if value is not None:
+            response_log[key] = value
+    
+    log_message = f"✅ LLM Response - {operation_name}: {json.dumps(response_log, ensure_ascii=False, indent=2)}"
+    if logger:
+        logger.info(log_message)
+    else:
+        printd(log_message) 

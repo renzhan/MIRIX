@@ -96,11 +96,20 @@ def get_image_mime_type(image_path):
 class AgentWrapper():
     
     def __init__(self, agent_config_file, load_from=None):
-
+        init_start_time = time.time()
+        print(f"🚀 开始初始化 AgentWrapper: {agent_config_file}")
+        
         # If load_from is specified, restore the database first before any agent initialization
         if load_from is not None:
+            print(f"📦 从备份恢复数据库: {load_from}")
+            restore_start = time.time()
             self._restore_database_before_init(load_from)
+            print(f"✅ 数据库恢复完成 (耗时: {time.time() - restore_start:.2f}s)")
 
+        # 加载配置文件
+        print("📋 加载配置文件...")
+        config_start = time.time()
+        
         with open(agent_config_file, "r") as f:
             agent_config = yaml.safe_load(f)
 
@@ -111,23 +120,56 @@ class AgentWrapper():
         self.is_screen_monitor = agent_config.get('is_screen_monitor', False)
         self.chat_agent_standalone = True
 
+        print(f"✅ 配置文件加载完成 (耗时: {time.time() - config_start:.2f}s)")
+        print(f"📊 配置信息: agent_name={self.agent_name}, model_name={self.model_name}, provider={self.model_provider}")
+
         # Initialize logger early
         self.logger = logging.getLogger(f"Mirix.AgentWrapper.{self.agent_name}")
         self.logger.setLevel(logging.INFO)
 
+        # 初始化客户端连接
+        print("🔄 初始化客户端连接...")
+        client_start = time.time()
+        
         self.client = create_client()
         self.client.set_default_llm_config(LLMConfig.default_config("gpt-4o-mini")) 
-        # self.client.set_default_embedding_config(EmbeddingConfig.default_config("text-embedding-3-small"))
-        self.client.set_default_embedding_config(EmbeddingConfig.default_config("text-embedding-004"))
+        # 🔧 修复Google AI地理位置限制：切换到OpenAI embedding
+        self.client.set_default_embedding_config(EmbeddingConfig.default_config("text-embedding-3-small"))
+        # self.client.set_default_embedding_config(EmbeddingConfig.default_config("text-embedding-004"))
+
+        print(f"✅ 客户端连接初始化完成 (耗时: {time.time() - client_start:.2f}s)")
 
         # Initialize agent states container
         self.agent_states = AgentStates()
 
+        print("🔍 检查现有agents...")
+        agent_check_start = time.time()
+        
+        # 提前创建LLM配置，确保所有Agent都有"大脑"
+        print("🧠 创建LLM配置...")
+        llm_config_start = time.time()
+        
+        provider = self.model_provider if self.model_provider else self._determine_model_provider(self.model_name)
+        llm_config = self._create_llm_config_for_provider(self.model_name, provider)
+        self.client.set_default_llm_config(llm_config)
+        
+        print(f"✅ LLM配置创建完成 (耗时: {time.time() - llm_config_start:.2f}s)")
+        print(f"📊 LLM配置: {llm_config.model} ({llm_config.model_endpoint_type})")
+        
         if len(self.client.list_agents()) > 0:
 
+            print("🛠️ 初始化基础工具...")
+            tool_start = time.time()
+            
             self.client.server.tool_manager.upsert_base_tools(self.client.user)
+            
+            print(f"✅ 基础工具初始化完成 (耗时: {time.time() - tool_start:.2f}s)")
 
+            print("📋 加载agents配置...")
+            agent_load_start = time.time()
+            
             all_agent_states = self.client.list_agents()
+            print(f"📊 找到 {len(all_agent_states)} 个现有agents")
 
             for agent_state in all_agent_states:
                 if agent_state.name == 'chat_agent':
@@ -159,26 +201,62 @@ class AgentWrapper():
                     system_prompt=system_prompt
                 )
             
+            print(f"✅ Agents配置加载完成 (耗时: {time.time() - agent_load_start:.2f}s)")
+            
+            # Check if chat_agent is missing and create it
+            if self.agent_states.agent_state is None:
+                print("⚠️ 缺少chat_agent，正在创建...")
+                create_start = time.time()
+                
+                core_memory = ChatMemory(
+                    human="",
+                    persona="You are a helpful personal assistant who can help the user remember things.",
+                    actor=self.client.user
+                )
+                chat_agent_state = self.client.create_agent(
+                    name='chat_agent',
+                    memory=core_memory,
+                    system=gpt_system.get_system_text('screen_monitor/chat_agent') if self.is_screen_monitor else gpt_system.get_system_text('base/chat_agent'),
+                    llm_config=llm_config  # ✅ 给chat_agent添加大脑
+                )
+                self.agent_states.agent_state = chat_agent_state
+                self.logger.info("Created missing chat_agent with LLM config")
+                print(f"✅ 补创建Agent: chat_agent (耗时: {time.time() - create_start:.2f}s)")
+            
             if self.agent_states.reflexion_agent_state is None:
+                print("⚠️ 缺少reflexion_agent，正在创建...")
+                create_start = time.time()
+                
                 reflexion_agent_state = self.client.create_agent(
                     name='reflexion_agent',
                     memory=self.agent_states.agent_state.memory,
                     agent_type=AgentType.reflexion_agent,
                     system=gpt_system.get_system_text('base/reflexion_agent'),
+                    llm_config=llm_config  # ✅ 给reflexion_agent添加大脑
                 )
                 setattr(self.agent_states, 'reflexion_agent_state', reflexion_agent_state)
+                self.logger.info("Created missing reflexion_agent with LLM config")
+                print(f"✅ 补创建Agent: reflexion_agent (耗时: {time.time() - create_start:.2f}s)")
             
             if self.agent_states.background_agent_state is None:
+                print("⚠️ 缺少background_agent，正在创建...")
+                create_start = time.time()
+                
                 background_agent_state = self.client.create_agent(
                     name='background_agent',
                     agent_type=AgentType.background_agent,
                     memory=self.agent_states.agent_state.memory,
                     system=gpt_system.get_system_text('base/background_agent'),
+                    llm_config=llm_config  # ✅ 给background_agent添加大脑
                 )
                 setattr(self.agent_states, 'background_agent_state', background_agent_state)
+                self.logger.info("Created missing background_agent with LLM config")
+                print(f"✅ 补创建Agent: background_agent (耗时: {time.time() - create_start:.2f}s)")
             
         else:
-
+            print("🆕 没有找到现有agents，开始创建新agents...")
+            create_all_start = time.time()
+            
             core_memory = ChatMemory(
                 human="",
                 persona="You are a helpful personal assitant who can help the user remember things.",
@@ -187,29 +265,45 @@ class AgentWrapper():
 
             # Create agents in a loop using imported configuration
             for config in AGENT_CONFIGS:
+                print(f"🔧 创建Agent: {config['name']}...")
+                agent_create_start = time.time()
+                
                 if config['name'] == 'chat_agent':
                     # chat_agent has different parameters
                     agent_state = self.client.create_agent(
                         name=config['name'],
                         memory=core_memory,
-                        system = gpt_system.get_system_text('screen_monitor/' + config['name']) if self.is_screen_monitor else gpt_system.get_system_text('base/' + config['name'])
+                        system = gpt_system.get_system_text('screen_monitor/' + config['name']) if self.is_screen_monitor else gpt_system.get_system_text('base/' + config['name']),
+                        llm_config=llm_config  # ✅ 给chat_agent也添加大脑
                     )
                 else:
-                    # All other agents follow the same pattern
+                    # All other agents follow the same pattern - 确保所有Memory Agent都有LLM配置
                     agent_state = self.client.create_agent(
                         name=config['name'],
                         agent_type=config['agent_type'],
                         memory=core_memory,
                         system = gpt_system.get_system_text('screen_monitor/' + config['name']) if self.is_screen_monitor else gpt_system.get_system_text('base/' + config['name']),
                         include_base_tools=config['include_base_tools'],
+                        llm_config=llm_config  # ✅ 给所有Memory Agent添加大脑！
                     )
                 
                 # Set the agent state on the appropriate attribute
                 setattr(self.agent_states, config['attr_name'], agent_state)
+                print(f"✅ 创建Agent: {config['name']} (耗时: {time.time() - agent_create_start:.2f}s)")
+            
+            print(f"🎉 所有agents创建完成 (总耗时: {time.time() - create_all_start:.2f}s)")
             
         # for agent_state in all_agent_states:
         #     messages = self.client.server.agent_manager.get_in_context_messages(agent_id=agent_state.id, actor=self.client.user)
         #     print(agent_state.name, len(messages))
+
+        # 初始化工具
+        print("🛠️ 初始化工具...")
+        tool_init_start = time.time()
+        
+        self.client.server.tool_manager.upsert_base_tools(self.client.user)
+        
+        print(f"✅ 工具初始化完成 (耗时: {time.time() - tool_init_start:.2f}s)")
 
         self.set_timezone(self.client.server.user_manager.get_user_by_id(self.client.user_id).timezone)
         self.set_persona("helpful_assistant") # This will now also set self.active_persona_name
@@ -263,6 +357,23 @@ class AgentWrapper():
         # For GEMINI models, extract all unprocessed images and fill temporary_messages
         if self.model_name in GEMINI_MODELS and self.google_client is not None:
             self._process_existing_uploaded_files()
+
+        # 初始化完成统计
+        total_init_time = time.time() - init_start_time
+        print(f"🎉 AgentWrapper初始化完成，总耗时: {total_init_time:.2f}s")
+        print(f"📊 初始化时间分解:")
+        if load_from is not None:
+            print(f"  - 数据库恢复: {time.time() - restore_start:.2f}s")
+        print(f"  - 配置文件加载: {time.time() - config_start:.2f}s")
+        print(f"  - 客户端连接: {time.time() - client_start:.2f}s")
+        print(f"  - LLM配置创建: {time.time() - llm_config_start:.2f}s")
+        if len(self.client.list_agents()) > 0:
+            print(f"  - 基础工具初始化: {time.time() - tool_start:.2f}s")
+            print(f"  - Agents配置加载: {time.time() - agent_load_start:.2f}s")
+        else:
+            print(f"  - 所有agents创建: {time.time() - create_all_start:.2f}s")
+        print(f"  - 工具初始化: {time.time() - tool_init_start:.2f}s")
+        print(f"  - 其他开销: {total_init_time - (time.time() - config_start) - (time.time() - client_start) - (time.time() - llm_config_start) - (time.time() - tool_init_start):.2f}s")
 
     def update_chat_agent_system_prompt(self, is_screen_monitoring: bool):
         '''
@@ -656,7 +767,7 @@ class AgentWrapper():
             )
             count += 1
             if count == TEMPORARY_MESSAGE_LIMIT:
-                self.temp_message_accumulator.absorb_content_into_memory(self.agent_states, user_id=user_id)
+                self.temp_message_accumulator.absorb_content_into_memory(self.agent_states, user_id=self.client.user_id)
                 count = 0
 
     def delete_files(self, file_names, google_client):

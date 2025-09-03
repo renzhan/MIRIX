@@ -517,3 +517,46 @@ class QueuingInterface(AgentInterface):
 
         self._queue_push(message_api=new_message, message_obj=msg_obj)
 
+
+class StreamingServerInterface(QueuingInterface):
+    """Streaming interface that extends QueuingInterface for real-time message streaming"""
+    
+    def __init__(self, use_assistant_message=True, assistant_message_tool_name=None, 
+                 assistant_message_tool_kwarg=None, inner_thoughts_in_kwargs=False, debug=True):
+        super().__init__(debug=debug)
+        self.use_assistant_message = use_assistant_message
+        self.assistant_message_tool_name = assistant_message_tool_name
+        self.assistant_message_tool_kwarg = assistant_message_tool_kwarg
+        self.inner_thoughts_in_kwargs = inner_thoughts_in_kwargs
+        self.streaming_mode = False
+        self.streaming_chat_completion_mode = False
+        
+    async def get_generator(self):
+        """Return async generator for streaming messages"""
+        async for message in self.message_generator(style="api"):
+            yield message
+
+
+async def sse_async_generator(generator, usage_task=None, finish_message=True):
+    """Server-Sent Events async generator for streaming responses"""
+    import json
+    try:
+        async for message in generator:
+            if isinstance(message, dict):
+                # Format as SSE event
+                yield f"data: {json.dumps(message)}\n\n"
+            elif isinstance(message, str):
+                yield f"data: {message}\n\n"
+        
+        # Send completion event
+        if finish_message:
+            yield f"data: {json.dumps({'status': 'completed'})}\n\n"
+            
+    except Exception as e:
+        # Send error event
+        error_message = {"error": str(e), "status": "error"}
+        yield f"data: {json.dumps(error_message)}\n\n"
+    finally:
+        if usage_task and not usage_task.done():
+            usage_task.cancel()
+

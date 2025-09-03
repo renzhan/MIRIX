@@ -176,7 +176,7 @@ def load_function_set(module: ModuleType) -> dict:
             try:
                 generated_schema = generate_schema(attr)
             except Exception as e:
-                import ipdb; ipdb.set_trace()
+                # import ipdb; ipdb.set_trace()  # 删除调试断点
                 raise e
 
             function_dict[attr_name] = {

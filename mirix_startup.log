@@ -1,0 +1,1456 @@
+2025-09-03 12:01:00,810 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 12:01:00,811 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 12:01:00,811 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 12:01:00,811 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 12:01:00,811 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 12:01:00,811 - __main__ - INFO -   PORT: 未设置
+2025-09-03 12:01:00,811 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 12:01:00,811 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 12:01:00,866 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.06s)
+2025-09-03 12:01:00,918 - __main__ - ERROR - ❌ 启动失败: No module named 'demjson3'
+2025-09-03 12:01:03,540 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 12:01:03,541 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 12:01:03,541 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 12:01:03,542 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 12:01:03,542 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 12:01:03,542 - __main__ - INFO -   PORT: 未设置
+2025-09-03 12:01:03,542 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 12:01:03,542 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 12:01:03,621 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 12:01:06,786 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 12:01:06,786 - __main__ - ERROR - ❌ 启动失败: name 'time' is not defined
+2025-09-03 12:01:15,766 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 12:01:15,767 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 12:01:15,768 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 12:01:15,768 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 12:01:15,768 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 12:01:15,768 - __main__ - INFO -   PORT: 未设置
+2025-09-03 12:01:15,768 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 12:01:15,768 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 12:01:15,802 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.03s)
+2025-09-03 12:01:15,843 - __main__ - ERROR - ❌ 启动失败: No module named 'tiktoken'
+2025-09-03 12:01:15,844 - __main__ - ERROR - 详细错误信息: Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/main.py", line 74, in main
+    from mirix.server import app
+  File "/Users/renzhan/work/code/MIRIX/mirix/__init__.py", line 5, in <module>
+    from mirix.client.client import LocalClient, create_client
+  File "/Users/renzhan/work/code/MIRIX/mirix/client/client.py", line 13, in <module>
+    import mirix.utils
+  File "/Users/renzhan/work/code/MIRIX/mirix/utils.py", line 24, in <module>
+    import tiktoken
+ModuleNotFoundError: No module named 'tiktoken'
+
+2025-09-03 12:01:30,778 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 12:01:30,780 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 12:01:30,780 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 12:01:30,780 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 12:01:30,780 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 12:01:30,780 - __main__ - INFO -   PORT: 未设置
+2025-09-03 12:01:30,780 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 12:01:30,780 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 12:01:30,830 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.05s)
+2025-09-03 12:01:31,020 - __main__ - ERROR - ❌ 启动失败: No module named 'pathvalidate'
+2025-09-03 12:01:31,022 - __main__ - ERROR - 详细错误信息: Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/main.py", line 74, in main
+    from mirix.server import app
+  File "/Users/renzhan/work/code/MIRIX/mirix/__init__.py", line 5, in <module>
+    from mirix.client.client import LocalClient, create_client
+  File "/Users/renzhan/work/code/MIRIX/mirix/client/client.py", line 13, in <module>
+    import mirix.utils
+  File "/Users/renzhan/work/code/MIRIX/mirix/utils.py", line 25, in <module>
+    from pathvalidate import sanitize_filename as pathvalidate_sanitize_filename
+ModuleNotFoundError: No module named 'pathvalidate'
+
+2025-09-03 12:02:42,807 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 12:02:42,808 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 12:02:42,808 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 12:02:42,808 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 12:02:42,808 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 12:02:42,808 - __main__ - INFO -   PORT: 未设置
+2025-09-03 12:02:42,808 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 12:02:42,808 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 12:02:42,884 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 12:02:42,960 - __main__ - ERROR - ❌ 启动失败: No module named 'pathvalidate'
+2025-09-03 12:02:42,961 - __main__ - ERROR - 详细错误信息: Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/main.py", line 74, in main
+    from mirix.server import app
+  File "/Users/renzhan/work/code/MIRIX/mirix/__init__.py", line 5, in <module>
+    from mirix.client.client import LocalClient, create_client
+  File "/Users/renzhan/work/code/MIRIX/mirix/client/client.py", line 13, in <module>
+    import mirix.utils
+  File "/Users/renzhan/work/code/MIRIX/mirix/utils.py", line 25, in <module>
+    from pathvalidate import sanitize_filename as pathvalidate_sanitize_filename
+ModuleNotFoundError: No module named 'pathvalidate'
+
+2025-09-03 12:02:46,834 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 12:02:46,835 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 12:02:46,835 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 12:02:46,835 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 12:02:46,835 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 12:02:46,835 - __main__ - INFO -   PORT: 未设置
+2025-09-03 12:02:46,835 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 12:02:46,835 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 12:02:46,891 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.06s)
+2025-09-03 12:02:48,382 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 12:02:48,382 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 12:02:48,382 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 12:02:48,382 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 12:02:48,396 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 1.56s)
+2025-09-03 12:02:48,396 - __main__ - INFO - 🎉 启动准备完成，总耗时: 1.56s
+2025-09-03 12:02:48,396 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 12:02:48,469 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 12:02:48,469 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 12:02:48,469 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 12:02:48,469 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 12:02:48,469 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 12:12:59,770 - Mirix.AgentWrapper.mirix - INFO - Setting timezone to: UTC (UTC+00:00)
+2025-09-03 12:12:59,773 - Mirix.AgentWrapper.mirix - INFO - (UTC+00:00)
+2025-09-03 12:57:36,502 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 12:57:36,504 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 12:57:36,504 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 12:57:36,504 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 12:57:36,504 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 12:57:36,504 - __main__ - INFO -   PORT: 未设置
+2025-09-03 12:57:36,504 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 12:57:36,504 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 12:57:36,584 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 12:57:39,850 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 12:57:39,851 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 12:57:39,851 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 12:57:39,851 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 12:57:39,899 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 3.40s)
+2025-09-03 12:57:39,899 - __main__ - INFO - 🎉 启动准备完成，总耗时: 3.40s
+2025-09-03 12:57:39,899 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 12:57:39,925 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 12:57:39,925 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 12:57:39,925 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 12:57:39,925 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 12:57:39,925 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:09:14,340 - Mirix.AgentWrapper.mirix - INFO - Setting timezone to: UTC (UTC+00:00)
+2025-09-03 13:09:14,345 - Mirix.AgentWrapper.mirix - INFO - (UTC+00:00)
+2025-09-03 13:39:39,740 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 13:39:39,741 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 13:39:39,741 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 13:39:39,741 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 13:39:39,742 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 13:39:39,742 - __main__ - INFO -   PORT: 未设置
+2025-09-03 13:39:39,742 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 13:39:39,742 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 13:39:39,840 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.10s)
+2025-09-03 13:39:41,554 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 13:39:41,554 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 13:39:41,554 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 13:39:41,554 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 13:39:41,568 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 1.83s)
+2025-09-03 13:39:41,568 - __main__ - INFO - 🎉 启动准备完成，总耗时: 1.83s
+2025-09-03 13:39:41,568 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 13:39:41,587 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 13:39:41,587 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 13:39:41,587 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 13:39:41,587 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:39:41,587 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:41:49,586 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 13:41:49,588 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 13:41:49,588 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 13:41:49,588 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 13:41:49,588 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 13:41:49,588 - __main__ - INFO -   PORT: 未设置
+2025-09-03 13:41:49,588 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 13:41:49,588 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 13:41:49,659 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.07s)
+2025-09-03 13:41:52,697 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 13:41:52,697 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 13:41:52,697 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 13:41:52,697 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 13:41:52,741 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 3.15s)
+2025-09-03 13:41:52,741 - __main__ - INFO - 🎉 启动准备完成，总耗时: 3.15s
+2025-09-03 13:41:52,741 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 13:41:52,760 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 13:41:52,761 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 13:41:52,761 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 13:41:52,761 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:41:52,761 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:47:48,791 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 13:47:48,792 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 13:47:48,792 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 13:47:48,792 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 13:47:48,792 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 13:47:48,793 - __main__ - INFO -   PORT: 未设置
+2025-09-03 13:47:48,793 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 13:47:48,793 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 13:47:48,872 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 13:47:51,864 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 13:47:51,864 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 13:47:51,864 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 13:47:51,864 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 13:47:51,905 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 3.11s)
+2025-09-03 13:47:51,905 - __main__ - INFO - 🎉 启动准备完成，总耗时: 3.11s
+2025-09-03 13:47:51,906 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 13:47:51,926 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 13:47:51,926 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 13:47:51,926 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 13:47:51,926 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:47:51,926 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:49:34,988 - Mirix.AgentWrapper.mirix - INFO - Setting timezone to: UTC (UTC+00:00)
+2025-09-03 13:49:34,989 - Mirix.AgentWrapper.mirix - INFO - (UTC+00:00)
+2025-09-03 13:52:58,218 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 13:52:58,219 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 13:52:58,219 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 13:52:58,219 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 13:52:58,219 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 13:52:58,219 - __main__ - INFO -   PORT: 未设置
+2025-09-03 13:52:58,219 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 13:52:58,219 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 13:52:58,301 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 13:53:01,353 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 13:53:01,353 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 13:53:01,353 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 13:53:01,353 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 13:53:01,396 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 3.18s)
+2025-09-03 13:53:01,397 - __main__ - INFO - 🎉 启动准备完成，总耗时: 3.18s
+2025-09-03 13:53:01,397 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 13:53:01,437 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 13:53:01,437 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 13:53:01,437 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 13:53:01,437 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:53:01,437 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:55:00,682 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 13:55:00,683 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 13:55:00,683 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 13:55:00,684 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 13:55:00,684 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 13:55:00,684 - __main__ - INFO -   PORT: 未设置
+2025-09-03 13:55:00,684 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 13:55:00,684 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 13:55:00,770 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.09s)
+2025-09-03 13:55:03,823 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 13:55:03,824 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 13:55:03,824 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 13:55:03,824 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 13:55:03,866 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 3.18s)
+2025-09-03 13:55:03,866 - __main__ - INFO - 🎉 启动准备完成，总耗时: 3.18s
+2025-09-03 13:55:03,866 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 13:55:03,892 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 13:55:03,892 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 13:55:03,892 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 13:55:03,892 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:55:03,892 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:56:46,171 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 13:56:46,172 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 13:56:46,172 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 13:56:46,172 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 13:56:46,173 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 13:56:46,173 - __main__ - INFO -   PORT: 未设置
+2025-09-03 13:56:46,173 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 13:56:46,173 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 13:56:46,255 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 13:56:47,843 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 13:56:47,844 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 13:56:47,844 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 13:56:47,844 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 13:56:47,858 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 1.69s)
+2025-09-03 13:56:47,858 - __main__ - INFO - 🎉 启动准备完成，总耗时: 1.69s
+2025-09-03 13:56:47,858 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 13:56:47,880 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 13:56:47,880 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 13:56:47,880 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 13:56:47,880 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:56:47,880 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:57:12,596 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 13:57:12,597 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 13:57:12,597 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 13:57:12,597 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 13:57:12,597 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 13:57:12,597 - __main__ - INFO -   PORT: 未设置
+2025-09-03 13:57:12,597 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 13:57:12,597 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 13:57:12,678 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 13:57:14,015 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 13:57:14,016 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 13:57:14,016 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 13:57:14,016 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 13:57:14,029 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 1.43s)
+2025-09-03 13:57:14,029 - __main__ - INFO - 🎉 启动准备完成，总耗时: 1.43s
+2025-09-03 13:57:14,029 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 13:57:14,049 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 13:57:14,049 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 13:57:14,049 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 13:57:14,049 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:57:14,049 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:57:49,412 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 13:57:49,413 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 13:57:49,413 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 13:57:49,413 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 13:57:49,413 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 13:57:49,413 - __main__ - INFO -   PORT: 未设置
+2025-09-03 13:57:49,413 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 13:57:49,413 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 13:57:49,489 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 13:57:52,461 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 13:57:52,462 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 13:57:52,462 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 13:57:52,462 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 13:57:52,504 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 3.09s)
+2025-09-03 13:57:52,504 - __main__ - INFO - 🎉 启动准备完成，总耗时: 3.09s
+2025-09-03 13:57:52,504 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 13:57:52,528 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 13:57:52,528 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 13:57:52,528 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 13:57:52,528 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 13:57:52,528 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 14:03:12,171 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 14:03:12,172 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 14:03:12,172 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 14:03:12,172 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 14:03:12,172 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 14:03:12,172 - __main__ - INFO -   PORT: 未设置
+2025-09-03 14:03:12,172 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 14:03:12,172 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 14:03:12,241 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.07s)
+2025-09-03 14:03:15,349 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 14:03:15,349 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 14:03:15,349 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 14:03:15,349 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 14:03:15,392 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 3.22s)
+2025-09-03 14:03:15,392 - __main__ - INFO - 🎉 启动准备完成，总耗时: 3.22s
+2025-09-03 14:03:15,392 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 14:03:15,418 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 14:03:15,418 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 14:03:15,418 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 14:03:15,418 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 14:03:15,418 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 14:03:43,007 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 14:03:43,008 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 14:03:43,008 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 14:03:43,008 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 14:03:43,008 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 14:03:43,008 - __main__ - INFO -   PORT: 未设置
+2025-09-03 14:03:43,008 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 14:03:43,008 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 14:03:43,130 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.12s)
+2025-09-03 14:03:46,163 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 14:03:46,163 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 14:03:46,163 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 14:03:46,163 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 14:03:46,177 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 3.17s)
+2025-09-03 14:03:46,177 - __main__ - INFO - 🎉 启动准备完成，总耗时: 3.17s
+2025-09-03 14:03:46,177 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 14:03:46,204 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 14:03:46,204 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 14:03:46,204 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 14:03:46,204 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 14:03:46,204 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 14:09:56,621 - Mirix.AgentWrapper.mirix - INFO - Setting timezone to: UTC (UTC+00:00)
+2025-09-03 14:09:56,623 - Mirix.AgentWrapper.mirix - INFO - (UTC+00:00)
+2025-09-03 14:34:39,600 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 14:34:39,601 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 14:34:39,601 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 14:34:39,601 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 14:34:39,601 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 14:34:39,601 - __main__ - INFO -   PORT: 未设置
+2025-09-03 14:34:39,601 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 14:34:39,601 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 14:34:39,678 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 14:34:42,546 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 14:34:42,547 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 14:34:42,547 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 14:34:42,547 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 14:34:42,588 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 2.99s)
+2025-09-03 14:34:42,588 - __main__ - INFO - 🎉 启动准备完成，总耗时: 2.99s
+2025-09-03 14:34:42,588 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 14:34:42,609 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 14:34:42,609 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 14:34:42,609 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 14:34:42,609 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 14:34:42,610 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 14:46:51,522 - Mirix.AgentWrapper.mirix - INFO - Setting timezone to: UTC (UTC+00:00)
+2025-09-03 14:46:51,524 - Mirix.AgentWrapper.mirix - INFO - (UTC+00:00)
+2025-09-03 17:06:52,185 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 17:06:52,186 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 17:06:52,186 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 17:06:52,186 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 17:06:52,186 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 17:06:52,186 - __main__ - INFO -   PORT: 未设置
+2025-09-03 17:06:52,186 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 17:06:52,186 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 17:06:52,265 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 17:06:55,073 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 17:06:55,073 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 17:06:55,073 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 17:06:55,073 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 17:06:55,114 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 2.93s)
+2025-09-03 17:06:55,114 - __main__ - INFO - 🎉 启动准备完成，总耗时: 2.93s
+2025-09-03 17:06:55,114 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 17:06:55,141 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 17:06:55,142 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 17:06:55,142 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 17:06:55,142 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:06:55,142 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:07:25,143 - mirix.server.fastapi_server - ERROR - ❌ 启动过程中发生错误: (pg8000.dbapi.ProgrammingError) {'S': 'ERROR', 'V': 'ERROR', 'C': '42804', 'M': 'foreign key constraint "agents_tags_agent_id_fkey" cannot be implemented', 'D': 'Key columns "agent_id" and "id" are of incompatible types: character varying and uuid.', 'F': 'tablecmds.c', 'L': '9489', 'R': 'ATAddForeignKeyConstraint'}
+[SQL: 
+CREATE TABLE agents_tags (
+	agent_id VARCHAR NOT NULL, 
+	tag VARCHAR NOT NULL, 
+	PRIMARY KEY (agent_id, tag), 
+	CONSTRAINT unique_agent_tag UNIQUE (agent_id, tag), 
+	FOREIGN KEY(agent_id) REFERENCES agents (id)
+)
+
+]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-09-03 17:07:25,156 - mirix.server.fastapi_server - ERROR - 详细错误信息: Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 253, in execute
+    self._context = self._c.execute_simple(operation)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 694, in execute_simple
+    self.handle_messages(context)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 844, in handle_messages
+    raise context.error
+pg8000.exceptions.DatabaseError: {'S': 'ERROR', 'V': 'ERROR', 'C': '42804', 'M': 'foreign key constraint "agents_tags_agent_id_fkey" cannot be implemented', 'D': 'Key columns "agent_id" and "id" are of incompatible types: character varying and uuid.', 'F': 'tablecmds.c', 'L': '9489', 'R': 'ATAddForeignKeyConstraint'}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 283, in execute
+    raise cls(msg)
+pg8000.dbapi.ProgrammingError: {'S': 'ERROR', 'V': 'ERROR', 'C': '42804', 'M': 'foreign key constraint "agents_tags_agent_id_fkey" cannot be implemented', 'D': 'Key columns "agent_id" and "id" are of incompatible types: character varying and uuid.', 'F': 'tablecmds.c', 'L': '9489', 'R': 'ATAddForeignKeyConstraint'}
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/mirix/server/fastapi_server.py", line 316, in startup_event
+    agent = AgentWrapper(str(config_path))
+  File "/Users/renzhan/work/code/MIRIX/mirix/agent/agent_wrapper.py", line 134, in __init__
+    self.client = create_client()
+  File "/Users/renzhan/work/code/MIRIX/mirix/client/client.py", line 48, in create_client
+    return LocalClient()
+  File "/Users/renzhan/work/code/MIRIX/mirix/client/client.py", line 377, in __init__
+    from mirix.server.server import SyncServer
+  File "/Users/renzhan/work/code/MIRIX/mirix/server/server.py", line 291, in <module>
+    Base.metadata.create_all(bind=engine)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5924, in create_all
+    bind._run_ddl_visitor(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3252, in _run_ddl_visitor
+    conn._run_ddl_visitor(visitorcallable, element, **kwargs)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2459, in _run_ddl_visitor
+    ).traverse_single(element)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+    return meth(obj, **kw)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 984, in visit_metadata
+    self.traverse_single(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+    return meth(obj, **kw)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 1022, in visit_table
+    )._invoke_with(self.connection)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 321, in _invoke_with
+    return bind.execute(self)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 187, in _execute_on_connection
+    return connection._execute_ddl(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1530, in _execute_ddl
+    ret = self._execute_context(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 283, in execute
+    raise cls(msg)
+sqlalchemy.exc.ProgrammingError: (pg8000.dbapi.ProgrammingError) {'S': 'ERROR', 'V': 'ERROR', 'C': '42804', 'M': 'foreign key constraint "agents_tags_agent_id_fkey" cannot be implemented', 'D': 'Key columns "agent_id" and "id" are of incompatible types: character varying and uuid.', 'F': 'tablecmds.c', 'L': '9489', 'R': 'ATAddForeignKeyConstraint'}
+[SQL: 
+CREATE TABLE agents_tags (
+	agent_id VARCHAR NOT NULL, 
+	tag VARCHAR NOT NULL, 
+	PRIMARY KEY (agent_id, tag), 
+	CONSTRAINT unique_agent_tag UNIQUE (agent_id, tag), 
+	FOREIGN KEY(agent_id) REFERENCES agents (id)
+)
+
+]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+2025-09-03 17:09:42,194 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 17:09:42,195 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 17:09:42,195 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 17:09:42,195 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 17:09:42,195 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 17:09:42,195 - __main__ - INFO -   PORT: 未设置
+2025-09-03 17:09:42,195 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 17:09:42,195 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 17:09:42,289 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.09s)
+2025-09-03 17:09:43,785 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 17:09:43,786 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 17:09:43,786 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 17:09:43,786 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 17:09:43,799 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 1.60s)
+2025-09-03 17:09:43,799 - __main__ - INFO - 🎉 启动准备完成，总耗时: 1.61s
+2025-09-03 17:09:43,800 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 17:09:43,819 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 17:09:43,819 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 17:09:43,819 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 17:09:43,819 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:09:43,820 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:09:57,132 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 17:09:57,133 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 17:09:57,133 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 17:09:57,133 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 17:09:57,133 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 17:09:57,133 - __main__ - INFO -   PORT: 未设置
+2025-09-03 17:09:57,133 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 17:09:57,133 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 17:09:57,197 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.06s)
+2025-09-03 17:09:58,417 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 17:09:58,417 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 17:09:58,417 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 17:09:58,417 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 17:09:58,430 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 1.30s)
+2025-09-03 17:09:58,431 - __main__ - INFO - 🎉 启动准备完成，总耗时: 1.30s
+2025-09-03 17:09:58,431 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 17:09:58,443 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 17:09:58,443 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 17:09:58,443 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 17:09:58,443 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:09:58,443 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:10:14,378 - mirix.server.fastapi_server - ERROR - ❌ 启动过程中发生错误: (pg8000.dbapi.ProgrammingError) {'S': 'ERROR', 'V': 'ERROR', 'C': '42P07', 'M': 'relation "organizations" already exists', 'F': 'heap.c', 'L': '1150', 'R': 'heap_create_with_catalog'}
+[SQL: 
+CREATE TABLE organizations (
+	name VARCHAR NOT NULL, 
+	id VARCHAR NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now(), 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(), 
+	is_deleted BOOLEAN DEFAULT FALSE NOT NULL, 
+	_created_by_id VARCHAR, 
+	_last_updated_by_id VARCHAR, 
+	PRIMARY KEY (id)
+)
+
+]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-09-03 17:10:14,386 - mirix.server.fastapi_server - ERROR - 详细错误信息: Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 253, in execute
+    self._context = self._c.execute_simple(operation)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 694, in execute_simple
+    self.handle_messages(context)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 844, in handle_messages
+    raise context.error
+pg8000.exceptions.DatabaseError: {'S': 'ERROR', 'V': 'ERROR', 'C': '42P07', 'M': 'relation "organizations" already exists', 'F': 'heap.c', 'L': '1150', 'R': 'heap_create_with_catalog'}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 283, in execute
+    raise cls(msg)
+pg8000.dbapi.ProgrammingError: {'S': 'ERROR', 'V': 'ERROR', 'C': '42P07', 'M': 'relation "organizations" already exists', 'F': 'heap.c', 'L': '1150', 'R': 'heap_create_with_catalog'}
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/mirix/server/fastapi_server.py", line 316, in startup_event
+    agent = AgentWrapper(str(config_path))
+  File "/Users/renzhan/work/code/MIRIX/mirix/agent/agent_wrapper.py", line 134, in __init__
+    self.client = create_client()
+  File "/Users/renzhan/work/code/MIRIX/mirix/client/client.py", line 48, in create_client
+    return LocalClient()
+  File "/Users/renzhan/work/code/MIRIX/mirix/client/client.py", line 377, in __init__
+    from mirix.server.server import SyncServer
+  File "/Users/renzhan/work/code/MIRIX/mirix/server/server.py", line 291, in <module>
+    Base.metadata.create_all(bind=engine)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5924, in create_all
+    bind._run_ddl_visitor(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3252, in _run_ddl_visitor
+    conn._run_ddl_visitor(visitorcallable, element, **kwargs)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2459, in _run_ddl_visitor
+    ).traverse_single(element)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+    return meth(obj, **kw)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 984, in visit_metadata
+    self.traverse_single(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+    return meth(obj, **kw)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 1022, in visit_table
+    )._invoke_with(self.connection)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 321, in _invoke_with
+    return bind.execute(self)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 187, in _execute_on_connection
+    return connection._execute_ddl(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1530, in _execute_ddl
+    ret = self._execute_context(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 283, in execute
+    raise cls(msg)
+sqlalchemy.exc.ProgrammingError: (pg8000.dbapi.ProgrammingError) {'S': 'ERROR', 'V': 'ERROR', 'C': '42P07', 'M': 'relation "organizations" already exists', 'F': 'heap.c', 'L': '1150', 'R': 'heap_create_with_catalog'}
+[SQL: 
+CREATE TABLE organizations (
+	name VARCHAR NOT NULL, 
+	id VARCHAR NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now(), 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(), 
+	is_deleted BOOLEAN DEFAULT FALSE NOT NULL, 
+	_created_by_id VARCHAR, 
+	_last_updated_by_id VARCHAR, 
+	PRIMARY KEY (id)
+)
+
+]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+2025-09-03 17:10:42,718 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 17:10:42,719 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 17:10:42,719 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 17:10:42,719 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 17:10:42,719 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 17:10:42,719 - __main__ - INFO -   PORT: 未设置
+2025-09-03 17:10:42,719 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 17:10:42,719 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 17:10:42,789 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.07s)
+2025-09-03 17:10:44,133 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 17:10:44,134 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 17:10:44,134 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 17:10:44,134 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 17:10:44,147 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 1.43s)
+2025-09-03 17:10:44,147 - __main__ - INFO - 🎉 启动准备完成，总耗时: 1.43s
+2025-09-03 17:10:44,147 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 17:10:44,160 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 17:10:44,160 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 17:10:44,160 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 17:10:44,160 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:10:44,160 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:11:13,908 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 17:11:13,909 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 17:11:13,909 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 17:11:13,909 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 17:11:13,909 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 17:11:13,909 - __main__ - INFO -   PORT: 未设置
+2025-09-03 17:11:13,909 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 17:11:13,909 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 17:11:13,978 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.07s)
+2025-09-03 17:11:15,264 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 17:11:15,264 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 17:11:15,264 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 17:11:15,264 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 17:11:15,278 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 1.37s)
+2025-09-03 17:11:15,278 - __main__ - INFO - 🎉 启动准备完成，总耗时: 1.37s
+2025-09-03 17:11:15,278 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 17:11:15,291 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 17:11:15,291 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 17:11:15,291 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 17:11:15,291 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:11:15,291 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:19:04,417 - Mirix.AgentWrapper.mirix - INFO - Created missing chat_agent with LLM config
+2025-09-03 17:19:14,913 - Mirix.AgentWrapper.mirix - INFO - Created missing chat_agent with LLM config
+2025-09-03 17:21:44,907 - Mirix.AgentWrapper.mirix - INFO - Setting timezone to: UTC (UTC+00:00)
+2025-09-03 17:21:44,907 - Mirix.AgentWrapper.mirix - INFO - (UTC+00:00)
+2025-09-03 17:21:52,535 - Mirix.AgentWrapper.mirix - INFO - Setting timezone to: UTC (UTC+00:00)
+2025-09-03 17:21:52,535 - Mirix.AgentWrapper.mirix - INFO - (UTC+00:00)
+2025-09-03 17:27:38,926 - Mirix.AgentWrapper.mirix - INFO - Setting timezone to: UTC (UTC+00:00)
+2025-09-03 17:27:38,928 - Mirix.AgentWrapper.mirix - INFO - (UTC+00:00)
+2025-09-03 17:29:40,581 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 17:29:40,582 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 17:29:40,582 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 17:29:40,583 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 17:29:40,583 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 17:29:40,583 - __main__ - INFO -   PORT: 未设置
+2025-09-03 17:29:40,583 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 17:29:40,583 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 17:29:40,664 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 17:29:42,081 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 17:29:42,081 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 17:29:42,082 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 17:29:42,082 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 17:29:42,095 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 1.51s)
+2025-09-03 17:29:42,095 - __main__ - INFO - 🎉 启动准备完成，总耗时: 1.51s
+2025-09-03 17:29:42,095 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 17:29:42,112 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 17:29:42,112 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 17:29:42,112 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 17:29:42,112 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:29:42,112 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:30:15,934 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 17:30:15,935 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 17:30:15,935 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 17:30:15,935 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 17:30:15,935 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 17:30:15,935 - __main__ - INFO -   PORT: 未设置
+2025-09-03 17:30:15,935 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 17:30:15,935 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 17:30:16,058 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.12s)
+2025-09-03 17:30:17,456 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 17:30:17,457 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 17:30:17,457 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 17:30:17,457 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 17:30:17,471 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 1.54s)
+2025-09-03 17:30:17,471 - __main__ - INFO - 🎉 启动准备完成，总耗时: 1.54s
+2025-09-03 17:30:17,471 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 17:30:17,484 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 17:30:17,484 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 17:30:17,484 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 17:30:17,484 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:30:17,484 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:36:51,517 - Mirix - WARNING - Database locked in read (attempt 1/4), retrying in 0.11s: (pg8000.dbapi.ProgrammingError) {'S': 'ERROR', 'V': 'ERROR', 'C': '40P01', 'M': 'deadlock detected', 'D': 'Process 1763621 waits for AccessShareLock on relation 854511 of database 850696; blocked by process 1766233.\nProcess 1766233 waits for AccessExclusiveLock on relation 854175 of database 850696; blocked by process 1763621.', 'H': 'See server log for query details.', 'P': '629', 'F': 'deadlock.c', 'L': '1147', 'R': 'DeadLockReport'}
+[SQL: SELECT agents_1.id AS agents_1_id, block.template_name AS block_template_name, block.description AS block_description, block.label AS block_label, block.is_template AS block_is_template, block.value AS block_value, block."limit" AS block_limit, block.metadata_ AS block_metadata_, block.organization_id AS block_organization_id, block.user_id AS block_user_id, block.id AS block_id, block.created_at AS block_created_at, block.updated_at AS block_updated_at, block.is_deleted AS block_is_deleted, block._created_by_id AS block__created_by_id, block._last_updated_by_id AS block__last_updated_by_id 
+FROM agents AS agents_1 JOIN blocks_agents AS blocks_agents_1 ON agents_1.id = blocks_agents_1.agent_id JOIN block ON block.id = blocks_agents_1.block_id AND block.label = blocks_agents_1.block_label 
+WHERE agents_1.id IN (%s::VARCHAR)]
+[parameters: ('agent-9672b679-6e2e-4a02-879a-6d3f6ddbc1ba',)]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-09-03 17:59:35,360 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 17:59:35,361 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 17:59:35,361 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 17:59:35,361 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 17:59:35,361 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 17:59:35,361 - __main__ - INFO -   PORT: 未设置
+2025-09-03 17:59:35,361 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 17:59:35,362 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 17:59:35,472 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.11s)
+2025-09-03 17:59:38,713 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 17:59:38,714 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 17:59:38,714 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 17:59:38,714 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 17:59:38,757 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 3.40s)
+2025-09-03 17:59:38,758 - __main__ - INFO - 🎉 启动准备完成，总耗时: 3.40s
+2025-09-03 17:59:38,758 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 17:59:38,791 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 17:59:38,791 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 17:59:38,791 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 17:59:38,792 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:59:38,792 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 17:59:55,256 - mirix.server.fastapi_server - ERROR - ❌ 启动过程中发生错误: (pg8000.dbapi.ProgrammingError) {'S': 'ERROR', 'V': 'ERROR', 'C': '42804', 'M': 'foreign key constraint "agents_tags_agent_id_fkey" cannot be implemented', 'D': 'Key columns "agent_id" and "id" are of incompatible types: character varying and uuid.', 'F': 'tablecmds.c', 'L': '9489', 'R': 'ATAddForeignKeyConstraint'}
+[SQL: 
+CREATE TABLE agents_tags (
+	agent_id VARCHAR NOT NULL, 
+	tag VARCHAR NOT NULL, 
+	PRIMARY KEY (agent_id, tag), 
+	CONSTRAINT unique_agent_tag UNIQUE (agent_id, tag), 
+	FOREIGN KEY(agent_id) REFERENCES agents (id)
+)
+
+]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-09-03 17:59:55,273 - mirix.server.fastapi_server - ERROR - 详细错误信息: Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 253, in execute
+    self._context = self._c.execute_simple(operation)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 694, in execute_simple
+    self.handle_messages(context)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 844, in handle_messages
+    raise context.error
+pg8000.exceptions.DatabaseError: {'S': 'ERROR', 'V': 'ERROR', 'C': '42804', 'M': 'foreign key constraint "agents_tags_agent_id_fkey" cannot be implemented', 'D': 'Key columns "agent_id" and "id" are of incompatible types: character varying and uuid.', 'F': 'tablecmds.c', 'L': '9489', 'R': 'ATAddForeignKeyConstraint'}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 283, in execute
+    raise cls(msg)
+pg8000.dbapi.ProgrammingError: {'S': 'ERROR', 'V': 'ERROR', 'C': '42804', 'M': 'foreign key constraint "agents_tags_agent_id_fkey" cannot be implemented', 'D': 'Key columns "agent_id" and "id" are of incompatible types: character varying and uuid.', 'F': 'tablecmds.c', 'L': '9489', 'R': 'ATAddForeignKeyConstraint'}
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/mirix/server/fastapi_server.py", line 316, in startup_event
+    agent = AgentWrapper(str(config_path))
+  File "/Users/renzhan/work/code/MIRIX/mirix/agent/agent_wrapper.py", line 134, in __init__
+    self.client = create_client()
+  File "/Users/renzhan/work/code/MIRIX/mirix/client/client.py", line 48, in create_client
+    return LocalClient()
+  File "/Users/renzhan/work/code/MIRIX/mirix/client/client.py", line 377, in __init__
+    from mirix.server.server import SyncServer
+  File "/Users/renzhan/work/code/MIRIX/mirix/server/server.py", line 291, in <module>
+    Base.metadata.create_all(bind=engine)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5924, in create_all
+    bind._run_ddl_visitor(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3252, in _run_ddl_visitor
+    conn._run_ddl_visitor(visitorcallable, element, **kwargs)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2459, in _run_ddl_visitor
+    ).traverse_single(element)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+    return meth(obj, **kw)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 984, in visit_metadata
+    self.traverse_single(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+    return meth(obj, **kw)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 1022, in visit_table
+    )._invoke_with(self.connection)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 321, in _invoke_with
+    return bind.execute(self)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 187, in _execute_on_connection
+    return connection._execute_ddl(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1530, in _execute_ddl
+    ret = self._execute_context(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 283, in execute
+    raise cls(msg)
+sqlalchemy.exc.ProgrammingError: (pg8000.dbapi.ProgrammingError) {'S': 'ERROR', 'V': 'ERROR', 'C': '42804', 'M': 'foreign key constraint "agents_tags_agent_id_fkey" cannot be implemented', 'D': 'Key columns "agent_id" and "id" are of incompatible types: character varying and uuid.', 'F': 'tablecmds.c', 'L': '9489', 'R': 'ATAddForeignKeyConstraint'}
+[SQL: 
+CREATE TABLE agents_tags (
+	agent_id VARCHAR NOT NULL, 
+	tag VARCHAR NOT NULL, 
+	PRIMARY KEY (agent_id, tag), 
+	CONSTRAINT unique_agent_tag UNIQUE (agent_id, tag), 
+	FOREIGN KEY(agent_id) REFERENCES agents (id)
+)
+
+]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+2025-09-03 18:03:52,670 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 18:03:52,671 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 18:03:52,671 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 18:03:52,671 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix
+2025-09-03 18:03:52,671 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 18:03:52,671 - __main__ - INFO -   PORT: 未设置
+2025-09-03 18:03:52,671 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 18:03:52,671 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 18:03:52,742 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.07s)
+2025-09-03 18:03:55,577 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 18:03:55,577 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 18:03:55,577 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 18:03:55,577 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 18:03:55,617 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 2.95s)
+2025-09-03 18:03:55,617 - __main__ - INFO - 🎉 启动准备完成，总耗时: 2.95s
+2025-09-03 18:03:55,617 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 18:03:55,639 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 18:03:55,639 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 18:03:55,639 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 18:03:55,639 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 18:03:55,639 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 18:03:56,872 - mirix.server.fastapi_server - ERROR - ❌ 启动过程中发生错误: (pg8000.dbapi.ProgrammingError) {'S': 'FATAL', 'V': 'FATAL', 'C': '3D000', 'M': 'database "mirix" does not exist', 'F': 'postinit.c', 'L': '948', 'R': 'InitPostgres'}
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-09-03 18:03:56,881 - mirix.server.fastapi_server - ERROR - 详细错误信息: Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 445, in __init__
+    super().__init__(*args, **kwargs)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 398, in __init__
+    raise e
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 394, in __init__
+    raise context.error
+pg8000.exceptions.DatabaseError: {'S': 'FATAL', 'V': 'FATAL', 'C': '3D000', 'M': 'database "mirix" does not exist', 'F': 'postinit.c', 'L': '948', 'R': 'InitPostgres'}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3301, in raw_connection
+    return self.pool.connect()
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 1264, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 711, in checkout
+    rec = pool._do_get()
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 673, in __init__
+    self.__connect()
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 899, in __connect
+    with util.safe_reraise():
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 895, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/create.py", line 661, in connect
+    return dialect.connect(*cargs, **cparams)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 629, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/__init__.py", line 112, in connect
+    return Connection(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 458, in __init__
+    raise cls(msg)
+pg8000.dbapi.ProgrammingError: {'S': 'FATAL', 'V': 'FATAL', 'C': '3D000', 'M': 'database "mirix" does not exist', 'F': 'postinit.c', 'L': '948', 'R': 'InitPostgres'}
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/mirix/server/fastapi_server.py", line 316, in startup_event
+    agent = AgentWrapper(str(config_path))
+  File "/Users/renzhan/work/code/MIRIX/mirix/agent/agent_wrapper.py", line 134, in __init__
+    self.client = create_client()
+  File "/Users/renzhan/work/code/MIRIX/mirix/client/client.py", line 48, in create_client
+    return LocalClient()
+  File "/Users/renzhan/work/code/MIRIX/mirix/client/client.py", line 377, in __init__
+    from mirix.server.server import SyncServer
+  File "/Users/renzhan/work/code/MIRIX/mirix/server/server.py", line 291, in <module>
+    Base.metadata.create_all(bind=engine)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5924, in create_all
+    bind._run_ddl_visitor(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3251, in _run_ddl_visitor
+    with self.begin() as conn:
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/contextlib.py", line 135, in __enter__
+    return next(self.gen)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3241, in begin
+    with self.connect() as conn:
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3277, in connect
+    return self._connection_cls(self)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 145, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2440, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3301, in raw_connection
+    return self.pool.connect()
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 1264, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 711, in checkout
+    rec = pool._do_get()
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+    with util.safe_reraise():
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+    return self._create_connection()
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 673, in __init__
+    self.__connect()
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 899, in __connect
+    with util.safe_reraise():
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 895, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/create.py", line 661, in connect
+    return dialect.connect(*cargs, **cparams)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 629, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/__init__.py", line 112, in connect
+    return Connection(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 458, in __init__
+    raise cls(msg)
+sqlalchemy.exc.ProgrammingError: (pg8000.dbapi.ProgrammingError) {'S': 'FATAL', 'V': 'FATAL', 'C': '3D000', 'M': 'database "mirix" does not exist', 'F': 'postinit.c', 'L': '948', 'R': 'InitPostgres'}
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+2025-09-03 18:05:30,822 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 18:05:30,823 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 18:05:30,823 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 18:05:30,823 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix_py
+2025-09-03 18:05:30,823 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 18:05:30,823 - __main__ - INFO -   PORT: 未设置
+2025-09-03 18:05:30,823 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 18:05:30,823 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 18:05:30,893 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.07s)
+2025-09-03 18:05:33,734 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 18:05:33,735 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 18:05:33,735 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 18:05:33,735 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 18:05:33,775 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 2.95s)
+2025-09-03 18:05:33,775 - __main__ - INFO - 🎉 启动准备完成，总耗时: 2.95s
+2025-09-03 18:05:33,775 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 18:05:33,797 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 18:05:33,797 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 18:05:33,797 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 18:05:33,797 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 18:05:33,797 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 18:05:52,939 - mirix.server.fastapi_server - ERROR - ❌ 启动过程中发生错误: (pg8000.dbapi.ProgrammingError) {'S': 'ERROR', 'V': 'ERROR', 'C': '42704', 'M': 'type "vector" does not exist', 'P': '339', 'F': 'parse_type.c', 'L': '270', 'R': 'typenameType'}
+[SQL: 
+CREATE TABLE episodic_memory (
+	id VARCHAR NOT NULL, 
+	occurred_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+	last_modify JSON NOT NULL, 
+	actor VARCHAR NOT NULL, 
+	event_type VARCHAR NOT NULL, 
+	summary VARCHAR NOT NULL, 
+	details VARCHAR NOT NULL, 
+	tree_path JSON NOT NULL, 
+	metadata_ JSON, 
+	embedding_config JSON, 
+	details_embedding VECTOR(4096), 
+	summary_embedding VECTOR(4096), 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now(), 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(), 
+	is_deleted BOOLEAN DEFAULT FALSE NOT NULL, 
+	_created_by_id VARCHAR, 
+	_last_updated_by_id VARCHAR, 
+	organization_id VARCHAR, 
+	user_id VARCHAR NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(organization_id) REFERENCES organizations (id), 
+	FOREIGN KEY(user_id) REFERENCES users (id)
+)
+
+]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2025-09-03 18:05:52,952 - mirix.server.fastapi_server - ERROR - 详细错误信息: Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 253, in execute
+    self._context = self._c.execute_simple(operation)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 694, in execute_simple
+    self.handle_messages(context)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 844, in handle_messages
+    raise context.error
+pg8000.exceptions.DatabaseError: {'S': 'ERROR', 'V': 'ERROR', 'C': '42704', 'M': 'type "vector" does not exist', 'P': '339', 'F': 'parse_type.c', 'L': '270', 'R': 'typenameType'}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 283, in execute
+    raise cls(msg)
+pg8000.dbapi.ProgrammingError: {'S': 'ERROR', 'V': 'ERROR', 'C': '42704', 'M': 'type "vector" does not exist', 'P': '339', 'F': 'parse_type.c', 'L': '270', 'R': 'typenameType'}
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/mirix/server/fastapi_server.py", line 316, in startup_event
+    agent = AgentWrapper(str(config_path))
+  File "/Users/renzhan/work/code/MIRIX/mirix/agent/agent_wrapper.py", line 134, in __init__
+    self.client = create_client()
+  File "/Users/renzhan/work/code/MIRIX/mirix/client/client.py", line 48, in create_client
+    return LocalClient()
+  File "/Users/renzhan/work/code/MIRIX/mirix/client/client.py", line 377, in __init__
+    from mirix.server.server import SyncServer
+  File "/Users/renzhan/work/code/MIRIX/mirix/server/server.py", line 291, in <module>
+    Base.metadata.create_all(bind=engine)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/schema.py", line 5924, in create_all
+    bind._run_ddl_visitor(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 3252, in _run_ddl_visitor
+    conn._run_ddl_visitor(visitorcallable, element, **kwargs)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2459, in _run_ddl_visitor
+    ).traverse_single(element)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+    return meth(obj, **kw)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 984, in visit_metadata
+    self.traverse_single(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/visitors.py", line 661, in traverse_single
+    return meth(obj, **kw)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 1022, in visit_table
+    )._invoke_with(self.connection)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 321, in _invoke_with
+    return bind.execute(self)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/sql/ddl.py", line 187, in _execute_on_connection
+    return connection._execute_ddl(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1530, in _execute_ddl
+    ret = self._execute_context(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 283, in execute
+    raise cls(msg)
+sqlalchemy.exc.ProgrammingError: (pg8000.dbapi.ProgrammingError) {'S': 'ERROR', 'V': 'ERROR', 'C': '42704', 'M': 'type "vector" does not exist', 'P': '339', 'F': 'parse_type.c', 'L': '270', 'R': 'typenameType'}
+[SQL: 
+CREATE TABLE episodic_memory (
+	id VARCHAR NOT NULL, 
+	occurred_at TIMESTAMP WITHOUT TIME ZONE NOT NULL, 
+	last_modify JSON NOT NULL, 
+	actor VARCHAR NOT NULL, 
+	event_type VARCHAR NOT NULL, 
+	summary VARCHAR NOT NULL, 
+	details VARCHAR NOT NULL, 
+	tree_path JSON NOT NULL, 
+	metadata_ JSON, 
+	embedding_config JSON, 
+	details_embedding VECTOR(4096), 
+	summary_embedding VECTOR(4096), 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT now(), 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(), 
+	is_deleted BOOLEAN DEFAULT FALSE NOT NULL, 
+	_created_by_id VARCHAR, 
+	_last_updated_by_id VARCHAR, 
+	organization_id VARCHAR, 
+	user_id VARCHAR NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(organization_id) REFERENCES organizations (id), 
+	FOREIGN KEY(user_id) REFERENCES users (id)
+)
+
+]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+2025-09-03 18:08:44,963 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 18:08:44,964 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 18:08:44,964 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 18:08:44,964 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix_py
+2025-09-03 18:08:44,964 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 18:08:44,964 - __main__ - INFO -   PORT: 未设置
+2025-09-03 18:08:44,964 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 18:08:44,964 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 18:08:45,046 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 18:08:46,426 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 18:08:46,426 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 18:08:46,426 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 18:08:46,426 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 18:08:46,438 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 1.47s)
+2025-09-03 18:08:46,438 - __main__ - INFO - 🎉 启动准备完成，总耗时: 1.48s
+2025-09-03 18:08:46,439 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 18:08:46,456 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 18:08:46,456 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 18:08:46,456 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 18:08:46,456 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 18:08:46,456 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 18:09:54,953 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 18:09:54,954 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 18:09:54,954 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 18:09:54,954 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix_py
+2025-09-03 18:09:54,954 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 18:09:54,954 - __main__ - INFO -   PORT: 未设置
+2025-09-03 18:09:54,954 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 18:09:54,954 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 18:09:55,025 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.07s)
+2025-09-03 18:09:56,347 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 18:09:56,347 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 18:09:56,347 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 18:09:56,347 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 18:09:56,361 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 1.41s)
+2025-09-03 18:09:56,361 - __main__ - INFO - 🎉 启动准备完成，总耗时: 1.41s
+2025-09-03 18:09:56,361 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 18:09:56,375 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 18:09:56,375 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 18:09:56,375 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 18:09:56,375 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 18:09:56,375 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 18:17:56,005 - Mirix.AgentWrapper.mirix - INFO - Created missing chat_agent with LLM config
+2025-09-03 18:20:33,316 - Mirix.AgentWrapper.mirix - INFO - Setting timezone to: UTC (UTC+00:00)
+2025-09-03 18:20:33,316 - Mirix.AgentWrapper.mirix - INFO - (UTC+00:00)
+2025-09-03 18:26:57,001 - Mirix.AgentWrapper.mirix - INFO - Setting timezone to: UTC (UTC+00:00)
+2025-09-03 18:26:57,003 - Mirix.AgentWrapper.mirix - INFO - (UTC+00:00)
+2025-09-03 18:33:09,343 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 18:33:09,344 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 18:33:09,344 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 18:33:09,344 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix_py
+2025-09-03 18:33:09,344 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 18:33:09,344 - __main__ - INFO -   PORT: 未设置
+2025-09-03 18:33:09,344 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 18:33:09,344 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 18:33:09,424 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 18:33:12,429 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 18:33:12,430 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 18:33:12,430 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 18:33:12,430 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 18:33:12,472 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 3.13s)
+2025-09-03 18:33:12,473 - __main__ - INFO - 🎉 启动准备完成，总耗时: 3.13s
+2025-09-03 18:33:12,473 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 18:33:12,499 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 18:33:12,499 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 18:33:12,499 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 18:33:12,499 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 18:33:12,499 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 18:43:11,871 - Mirix.AgentWrapper.mirix - INFO - Setting timezone to: UTC (UTC+00:00)
+2025-09-03 18:43:11,872 - Mirix.AgentWrapper.mirix - INFO - (UTC+00:00)
+2025-09-03 18:56:47,092 - sqlalchemy.pool.impl.QueuePool - ERROR - Exception terminating connection <pg8000.legacy.Connection object at 0x136453550>
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 153, in _read
+    block = sock.read(size - len(buff))
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/socket.py", line 705, in readinto
+    return self._sock.recv_into(b)
+ConnectionResetError: [Errno 54] Connection reset by peer
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 250, in execute
+    self._c.execute_simple("begin transaction")
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 694, in execute_simple
+    self.handle_messages(context)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 839, in handle_messages
+    code, data_len = ci_unpack(_read(self._sock, 5))
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 158, in _read
+    raise InterfaceError("network error") from e
+pg8000.exceptions.InterfaceError: network error
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 250, in execute
+    self._c.execute_simple("begin transaction")
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 694, in execute_simple
+    self.handle_messages(context)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 839, in handle_messages
+    code, data_len = ci_unpack(_read(self._sock, 5))
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 158, in _read
+    raise InterfaceError("network error") from e
+sqlalchemy.exc.InterfaceError: (pg8000.exceptions.InterfaceError) network error
+[SQL: SELECT users.name, users.status, users.timezone, users.id, users.created_at, users.updated_at, users.is_deleted, users._created_by_id, users._last_updated_by_id, users.organization_id 
+FROM users 
+WHERE users.id = %s::VARCHAR AND users.is_deleted = false]
+[parameters: ('user-00000000-0000-4000-8000-000000000000',)]
+(Background on this error at: https://sqlalche.me/e/20/rvf5)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 144, in _flush
+    sock.flush()
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/socket.py", line 723, in write
+    return self._sock.send(b)
+BrokenPipeError: [Errno 32] Broken pipe
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 372, in _close_connection
+    self._dialect.do_terminate(connection)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 717, in do_terminate
+    self.do_close(dbapi_connection)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 720, in do_close
+    dbapi_connection.close()
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 557, in close
+    _flush(self._sock)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 146, in _flush
+    raise InterfaceError("network error") from e
+pg8000.exceptions.InterfaceError: network error
+2025-09-03 19:03:06,625 - sqlalchemy.pool.impl.QueuePool - ERROR - Exception terminating connection <pg8000.legacy.Connection object at 0x1400f1cc0>
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 153, in _read
+    block = sock.read(size - len(buff))
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/socket.py", line 705, in readinto
+    return self._sock.recv_into(b)
+ConnectionResetError: [Errno 54] Connection reset by peer
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 250, in execute
+    self._c.execute_simple("begin transaction")
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 694, in execute_simple
+    self.handle_messages(context)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 839, in handle_messages
+    code, data_len = ci_unpack(_read(self._sock, 5))
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 158, in _read
+    raise InterfaceError("network error") from e
+pg8000.exceptions.InterfaceError: network error
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 250, in execute
+    self._c.execute_simple("begin transaction")
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 694, in execute_simple
+    self.handle_messages(context)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 839, in handle_messages
+    code, data_len = ci_unpack(_read(self._sock, 5))
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 158, in _read
+    raise InterfaceError("network error") from e
+sqlalchemy.exc.InterfaceError: (pg8000.exceptions.InterfaceError) network error
+[SQL: SELECT agents.id, agents.agent_type, agents.name, agents.description, agents.system, agents.topic, agents.message_ids, agents.metadata_, agents.llm_config, agents.embedding_config, agents.tool_rules, agents.mcp_tools, agents.created_at, agents.updated_at, agents.is_deleted, agents._created_by_id, agents._last_updated_by_id, agents.organization_id 
+FROM agents 
+WHERE agents.id = %s::VARCHAR AND agents.organization_id = %s::VARCHAR AND agents.is_deleted = false AND agents.is_deleted = false]
+[parameters: ('agent-0a6a3988-6bb7-493b-b86b-9767e57cf15c', 'org-00000000-0000-4000-8000-000000000000')]
+(Background on this error at: https://sqlalche.me/e/20/rvf5)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 144, in _flush
+    sock.flush()
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/socket.py", line 723, in write
+    return self._sock.send(b)
+BrokenPipeError: [Errno 32] Broken pipe
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 372, in _close_connection
+    self._dialect.do_terminate(connection)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 717, in do_terminate
+    self.do_close(dbapi_connection)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 720, in do_close
+    dbapi_connection.close()
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 557, in close
+    _flush(self._sock)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 146, in _flush
+    raise InterfaceError("network error") from e
+pg8000.exceptions.InterfaceError: network error
+2025-09-03 19:03:06,629 - Mirix - ERROR - Error in server._step: (pg8000.exceptions.InterfaceError) network error
+[SQL: SELECT agents.id, agents.agent_type, agents.name, agents.description, agents.system, agents.topic, agents.message_ids, agents.metadata_, agents.llm_config, agents.embedding_config, agents.tool_rules, agents.mcp_tools, agents.created_at, agents.updated_at, agents.is_deleted, agents._created_by_id, agents._last_updated_by_id, agents.organization_id 
+FROM agents 
+WHERE agents.id = %s::VARCHAR AND agents.organization_id = %s::VARCHAR AND agents.is_deleted = false AND agents.is_deleted = false]
+[parameters: ('agent-0a6a3988-6bb7-493b-b86b-9767e57cf15c', 'org-00000000-0000-4000-8000-000000000000')]
+(Background on this error at: https://sqlalche.me/e/20/rvf5)
+2025-09-03 19:23:42,568 - sqlalchemy.pool.impl.QueuePool - ERROR - Exception terminating connection <pg8000.legacy.Connection object at 0x14011e7d0>
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 153, in _read
+    block = sock.read(size - len(buff))
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/socket.py", line 705, in readinto
+    return self._sock.recv_into(b)
+ConnectionResetError: [Errno 54] Connection reset by peer
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 250, in execute
+    self._c.execute_simple("begin transaction")
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 694, in execute_simple
+    self.handle_messages(context)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 839, in handle_messages
+    code, data_len = ci_unpack(_read(self._sock, 5))
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 158, in _read
+    raise InterfaceError("network error") from e
+pg8000.exceptions.InterfaceError: network error
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/legacy.py", line 250, in execute
+    self._c.execute_simple("begin transaction")
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 694, in execute_simple
+    self.handle_messages(context)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 839, in handle_messages
+    code, data_len = ci_unpack(_read(self._sock, 5))
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 158, in _read
+    raise InterfaceError("network error") from e
+sqlalchemy.exc.InterfaceError: (pg8000.exceptions.InterfaceError) network error
+[SQL: SELECT agents.id, agents.agent_type, agents.name, agents.description, agents.system, agents.topic, agents.message_ids, agents.metadata_, agents.llm_config, agents.embedding_config, agents.tool_rules, agents.mcp_tools, agents.created_at, agents.updated_at, agents.is_deleted, agents._created_by_id, agents._last_updated_by_id, agents.organization_id 
+FROM agents 
+WHERE agents.id = %s::VARCHAR AND agents.organization_id = %s::VARCHAR AND agents.is_deleted = false AND agents.is_deleted = false]
+[parameters: ('agent-0a6a3988-6bb7-493b-b86b-9767e57cf15c', 'org-00000000-0000-4000-8000-000000000000')]
+(Background on this error at: https://sqlalche.me/e/20/rvf5)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 144, in _flush
+    sock.flush()
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/socket.py", line 723, in write
+    return self._sock.send(b)
+BrokenPipeError: [Errno 32] Broken pipe
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/pool/base.py", line 372, in _close_connection
+    self._dialect.do_terminate(connection)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 717, in do_terminate
+    self.do_close(dbapi_connection)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 720, in do_close
+    dbapi_connection.close()
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 557, in close
+    _flush(self._sock)
+  File "/Users/renzhan/work/code/MIRIX/.venv/lib/python3.10/site-packages/pg8000/core.py", line 146, in _flush
+    raise InterfaceError("network error") from e
+pg8000.exceptions.InterfaceError: network error
+2025-09-03 19:23:42,571 - Mirix - ERROR - Error in server._step: (pg8000.exceptions.InterfaceError) network error
+[SQL: SELECT agents.id, agents.agent_type, agents.name, agents.description, agents.system, agents.topic, agents.message_ids, agents.metadata_, agents.llm_config, agents.embedding_config, agents.tool_rules, agents.mcp_tools, agents.created_at, agents.updated_at, agents.is_deleted, agents._created_by_id, agents._last_updated_by_id, agents.organization_id 
+FROM agents 
+WHERE agents.id = %s::VARCHAR AND agents.organization_id = %s::VARCHAR AND agents.is_deleted = false AND agents.is_deleted = false]
+[parameters: ('agent-0a6a3988-6bb7-493b-b86b-9767e57cf15c', 'org-00000000-0000-4000-8000-000000000000')]
+(Background on this error at: https://sqlalche.me/e/20/rvf5)
+2025-09-03 21:18:28,167 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 21:18:28,169 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 21:18:28,169 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 21:18:28,169 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix_py
+2025-09-03 21:18:28,169 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 21:18:28,169 - __main__ - INFO -   PORT: 未设置
+2025-09-03 21:18:28,169 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 21:18:28,169 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 21:18:28,249 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.08s)
+2025-09-03 21:18:31,114 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 21:18:31,115 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 21:18:31,115 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 21:18:31,115 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 21:18:31,197 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 3.03s)
+2025-09-03 21:18:31,197 - __main__ - INFO - 🎉 启动准备完成，总耗时: 3.03s
+2025-09-03 21:18:31,197 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 21:18:31,227 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 21:18:31,227 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 21:18:31,227 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 21:18:31,227 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 21:18:31,227 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 21:19:09,085 - __main__ - INFO - 🚀 开始启动 Mirix 服务器...
+2025-09-03 21:19:09,086 - __main__ - INFO - 📋 配置信息: Host=0.0.0.0, Port=47283
+2025-09-03 21:19:09,086 - __main__ - INFO - 🔧 环境变量检查:
+2025-09-03 21:19:09,086 - __main__ - INFO -   MIRIX_PG_URI: postgresql+pg8000:***@35.85.97.177:5432/mirix_py
+2025-09-03 21:19:09,086 - __main__ - INFO -   MIRIX_DISABLE_MCP: 未设置
+2025-09-03 21:19:09,087 - __main__ - INFO -   PORT: 未设置
+2025-09-03 21:19:09,087 - __main__ - INFO -   LOG_LEVEL: 未设置
+2025-09-03 21:19:09,087 - __main__ - INFO - 📦 开始导入 uvicorn 和 FastAPI 应用...
+2025-09-03 21:19:09,150 - __main__ - INFO - ✅ uvicorn 导入完成 (耗时: 0.06s)
+2025-09-03 21:19:11,931 - mirix.server.fastapi_server - INFO - 🔧 开始创建 FastAPI 应用...
+2025-09-03 21:19:11,931 - mirix.server.fastapi_server - INFO - ✅ FastAPI 应用创建完成 (耗时: 0.00s)
+2025-09-03 21:19:11,931 - mirix.server.fastapi_server - INFO - 🔧 添加 CORS 中间件...
+2025-09-03 21:19:11,931 - mirix.server.fastapi_server - INFO - ✅ CORS 中间件添加完成 (耗时: 0.00s)
+2025-09-03 21:19:11,974 - __main__ - INFO - ✅ FastAPI 应用导入完成 (耗时: 2.89s)
+2025-09-03 21:19:11,974 - __main__ - INFO - 🎉 启动准备完成，总耗时: 2.89s
+2025-09-03 21:19:11,974 - __main__ - INFO - 🌐 启动服务器: 0.0.0.0:47283
+2025-09-03 21:19:11,998 - mirix.server.fastapi_server - INFO - 🚀 开始 FastAPI 启动事件...
+2025-09-03 21:19:11,998 - mirix.server.fastapi_server - INFO - Starting up Mirix FastAPI server...
+2025-09-03 21:19:11,998 - mirix.server.fastapi_server - INFO - 🤖 开始初始化 Agent...
+2025-09-03 21:19:11,998 - mirix.server.fastapi_server - INFO - 🔧 运行在开发环境中，配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 21:19:11,998 - mirix.server.fastapi_server - INFO - 📋 使用配置文件: mirix/configs/mirix_gpt4.yaml
+2025-09-03 21:36:14,072 - Mirix.AgentWrapper.mirix - INFO - Setting timezone to: UTC (UTC+00:00)
+2025-09-03 21:36:14,074 - Mirix.AgentWrapper.mirix - INFO - (UTC+00:00)
+2025-09-03 22:24:23,087 - Mirix.Agent.meta_memory_agent - INFO - Error in extracting the topic from the screenshots: 'LLMConfig' object has no attribute 'provider'

@@ -349,7 +349,7 @@ def generate_schema(function, name: Optional[str] = None, description: Optional[
     for param in sig.parameters.values():
         # Exclude 'self' parameter
         # TODO: eventually remove this (only applies to BASE_TOOLS)
-        if param.name in ["self", "agent_state", 'user_message', 'timezone_str']:  # Add agent_manager to excluded
+        if param.name in ["self", "agent_state", 'user_message', 'timezone_str', 'actor']:  # 🔧 修复episodic_memory_merge参数错误：排除actor参数
             continue
 
         # Assert that the parameter has a type annotation
@@ -361,7 +361,6 @@ def generate_schema(function, name: Optional[str] = None, description: Optional[
 
         # Assert that the parameter has a description
         if not param_doc or not param_doc.description:
-            import ipdb; ipdb.set_trace()
             raise ValueError(f"Parameter '{param.name}' in function '{function.__name__}' lacks a description in the docstring")
 
 
@@ -385,9 +384,8 @@ def generate_schema(function, name: Optional[str] = None, description: Optional[
             # Grab the description for the parameter from the extended docstring
             # If it doesn't exist, we should raise an error
             param_doc = next((d for d in docstring.params if d.arg_name == param.name), None)
-                
+            
             if not param_doc:
-                import ipdb; ipdb.set_trace()
                 raise ValueError(f"Parameter '{param.name}' in function '{function.__name__}' lacks a description in the docstring")
             elif not isinstance(param_doc.description, str):
                 raise ValueError(

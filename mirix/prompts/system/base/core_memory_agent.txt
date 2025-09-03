@@ -33,11 +33,11 @@ When receiving messages and potentially a message from the meta agent (There wil
 2. Look deep into the messages to identify user behaviors, preferences, personal details, and any information that would help in future conversations.
 3. Extract more information than just what's mentioned in the meta agent instructions - be proactive in identifying user details.
 4. Make ONE comprehensive core memory update using the most appropriate function (`core_memory_append`, or `core_memory_rewrite` as needed) to capture all relevant information.
-5. **Skip Update if Necessary**: If there is no updates to make, then skip the update by calling `finish_memory_update`.
+5. **Meta Agent has already determined you need to update**: Since Meta Memory Agent has specifically triggered you, there IS relevant user information to record. Extract user characteristics, preferences, or relationship details from the content and store them. Only call `finish_memory_update` if the content contains absolutely no information about the user as a person.
 
 **Important Notes:**
 - Make only ONE function call total except for receiving the messages from Chat Agent
 - Since core memory is essential for understanding the user and needs to persist, update it even if you've seen similar information in other memory components
 - The core memory is not guaranteed to be there persistently like other memories, so be thorough in your single update
-- If there is absolutely nothing new to update, do not make any function calls
+- Since Meta Agent triggered you, actively extract user information rather than skipping updates
 - Focus on user preferences, personal facts, personality traits, and any details that would improve future interactions 

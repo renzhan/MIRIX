@@ -213,11 +213,11 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
         console.log(`Found ${connectedServers.length} connected MCP servers:`, connectedServers.map(s => s.id));
       } else {
         console.error('Failed to fetch MCP marketplace');
-        setMcpMessage(`❌ ${t('settings.messages.failedToLoadMcpMarketplace')}`);
+        setMcpMessage('❌ Failed to load MCP marketplace');
       }
     } catch (error) {
       console.error('Error fetching MCP marketplace:', error);
-      setMcpMessage(`❌ ${t('settings.messages.errorLoadingMcpMarketplace')}`);
+      setMcpMessage('❌ Error loading MCP marketplace');
     } finally {
       setIsLoadingMcp(false);
     }
@@ -273,7 +273,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
         const results = query.trim() ? (data.results || []) : (data.servers || []);
         
         // Filter by category if not 'All'
-        const filteredResults = selectedCategory === 'All' || selectedCategory === t('settings.mcp.filterAll')
+        const filteredResults = selectedCategory === 'All' 
           ? results 
           : results.filter(server => server.category === selectedCategory);
           
@@ -324,7 +324,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
     
     try {
       setIsLoadingMcp(true);
-      setMcpMessage(t('settings.mcp.connectingTo', { serverId }));
+      setMcpMessage(`Connecting to ${serverId}...`);
       
       const response = await queuedFetch(`${settings.serverUrl}/mcp/marketplace/connect`, {
         method: 'POST',
@@ -335,7 +335,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          setMcpMessage(`✅ ${t('settings.mcp.connectedSuccess', { serverName: data.server_name, toolsCount: data.tools_count })}`);
+          setMcpMessage(`✅ Connected to ${data.server_name}! Found ${data.tools_count} tools.`);
           // Refresh the marketplace to update connection status
           await fetchMcpMarketplace();
           await searchMcpMarketplace(mcpSearchQuery);
@@ -347,7 +347,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       }
     } catch (error) {
       console.error('Error connecting MCP server:', error);
-      setMcpMessage(`❌ ${t('settings.mcp.connectionError')}`);
+      setMcpMessage('❌ Connection error');
     } finally {
       setIsLoadingMcp(false);
       setTimeout(() => setMcpMessage(''), 5000);
@@ -358,23 +358,23 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
     const { clientId, clientSecret } = gmailCredentials;
     
     if (!clientId.trim()) {
-      setMcpMessage(`❌ ${t('settings.messages.gmailClientIdRequired')}`);
+      setMcpMessage('❌ Gmail Client ID is required');
       return;
     }
     
     if (!clientSecret.trim()) {
-      setMcpMessage(`❌ ${t('settings.messages.gmailClientSecretRequired')}`);
+      setMcpMessage('❌ Gmail Client Secret is required');
       return;
     }
     
     setShowGmailModal(false);
-    setMcpMessage(`🔐 ${t('settings.mcp.gmailOAuth')}`);
+    setMcpMessage('🔐 Connecting to Gmail... This will open a browser window for OAuth authorization.');
     
     const envVars = { client_id: clientId.trim(), client_secret: clientSecret.trim() };
     
     try {
       setIsLoadingMcp(true);
-      setMcpMessage(t('settings.mcp.connectingToGmail'));
+      setMcpMessage('Connecting to Gmail...');
       
       const response = await queuedFetch(`${settings.serverUrl}/mcp/marketplace/connect`, {
         method: 'POST',
@@ -385,7 +385,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          setMcpMessage(`✅ ${t('settings.mcp.connectedSuccess', { serverName: data.server_name, toolsCount: data.tools_count })}`);
+          setMcpMessage(`✅ Connected to ${data.server_name}! Found ${data.tools_count} tools.`);
           // Clear credentials for security
           setGmailCredentials({ clientId: '', clientSecret: '' });
           // Refresh the marketplace to update connection status
@@ -399,7 +399,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       }
     } catch (error) {
       console.error('Error connecting Gmail server:', error);
-      setMcpMessage(`❌ ${t('settings.mcp.gmailConnectionError')}`);
+      setMcpMessage('❌ Gmail connection error');
     } finally {
       setIsLoadingMcp(false);
       setTimeout(() => setMcpMessage(''), 5000);
@@ -500,7 +500,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
     }
     try {
       setIsLoadingMcp(true);
-      setMcpMessage(t('settings.mcp.disconnectingFrom', { serverId }));
+      setMcpMessage(`Disconnecting from ${serverId}...`);
       
       const response = await queuedFetch(`${settings.serverUrl}/mcp/marketplace/disconnect`, {
         method: 'POST',
@@ -511,7 +511,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          setMcpMessage(`✅ ${t('settings.mcp.disconnectedSuccess', { serverId })}`);
+          setMcpMessage(`✅ Disconnected from ${serverId}`);
           // Refresh the marketplace to update connection status
           await fetchMcpMarketplace();
           await searchMcpMarketplace(mcpSearchQuery);
@@ -523,7 +523,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       }
     } catch (error) {
       console.error('Error disconnecting MCP server:', error);
-      setMcpMessage(`❌ ${t('settings.mcp.disconnectionError')}`);
+      setMcpMessage('❌ Disconnection error');
     } finally {
       setIsLoadingMcp(false);
       setTimeout(() => setMcpMessage(''), 5000);
@@ -617,7 +617,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
     
     if (!settings.serverUrl) {
       console.error('Cannot change persona: serverUrl not available');
-      setUpdateMessage(`❌ ${t('settings.messages.serverNotAvailable')}`);
+      setUpdateMessage('❌ Server not available');
       return;
     }
     
@@ -627,7 +627,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
     // Apply the template regardless of whether personaDetails is loaded
     // The backend will handle checking if the persona exists
     setIsApplyingTemplate(true);
-    setUpdateMessage(t('settings.messages.applyingPersonaTemplate'));
+    setUpdateMessage('Applying persona template...');
     
     try {
       console.log(`Applying persona template: ${newPersona}`);
@@ -647,16 +647,16 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       if (response.ok) {
         // Immediately refresh the core memory persona text
         await fetchCoreMemoryPersona();
-        setUpdateMessage(`✅ ${t('settings.messages.personaTemplateAppliedSuccess')}`);
+        setUpdateMessage('✅ Persona template applied successfully!');
         console.log(`Successfully applied and updated persona: ${newPersona}`);
       } else {
         const errorData = await response.text();
         console.error('Failed to apply persona template:', errorData);
-        setUpdateMessage(`❌ ${t('settings.messages.personaTemplateApplyFailed')}`);
+        setUpdateMessage('❌ Failed to apply persona template');
       }
     } catch (error) {
       console.error('Error applying persona template:', error);
-      setUpdateMessage(`❌ ${t('settings.messages.personaTemplateApplyError')}`);
+      setUpdateMessage('❌ Error applying persona template');
     } finally {
       setIsApplyingTemplate(false);
       // Clear message after 2 seconds
@@ -674,16 +674,16 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
     if (personaDetails[newPersona]) {
       // Use cached persona details
       setSelectedPersonaText(personaDetails[newPersona]);
-      setUpdateMessage(`📝 ${t('settings.messages.templateLoaded')}`);
+      setUpdateMessage('📝 Template loaded - click Save to apply');
       setTimeout(() => setUpdateMessage(''), 3000);
     } else {
       // Fallback: refresh persona details if not found
       setIsApplyingTemplate(true);
-      setUpdateMessage(t('settings.messages.loadingTemplate'));
+      setUpdateMessage('Loading template...');
       
       try {
         if (!settings.serverUrl) {
-          setUpdateMessage(`❌ ${t('settings.messages.serverNotAvailable')}`);
+          setUpdateMessage('❌ Server not available');
           return;
         }
         
@@ -694,16 +694,16 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
           
           if (data.personas[newPersona]) {
             setSelectedPersonaText(data.personas[newPersona]);
-            setUpdateMessage(`📝 ${t('settings.messages.templateLoaded')}`);
+            setUpdateMessage('📝 Template loaded - click Save to apply');
           } else {
-            setUpdateMessage(`❌ ${t('settings.messages.templateNotFound')}`);
+            setUpdateMessage('❌ Template not found');
           }
         } else {
-          setUpdateMessage(`❌ ${t('settings.messages.loadTemplatesFailed')}`);
+          setUpdateMessage('❌ Failed to load templates');
         }
       } catch (error) {
         console.error('Error loading persona template:', error);
-        setUpdateMessage(`❌ ${t('settings.messages.loadTemplateError')}`);
+        setUpdateMessage('❌ Error loading template');
       } finally {
         setIsApplyingTemplate(false);
         setTimeout(() => setUpdateMessage(''), 3000);
@@ -716,14 +716,14 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
     
     if (!settings.serverUrl) {
       console.error('Cannot change model: serverUrl not available');
-      setModelUpdateMessage(`❌ ${t('settings.messages.serverNotAvailable')}`);
+      setModelUpdateMessage('❌ Server not available');
       return;
     }
     
     handleInputChange('model', newModel);
     
     setIsChangingModel(true);
-    setModelUpdateMessage(t('settings.messages.changingChatModel'));
+    setModelUpdateMessage('Changing chat agent model...');
     
     try {
       console.log(`Setting chat agent model: ${newModel}`);
@@ -744,11 +744,11 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
         const data = await response.json();
         
         if (data.success) {
-          setModelUpdateMessage(`✅ ${t('settings.messages.chatModelSetSuccess')}`);
+          setModelUpdateMessage('✅ Chat agent model set successfully!');
           console.log(`Successfully set chat agent model: ${newModel}`);
           
           // Show initialization message when model is successfully set
-          setModelUpdateMessage(`🔄 ${t('settings.messages.initializingChatAgent')}`);
+          setModelUpdateMessage('🔄 Initializing chat agent with new model...');
           
           // Automatically check for API keys after model change
           if (onApiKeyCheck) {
@@ -775,7 +775,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
             }
           } else {
             // Show error message for other types of failures
-            let errorMessage = data.message || t('settings.messages.failedToSetChatModel');
+            let errorMessage = data.message || 'Failed to set chat agent model';
             setModelUpdateMessage(`❌ ${errorMessage}`);
             console.error('Chat model set failed:', data);
           }
@@ -783,11 +783,11 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       } else {
         const errorData = await response.text();
         console.error('Failed to set chat agent model:', errorData);
-        setModelUpdateMessage(`❌ ${t('settings.messages.failedToSetChatModel')}`);
+        setModelUpdateMessage('❌ Failed to set chat agent model');
       }
     } catch (error) {
       console.error('Error setting chat agent model:', error);
-      setModelUpdateMessage(`❌ ${t('settings.messages.errorSettingChatModel')}`);
+      setModelUpdateMessage('❌ Error setting chat agent model');
     } finally {
       setIsChangingModel(false);
       // Clear message after 2 seconds
@@ -800,14 +800,14 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
     
     if (!settings.serverUrl) {
       console.error('Cannot change memory model: serverUrl not available');
-      setMemoryModelUpdateMessage(`❌ ${t('settings.messages.serverNotAvailable')}`);
+      setMemoryModelUpdateMessage('❌ Server not available');
       return;
     }
     
     handleInputChange('memoryModel', newModel);
     
     setIsChangingMemoryModel(true);
-    setMemoryModelUpdateMessage(t('settings.messages.changingMemoryModel'));
+    setMemoryModelUpdateMessage('Changing memory manager model...');
     
     try {
       console.log(`Setting memory manager model: ${newModel}`);
@@ -828,11 +828,11 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
         const data = await response.json();
         
         if (data.success) {
-          setMemoryModelUpdateMessage(`✅ ${t('settings.messages.memoryModelSetSuccess')}`);
+          setMemoryModelUpdateMessage('✅ Memory manager model set successfully!');
           console.log(`Successfully set memory manager model: ${newModel}`);
           
           // Show initialization message when model is successfully set
-          setMemoryModelUpdateMessage(`🔄 ${t('settings.messages.initializingMemoryManager')}`);
+          setMemoryModelUpdateMessage('🔄 Initializing memory manager with new model...');
           
           // Automatically check for API keys after memory model change
           if (onApiKeyCheck) {
@@ -859,7 +859,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
             }
           } else {
             // Show error message for other types of failures
-            let errorMessage = data.message || t('settings.messages.failedToSetMemoryModel');
+            let errorMessage = data.message || 'Failed to set memory manager model';
             setMemoryModelUpdateMessage(`❌ ${errorMessage}`);
             console.error('Memory model set failed:', data);
           }
@@ -867,11 +867,11 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       } else {
         const errorData = await response.text();
         console.error('Failed to set memory manager model:', errorData);
-        setMemoryModelUpdateMessage(`❌ ${t('settings.messages.failedToSetMemoryModel')}`);
+        setMemoryModelUpdateMessage('❌ Failed to set memory manager model');
       }
     } catch (error) {
       console.error('Error setting memory manager model:', error);
-      setMemoryModelUpdateMessage(`❌ ${t('settings.messages.errorSettingMemoryModel')}`);
+      setMemoryModelUpdateMessage('❌ Error setting memory manager model');
     } finally {
       setIsChangingMemoryModel(false);
       // Clear message after 2 seconds
@@ -884,14 +884,14 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
     
     if (!settings.serverUrl) {
       console.error('Cannot change timezone: serverUrl not available');
-      setTimezoneUpdateMessage(`❌ ${t('settings.messages.serverNotAvailable')}`);
+      setTimezoneUpdateMessage('❌ Server not available');
       return;
     }
     
     handleInputChange('timezone', newTimezone);
     
     setIsChangingTimezone(true);
-    setTimezoneUpdateMessage(t('settings.messages.changingTimezone'));
+    setTimezoneUpdateMessage('Changing timezone...');
     
     try {
       console.log(`Setting timezone: ${newTimezone}`);
@@ -910,16 +910,16 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       
       if (response.ok) {
         const data = await response.json();
-        setTimezoneUpdateMessage(`✅ ${t('settings.messages.timezoneSetSuccess')}`);
+        setTimezoneUpdateMessage('✅ Timezone set successfully!');
         console.log(`Successfully set timezone: ${newTimezone}`);
       } else {
         const errorData = await response.text();
         console.error('Failed to set timezone:', errorData);
-        setTimezoneUpdateMessage(`❌ ${t('settings.messages.failedToSetTimezone')}`);
+        setTimezoneUpdateMessage('❌ Failed to set timezone');
       }
     } catch (error) {
       console.error('Error setting timezone:', error);
-      setTimezoneUpdateMessage(`❌ ${t('settings.messages.errorSettingTimezone')}`);
+      setTimezoneUpdateMessage('❌ Error setting timezone');
     } finally {
       setIsChangingTimezone(false);
       // Clear message after 2 seconds
@@ -934,7 +934,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
   const updatePersonaText = async () => {
     if (!settings.serverUrl) {
       console.error('Cannot update persona text: serverUrl not available');
-      setUpdateMessage(`❌ ${t('settings.messages.serverNotAvailable')}`);
+      setUpdateMessage('❌ Server not available');
       return;
     }
     
@@ -1237,9 +1237,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
               className="setting-select"
             >
               <option value="en">English</option>
-              <option value="zh">
-                {i18n.language?.startsWith('zh') ? '中文简体' : 'Chinese Simplified (中文简体)'}
-              </option>
+              <option value="zh">中文</option>
             </select>
             <span className="setting-description">
               {t('settings.languageDescription')}
@@ -1304,16 +1302,16 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
         <div className="settings-section">
           <div className="section-header-with-action">
             <div>
-              <h3>🔧 {t('settings.mcp.title')}</h3>
-              <p>{t('settings.mcp.description')}</p>
+              <h3>🔧 MCP Tools Marketplace</h3>
+              <p>Discover and connect to Model Context Protocol (MCP) tools to extend your agent's capabilities.</p>
             </div>
             <button
               onClick={refreshMcpStatus}
               disabled={isLoadingMcp}
               className="refresh-mcp-btn"
-              title={t('settings.mcp.refreshTooltip')}
+              title="Refresh MCP connection status"
             >
-              🔄 {t('settings.mcp.refresh')}
+              🔄 Refresh
             </button>
           </div>
           
@@ -1323,7 +1321,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
               <div className="mcp-search">
                 <input
                   type="text"
-                  placeholder={t('settings.mcp.searchPlaceholder')}
+                  placeholder="Search MCP tools..."
                   value={mcpSearchQuery}
                   onChange={(e) => setMcpSearchQuery(e.target.value)}
                   className="mcp-search-input"
@@ -1336,9 +1334,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
                   className="mcp-category-select"
                 >
                   {mcpMarketplace.categories.map(category => (
-                    <option key={category} value={category}>
-                      {category === 'All' ? t('settings.mcp.filterAll') : category}
-                    </option>
+                    <option key={category} value={category}>{category}</option>
                   ))}
                 </select>
               </div>
@@ -1353,7 +1349,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
 
             {/* Loading State */}
             {isLoadingMcp && (
-              <div className="mcp-loading">🔄 {t('settings.mcp.loading')}</div>
+              <div className="mcp-loading">🔄 Loading MCP tools...</div>
             )}
 
             {/* MCP Tools List */}
@@ -1364,7 +1360,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
                     <div className="mcp-server-info">
                       <h4 className="mcp-server-name">{server.name}</h4>
                       <span className="mcp-server-category">{server.category}</span>
-                      {server.is_connected && <span className="mcp-connected-badge">✅ {t('settings.mcp.connected')}</span>}
+                      {server.is_connected && <span className="mcp-connected-badge">✅ Connected</span>}
                     </div>
                     <div className="mcp-server-actions">
                       {server.is_connected ? (
@@ -1373,7 +1369,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
                           disabled={isLoadingMcp}
                           className="mcp-disconnect-btn"
                         >
-                          {t('settings.mcp.disconnect')}
+                          Disconnect
                         </button>
                       ) : (
                         <button
@@ -1381,14 +1377,14 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
                           disabled={isLoadingMcp}
                           className="mcp-connect-btn"
                         >
-                          {t('settings.mcp.connect')}
+                          Connect
                         </button>
                       )}
                     </div>
                   </div>
                   <p className="mcp-server-description">{server.description}</p>
                   <div className="mcp-server-details">
-                    {server.author && <span className="mcp-author">{t('settings.mcp.author', { author: server.author })}</span>}
+                    {server.author && <span className="mcp-author">By {server.author}</span>}
                     {server.tags && server.tags.length > 0 && (
                       <div className="mcp-tags">
                         {server.tags.map(tag => (
@@ -1398,7 +1394,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
                     )}
                     {server.requirements && server.requirements.length > 0 && (
                       <div className="mcp-requirements">
-                        <strong>{t('settings.mcp.requirements')}</strong> {server.requirements.join(', ')}
+                        <strong>Requirements:</strong> {server.requirements.join(', ')}
                       </div>
                     )}
                     {server.documentation_url && (
@@ -1408,7 +1404,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
                         rel="noopener noreferrer" 
                         className="mcp-github-link"
                       >
-                        📖 {t('settings.mcp.documentation')}
+                        📖 Documentation
                       </a>
                     )}
                   </div>
@@ -1417,7 +1413,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
               
               {!isLoadingMcp && mcpSearchResults.length === 0 && (
                 <div className="mcp-no-results">
-                  {mcpSearchQuery ? t('settings.mcp.noResults') : t('settings.mcp.noResultsDefault')}
+                  {mcpSearchQuery ? 'No MCP tools found matching your search.' : 'No MCP tools available.'}
                 </div>
               )}
             </div>
@@ -1425,10 +1421,10 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
         </div>
 
         <div className="settings-section">
-          <h3>👥 {t('settings.userSelection.title')}</h3>
+          <h3>👥 User Selection</h3>
           
           <div className="setting-item">
-            <label htmlFor="user-selector">{t('settings.userSelection.currentUser')}</label>
+            <label htmlFor="user-selector">Current User</label>
             <div className="user-selector-container">
               <div className="user-selector-with-add">
                 <div 
@@ -1437,13 +1433,13 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
                 >
                   <div className="user-selector-current">
                     {isLoadingUsers ? (
-                      <span className="loading-text">🔄 {t('settings.userSelection.loadingUsers')}</span>
+                      <span className="loading-text">🔄 Loading users...</span>
                     ) : currentUser ? (
                       <span className="current-user-display">
                         {currentUser.name}
                       </span>
                     ) : (
-                      <span className="no-user-selected">{t('settings.userSelection.noUserSelected')}</span>
+                      <span className="no-user-selected">No user selected</span>
                     )}
                     <span className={`dropdown-arrow ${isUserDropdownOpen ? 'up' : 'down'}`}>
                       {isUserDropdownOpen ? '▲' : '▼'}
@@ -1471,7 +1467,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
                           </div>
                         ))
                       ) : (
-                        <div className="no-users-dropdown">{t('settings.userSelection.noUsersAvailable')}</div>
+                        <div className="no-users-dropdown">No users available</div>
                       )}
                     </div>
                   )}
@@ -1482,14 +1478,14 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
                     e.stopPropagation();
                     setShowAddUserModal(true);
                   }}
-                  title={t('settings.userSelection.addUserTooltip')}
+                  title="Add New User"
                 >
-                  + {t('settings.userSelection.addUser')}
+                  + Add User
                 </button>
               </div>
             </div>
             <span className="setting-description">
-              {t('settings.userSelection.description')}
+              Select the current user context for the application.
             </span>
           </div>
         </div>
@@ -1535,43 +1531,43 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
         <div className="modal-overlay">
           <div className="modal-content gmail-modal">
             <div className="modal-header">
-              <h3>📧 {t('settings.modals.gmail.title')}</h3>
+              <h3>📧 Gmail OAuth2 Setup</h3>
               <button className="modal-close-btn" onClick={handleGmailModalClose}>×</button>
             </div>
             <div className="modal-body">
               <p className="gmail-modal-description">
-                {t('settings.modals.gmail.description')}
+                To connect Gmail, you need OAuth2 credentials from Google Cloud Console.
               </p>
               <div className="gmail-setup-steps">
                 <ol>
-                  <li>{t('settings.modals.gmail.step1')} <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud Console</a></li>
-                  <li>{t('settings.modals.gmail.step2')}</li>
-                  <li>{t('settings.modals.gmail.step3')}</li>
-                  <li>{t('settings.modals.gmail.step4')}</li>
+                  <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud Console</a></li>
+                  <li>Create OAuth2 credentials if you don't have them</li>
+                  <li>Add <code>http://localhost:8080</code>, <code>http://localhost:8081</code>, and <code>http://localhost:8082</code> as redirect URIs</li>
+                  <li>Enter your credentials below</li>
                 </ol>
               </div>
               
               <div className="gmail-form">
                 <div className="form-group">
-                  <label htmlFor="gmail-client-id">{t('settings.modals.gmail.clientId')}</label>
+                  <label htmlFor="gmail-client-id">Client ID:</label>
                   <input
                     id="gmail-client-id"
                     type="text"
                     value={gmailCredentials.clientId}
                     onChange={(e) => setGmailCredentials(prev => ({...prev, clientId: e.target.value}))}
-                    placeholder={t('settings.modals.gmail.clientIdPlaceholder')}
+                    placeholder="Enter your Gmail OAuth2 Client ID"
                     className="gmail-input"
                   />
                 </div>
                 
                 <div className="form-group">
-                  <label htmlFor="gmail-client-secret">{t('settings.modals.gmail.clientSecret')}</label>
+                  <label htmlFor="gmail-client-secret">Client Secret:</label>
                   <input
                     id="gmail-client-secret"
                     type="password"
                     value={gmailCredentials.clientSecret}
                     onChange={(e) => setGmailCredentials(prev => ({...prev, clientSecret: e.target.value}))}
-                    placeholder={t('settings.modals.gmail.clientSecretPlaceholder')}
+                    placeholder="Enter your Gmail OAuth2 Client Secret"
                     className="gmail-input"
                   />
                 </div>
@@ -1580,14 +1576,14 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
             
             <div className="modal-footer">
               <button className="modal-btn secondary" onClick={handleGmailModalClose}>
-                {t('settings.modals.gmail.cancel')}
+                Cancel
               </button>
               <button 
                 className="modal-btn primary" 
                 onClick={handleGmailConnect}
                 disabled={!gmailCredentials.clientId.trim() || !gmailCredentials.clientSecret.trim()}
               >
-                {t('settings.modals.gmail.connectButton')}
+                Connect to Gmail
               </button>
             </div>
           </div>
@@ -1599,23 +1595,23 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
         <div className="modal-overlay">
           <div className="modal-content add-user-modal">
             <div className="modal-header">
-              <h3>👤 {t('settings.modals.addUser.title')}</h3>
+              <h3>👤 Add New User</h3>
               <button className="modal-close-btn" onClick={() => setShowAddUserModal(false)}>×</button>
             </div>
             <div className="modal-body">
               <p className="add-user-description">
-                {t('settings.modals.addUser.description')}
+                Create a new user account in the system.
               </p>
               
               <div className="add-user-form">
                 <div className="form-group">
-                  <label htmlFor="new-user-name">{t('settings.modals.addUser.userName')}</label>
+                  <label htmlFor="new-user-name">User Name:</label>
                   <input
                     id="new-user-name"
                     type="text"
                     value={newUserName}
                     onChange={(e) => setNewUserName(e.target.value)}
-                    placeholder={t('settings.modals.addUser.userNamePlaceholder')}
+                    placeholder="Enter user name"
                     className="add-user-input"
                     autoFocus
                   />
@@ -1625,14 +1621,14 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
             
             <div className="modal-footer">
               <button className="modal-btn secondary" onClick={() => setShowAddUserModal(false)}>
-                {t('settings.modals.addUser.cancel')}
+                Cancel
               </button>
               <button 
                 className="modal-btn primary" 
                 onClick={handleCreateUser}
                 disabled={!newUserName.trim()}
               >
-                {t('settings.modals.addUser.createButton')}
+                Create User
               </button>
             </div>
           </div>
