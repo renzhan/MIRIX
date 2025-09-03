@@ -1501,7 +1501,7 @@ def log_llm_request(logger, operation_name, llm_config, messages, tools=None, **
     request_log = {
         'llm_config': {
             'model': llm_config.model,
-            'provider': llm_config.provider,
+            'provider': llm_config.model_endpoint_type,
             'temperature': llm_config.temperature
         },
         'messages_count': len(messages),
