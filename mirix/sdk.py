@@ -162,6 +162,13 @@ class Mirix:
         users = self._agent.client.server.user_manager.list_users()
         return users
 
+
+    def construct_system_message(self, message: str, user_id: str) -> str:
+        """
+        Construct a system message from a message.
+        """
+        return self._agent.construct_system_message(message, user_id)
+
     def get_user_by_name(self, user_name: str):
         """
         Get a user by their name.

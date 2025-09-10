@@ -1437,6 +1437,97 @@ These keywords have been used to retrieve relevant memories from the database.
 
         return system_prompt
 
+    def construct_system_message(self, message: str) -> str:
+        
+        # Step 1: extract topic from "message"
+        topics = None
+        
+        try:
+
+            # Create temporary messages for topic extraction
+            temporary_messages = [prepare_input_message_create(MessageCreate(
+                role=MessageRole.user,
+                content=message,
+            ), self.agent_state.id, wrap_user_message=False, wrap_system_message=True)]
+
+            temporary_messages.append(prepare_input_message_create(MessageCreate(
+                role=MessageRole.user,
+                content="The above are the inputs from the user, please look at these content and extract the topic (brief description of what the user is focusing on) from these content. If there are multiple focuses in these content, then extract them all and put them into one string separated by ';'. Call the function `update_topic` to update the topic with the extracted topics.",
+            ), self.agent_state.id, wrap_user_message=False, wrap_system_message=True))
+
+            temporary_messages = [
+                prepare_input_message_create(MessageCreate(
+                    role=MessageRole.system,
+                    content="You are a helpful assistant that extracts the topic from the user's input.",
+                ), self.agent_state.id, wrap_user_message=False, wrap_system_message=True),
+            ] + temporary_messages
+            
+            # Define the function for topic extraction
+            functions = [{
+                'name': 'update_topic',
+                'description': "Update the topic of the conversation/content. The topic will be used for retrieving relevant information from the database",
+                'parameters': {
+                    'type': 'object',
+                    'properties': {
+                        'topic': {
+                            'type': 'string', 
+                            'description': 'The topic of the current conversation/content. If there are multiple topics then separate them with ";".'}
+                    },
+                    'required': ['topic']
+                },
+            }]
+            
+            # Use LLMClient to extract topics
+            llm_client = LLMClient.create(
+                llm_config=self.agent_state.llm_config,
+                put_inner_thoughts_first=True,
+            )
+            
+            if llm_client:
+                response = llm_client.send_llm_request(
+                    messages=temporary_messages,
+                    tools=functions,
+                    stream=False,
+                    force_tool_call='update_topic',
+                )
+            else:
+                # Fallback to existing create function
+                response = create(
+                    llm_config=self.agent_state.llm_config,
+                    messages=temporary_messages,
+                    functions=functions,
+                    force_tool_call='update_topic',
+                )
+
+            # Extract topics from the response
+            for choice in response.choices:
+                if hasattr(choice.message, 'tool_calls') and choice.message.tool_calls is not None and len(choice.message.tool_calls) > 0:
+                    try:
+                        function_args = json.loads(choice.message.tool_calls[0].function.arguments)
+                        topics = function_args.get('topic')
+                        self.logger.info(f"Extracted topics: {topics}")
+                        break
+                    except (json.JSONDecodeError, KeyError) as parse_error:
+                        self.logger.warning(f"Failed to parse topic extraction response: {parse_error}")
+                        continue
+
+        except Exception as e:
+            self.logger.info(f"Error in extracting the topic from the message: {e}")
+            topics = None
+        
+        # Step 2: build system prompt with topic
+        # Get the raw system prompt
+        in_context_messages = self.agent_manager.get_in_context_messages(agent_id=self.agent_state.id, actor=self.user)
+        raw_system = in_context_messages[0].content[0].text if in_context_messages and in_context_messages[0].role == MessageRole.system else ""
+        
+        # Build the complete system prompt with memories
+        complete_system_prompt, _ = self.build_system_prompt_with_memories(
+            raw_system=raw_system,
+            topics=topics
+        )
+        
+        return complete_system_prompt
+
     def inner_step(
         self,
         first_input_messge: Message,
