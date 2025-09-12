@@ -368,6 +368,20 @@ class Agent(BaseAgent):
                 function_args["self"] = self  # need to attach self to arg since it's dynamically linked
                 function_response = callable_func(**function_args)
 
+            elif target_mirix_tool.tool_type == ToolType.USER_DEFINED:
+
+                agent_state_copy = self.agent_state.__deepcopy__()
+
+                # Execute user-defined tool in sandbox for security
+                sandbox = ToolExecutionSandbox(
+                    tool_name=function_name,
+                    args=function_args,
+                    user=self.user,
+                    tool_object=target_mirix_tool
+                )
+                sandbox_result = sandbox.run(agent_state=agent_state_copy)
+                function_response = sandbox_result.func_return
+
             elif target_mirix_tool.tool_type == ToolType.MIRIX_MCP:
                 # Handle MCP tool execution
                 function_response = self._execute_mcp_tool(function_name, function_args, target_mirix_tool, request_user_confirmation)
@@ -413,6 +427,9 @@ class Agent(BaseAgent):
             if not allowed_tool_names
             else [func for func in agent_state_tool_jsons if func["name"] in allowed_tool_names]
         )
+
+        for func in allowed_functions:
+            assert func
 
         # Don't allow a tool to be called if it failed last time
         if last_function_failed and self.tool_rules_solver.tool_call_history:
@@ -632,6 +649,8 @@ class Agent(BaseAgent):
             if response_message.content:
                 # The content if then internal monologue, not chat
                 self.interface.internal_monologue(response_message.content, msg_obj=messages[-1])
+                # Log inner thoughts for debugging and analysis
+                self.logger.info(f"Inner thoughts: {response_message.content}")
                 # Flag to avoid printing a duplicate if inner thoughts get popped from the function call
                 nonnull_content = True
 
@@ -713,9 +732,11 @@ class Agent(BaseAgent):
                 # Check if inner thoughts is in the function call arguments (possible apparently if you are using Azure)
                 if "inner_thoughts" in function_args:
                     response_message.content = function_args.pop("inner_thoughts")
+                    self.logger.info(f"Inner thoughts extracted from function args: {response_message.content}")
                 # The content if then internal monologue, not chat
                 if response_message.content and not nonnull_content:
                     self.interface.internal_monologue(response_message.content, msg_obj=messages[-1])
+                    self.logger.info(f"Inner thoughts (from function call): {response_message.content}")
 
                 continue_chaining = True
 
@@ -993,6 +1014,8 @@ class Agent(BaseAgent):
                 )
             )  # extend conversation with assistant's reply
             self.interface.internal_monologue(response_message.content, msg_obj=messages[-1])
+            # Log inner thoughts for debugging and analysis  
+            self.logger.info(f"Inner thoughts (no function call): {response_message.content}")
             continue_chaining = True
             function_failed = False
             if display_intermediate_message:
@@ -1556,6 +1579,10 @@ These keywords have been used to retrieve relevant memories from the database.
         """Runs a single step in the agent loop (generates at most one LLM call)"""
 
         try:
+            # Log the start of each reasoning step
+            self.logger.info(f"Starting agent step - step_count: {step_count}, chaining: {chaining}")
+            if topics:
+                self.logger.info(f"Step topics: {topics}")
 
             # Step 0: get in-context messages and get the raw system prompt
             in_context_messages = self.agent_manager.get_in_context_messages(agent_id=self.agent_state.id, actor=self.user)
@@ -1596,6 +1623,16 @@ These keywords have been used to retrieve relevant memories from the database.
                 put_inner_thoughts_first=put_inner_thoughts_first,
                 existing_file_uris=existing_file_uris,
             )
+
+            # Log the raw AI response for debugging and analysis
+            self.logger.info(f"AI response received - choices: {len(response.choices)}")
+            for i, choice in enumerate(response.choices):
+                if choice.message.content:
+                    self.logger.info(f"Choice {i} reasoning content: {choice.message.content}")
+                if choice.message.tool_calls:
+                    self.logger.info(f"Choice {i} has {len(choice.message.tool_calls)} tool calls")
+                    for j, tool_call in enumerate(choice.message.tool_calls):
+                        self.logger.info(f"Tool call {j}: {tool_call.function.name} with args: {tool_call.function.arguments}")
 
             # Step 3: check if LLM wanted to call a function
             # (if yes) Step 4: call the function
@@ -1707,6 +1744,9 @@ These keywords have been used to retrieve relevant memories from the database.
             self.agent_state = self.agent_manager.append_to_in_context_messages(
                 all_new_messages, agent_id=self.agent_state.id, actor=self.user
             )
+
+            # Log step completion and results
+            self.logger.info(f"Agent step completed - continue_chaining: {continue_chaining}, function_failed: {function_failed}, messages_generated: {len(all_new_messages)}")
 
             return AgentStepResponse(
                 messages=all_new_messages,
