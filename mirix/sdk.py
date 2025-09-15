@@ -527,8 +527,6 @@ class Mirix:
                 limit=1000  # Get all agents
             )
 
-            import ipdb; ipdb.set_trace()
-
             if apply_to_agents != 'all':
                 all_agents = [agent for agent in all_agents if agent.name in all_agents]
 
