@@ -169,6 +169,13 @@ class Mirix:
         """
         return self._agent.construct_system_message(message, user_id)
 
+
+    def extract_memory_for_system_prompt(self, message: str, user_id: str) -> str:
+        """
+        Extract memory for system prompt from a message.
+        """
+        return self._agent.extract_memory_for_system_prompt(message, user_id)
+
     def get_user_by_name(self, user_name: str):
         """
         Get a user by their name.
