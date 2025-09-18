@@ -274,6 +274,14 @@ class AgentWrapper():
                                                     message=message,
                                                     user_id=user_id)
 
+    def extract_memory_for_system_prompt(self, message: str, user_id: str) -> str:
+        """
+        Extract memory for system prompt from a message.
+        """
+        return self.client.extract_memory_for_system_prompt(agent_id=self.agent_states.agent_state.id, 
+                                                    message=message,
+                                                    user_id=user_id)
+
     def update_chat_agent_system_prompt(self, is_screen_monitoring: bool):
         '''
         Update chat agent system prompt based on screen monitoring status
