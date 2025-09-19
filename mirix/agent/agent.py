@@ -237,13 +237,14 @@ class Agent(BaseAgent):
                 if updated_value != self.agent_state.memory.get_block(label).value:
                     # update the block if it's changed
                     block_id = self.agent_state.memory.get_block(label).id
+                    import ipdb; ipdb.set_trace()
                     block = self.block_manager.update_block(
                         block_id=block_id, block_update=BlockUpdate(value=updated_value), actor=self.user
                     )
 
             # refresh memory from DB (using block ids)
             self.agent_state.memory = Memory(
-                blocks=[self.block_manager.get_block_by_id(block.id, actor=self.user) for block in self.agent_state.memory.get_blocks()]
+                blocks=[self.block_manager.get_block_by_id(block.id, actor=self.user) for block in self.block_manager.get_blocks(actor=self.user)]
             )
 
             # NOTE: don't do this since re-buildin the memory is handled at the start of the step
@@ -1044,6 +1045,9 @@ class Agent(BaseAgent):
 
         if user_id:
             self.user = self.user_manager.get_user_by_id(user_id)
+            self.agent_state.memory = Memory(
+                blocks=[self.block_manager.get_block_by_id(block.id, actor=self.user) for block in self.block_manager.get_blocks(actor=self.user)]
+            )
 
         max_chaining_steps = max_chaining_steps or MAX_CHAINING_STEPS
 
