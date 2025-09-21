@@ -237,7 +237,6 @@ class Agent(BaseAgent):
                 if updated_value != self.agent_state.memory.get_block(label).value:
                     # update the block if it's changed
                     block_id = self.agent_state.memory.get_block(label).id
-                    import ipdb; ipdb.set_trace()
                     block = self.block_manager.update_block(
                         block_id=block_id, block_update=BlockUpdate(value=updated_value), actor=self.user
                     )
