@@ -542,8 +542,10 @@ def trigger_memory_update(self: "Agent", user_message: object, memory_types: Lis
             if matching_agent is None:
                 raise ValueError(f"No agent found with type '{agent_type}'")
             
-            client.send_message(agent_id=matching_agent.id, 
+            client.send_message(
                 role='user', 
+                user_id=self.user.id,
+                agent_id=matching_agent.id, 
                 message=user_message['message'], 
                 existing_file_uris=user_message['existing_file_uris'],
                 retrieved_memories=user_message.get('retrieved_memories', None)

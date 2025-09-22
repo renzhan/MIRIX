@@ -320,8 +320,10 @@ class Agent(BaseAgent):
         Execute tool modifications and persist the state of the agent.
         Note: only some agent state modifications will be persisted, such as data in the AgentState ORM and block data
         """
-        # TODO: add agent manager here
-        orig_memory_str = self.agent_state.memory.compile()
+        
+        self.agent_state.memory = Memory(
+            blocks=[self.block_manager.get_block_by_id(block.id, actor=self.user) for block in self.block_manager.get_blocks(actor=self.user)]
+        )
 
         # TODO: need to have an AgentState object that actually has full access to the block data
         # this is because the sandbox tools need to be able to access block.value to edit this data
