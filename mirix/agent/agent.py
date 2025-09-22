@@ -240,6 +240,8 @@ class Agent(BaseAgent):
                     block = self.block_manager.update_block(
                         block_id=block_id, block_update=BlockUpdate(value=updated_value), actor=self.user
                     )
+                    assert block.user_id == self.user.id
+                    self.logger.info(f"Updated block {label} with value {updated_value} and user {self.user.id}")
 
             # refresh memory from DB (using block ids)
             self.agent_state.memory = Memory(
