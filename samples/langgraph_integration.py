@@ -46,7 +46,9 @@ def chatbot(state: State):
 
     try:
 
-        system_message = mirix_agent.construct_system_message(messages[-1].content, user_id=user_id)
+        memories = mirix_agent.extract_memory_for_system_prompt(messages[-1].content, user_id=user_id)
+
+        system_message = "You are a helpful assistant that can answer questions and help with tasks. You have the following memories:\n\n" + memories
 
         full_messages = [system_message] + messages
 
