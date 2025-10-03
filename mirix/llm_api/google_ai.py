@@ -230,7 +230,8 @@ def convert_tools_to_google_ai_format(tools: List[Tool], inner_thoughts_in_kwarg
                 "type": "STRING",
                 "description": INNER_THOUGHTS_KWARG_DESCRIPTION,
             }
-            func["parameters"]["required"].append(INNER_THOUGHTS_KWARG)
+            if INNER_THOUGHTS_KWARG not in func["parameters"]["required"]:
+                func["parameters"]["required"].append(INNER_THOUGHTS_KWARG)
 
     return [{"functionDeclarations": function_list}]
 
