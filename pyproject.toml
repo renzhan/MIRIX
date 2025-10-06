@@ -82,6 +82,7 @@ dependencies = [
     "pytest (>=8.4.2,<9.0.0)",
     "ruff (>=0.13.3,<0.14.0)",
     "pyright (>=1.1.406,<2.0.0)",
+    "ipdb (>=0.13.13,<0.14.0)",
 ]
 
 [project.optional-dependencies]
