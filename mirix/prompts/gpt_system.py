@@ -1,6 +1,5 @@
 import os
 
-from mirix.constants import MIRIX_DIR
 
 
 def get_system_text(key):
