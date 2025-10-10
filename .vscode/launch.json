@@ -1,0 +1,40 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Run main.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "--host", "0.0.0.0",
+                "--port", "47283"
+            ],
+            "justMyCode": true
+        },
+        {
+            "name": "调试当前 Python 文件",
+            "type": "python",
+            "request": "launch",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "EMAIL_USER_ID":"1952974833739087873",
+                "PAMS_SERVER_URL":"https://aiop-test.item.com",
+                "PAMS_USER_ID":"user-f3353002-f1bf-412a-8958-ed0907390c05"
+            },
+            "args": [],
+            "justMyCode": false,
+            "stopOnEntry": false
+        }
+    ]
+}

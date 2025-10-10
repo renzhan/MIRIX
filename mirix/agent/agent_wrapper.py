@@ -119,11 +119,11 @@ class AgentWrapper:
 
         # Initialize agent states container
         self.agent_states = AgentStates()
-
-        if len(self.client.list_agents()) > 0:
+        agents = self.client.list_agents()
+        if len(agents) > 0:
             self.client.server.tool_manager.upsert_base_tools(self.client.user)
 
-            all_agent_states = self.client.list_agents()
+            all_agent_states = agents #self.client.list_agents()
 
             for agent_state in all_agent_states:
                 if agent_state.name == "chat_agent":

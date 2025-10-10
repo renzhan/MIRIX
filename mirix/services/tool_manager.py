@@ -52,12 +52,19 @@ class ToolManager:
                 exclude_unset=True, exclude_none=True
             )
 
-            # If there's anything to update
-            if update_data:
-                self.update_tool_by_id(tool.id, ToolUpdate(**update_data), actor)
+            # Compare with existing tool to see if there are actual changes
+            actual_changes = {}
+            for key, new_value in update_data.items():
+                existing_value = getattr(tool, key, None)
+                if existing_value != new_value:
+                    actual_changes[key] = new_value
+
+            # Only update if there are actual changes
+            if actual_changes:
+                self.update_tool_by_id(tool.id, ToolUpdate(**actual_changes), actor)
             else:
                 printd(
-                    f"`create_or_update_tool` was called with user_id={actor.id}, organization_id={actor.organization_id}, name={pydantic_tool.name}, but found existing tool with nothing to update."
+                    f"`create_or_update_tool` was called with user_id={actor.id}, organization_id={actor.organization_id}, name={pydantic_tool.name}, but found existing tool with no changes needed."
                 )
         else:
             tool = self.create_tool(pydantic_tool, actor=actor)

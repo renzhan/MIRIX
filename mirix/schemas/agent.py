@@ -34,6 +34,8 @@ class AgentType(str, Enum):
     meta_memory_agent = "meta_memory_agent"
     semantic_memory_agent = "semantic_memory_agent"
     core_memory_agent = "core_memory_agent"
+    email_reply_agent = "email_reply_agent"
+    workflow_agent = "workflow_agent"
 
 
 class AgentState(OrmMetadataBase, validate_assignment=True):
