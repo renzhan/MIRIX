@@ -665,6 +665,9 @@ class SyncServer(Server):
             # Use provided chaining value or fall back to server default
             effective_chaining = chaining if chaining is not None else self.chaining
 
+            if actor and (user_id is None or user_id == ""):
+                user_id = actor.id
+
             usage_stats = mirix_agent.step(
                 input_messages=input_messages,
                 chaining=effective_chaining,

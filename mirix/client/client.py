@@ -1222,6 +1222,7 @@ class LocalClient(AbstractClient):
 
     def send_messages(
         self,
+        user_id: str,
         agent_id: str,
         messages: List[Union[Message | MessageCreate]],
     ):
@@ -1237,7 +1238,7 @@ class LocalClient(AbstractClient):
         """
         self.interface.clear()
         usage = self.server.send_messages(
-            actor=self.server.user_manager.get_user_by_id(self.user.id),
+            actor=self.server.user_manager.get_user_by_id(user_id),
             agent_id=agent_id,
             messages=messages,
         )
