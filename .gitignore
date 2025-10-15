@@ -34,3 +34,4 @@ local_evaluations
 mirix.egg-info
 .local
 .venv/
+.idea/

@@ -17,6 +17,18 @@ from mirix.agent.app_utils import encode_image
 from mirix.constants import CHAINING_FOR_MEMORY_UPDATE
 from mirix.voice_utils import convert_base64_to_audio_segment, process_voice_files
 
+# ✅ TASK 3 - Modification 1: Import Redis message store functions
+from mirix.agent.redis_message_store import (
+    add_message_to_redis,
+    get_messages_from_redis,
+    remove_messages_from_redis,
+    get_message_count_from_redis,
+    # ✅ FIX: Import user conversation functions for multi-user concurrency safety
+    add_conversation_to_redis,
+    get_conversations_from_redis,
+    clear_conversations_from_redis,
+)
+
 
 def get_image_mime_type(image_path):
     """Get MIME type for image files."""
@@ -46,6 +58,7 @@ class TemporaryMessageAccumulator:
         upload_manager,
         message_queue,
         model_name,
+        # ✅ TASK 3 - Modification 2: Removed user_id from __init__, will be passed per method call
         temporary_message_limit=TEMPORARY_MESSAGE_LIMIT,
     ):
         self.client = client
@@ -54,6 +67,7 @@ class TemporaryMessageAccumulator:
         self.upload_manager = upload_manager
         self.message_queue = message_queue
         self.model_name = model_name
+        # ✅ TASK 3 - Modification 2: user_id will be passed to each method that needs user isolation
         self.temporary_message_limit = temporary_message_limit
 
         # Initialize logger
@@ -65,12 +79,12 @@ class TemporaryMessageAccumulator:
         # Determine if this model needs file uploads
         self.needs_upload = model_name in GEMINI_MODELS
 
-        # Initialize locks for thread safety
-        self._temporary_messages_lock = threading.Lock()
-
-        # Initialize temporary message storage
-        self.temporary_messages = []  # Flat list of (timestamp, item) tuples
-        self.temporary_user_messages = [[]]  # List of batches
+        # ✅ TASK 3 - Modification 3: Remove in-memory storage (now using Redis)
+        # REMOVED: self._temporary_messages_lock = threading.Lock()
+        # REMOVED: self.temporary_messages = []
+        
+        # ✅ FIX: Remove in-memory user conversation storage (now using Redis for multi-user safety)
+        # REMOVED: self.temporary_user_messages = [[]]
 
         # URI tracking for cloud files
         self.uri_to_create_time = {}
@@ -79,9 +93,23 @@ class TemporaryMessageAccumulator:
         self.upload_start_times = {}  # Track when uploads started for cleanup purposes
 
     def add_message(
-        self, full_message, timestamp, delete_after_upload=True, async_upload=True
+        self, full_message, timestamp, user_id, delete_after_upload=True, async_upload=True
     ):
-        """Add a message to temporary storage."""
+        """Add a message to temporary storage.
+        
+        Args:
+            full_message: Message data containing text, images, sources, voice files
+            timestamp: Message timestamp
+            user_id: User ID for Redis isolation (required)
+            delete_after_upload: Whether to delete files after upload
+            async_upload: Whether to upload files asynchronously
+            
+        Raises:
+            ValueError: If user_id is None
+        """
+        # ✅ TASK 3 - Modification 4: Validate user_id for multi-user isolation
+        if user_id is None:
+            raise ValueError("user_id is required for add_message")
         if self.needs_upload and self.upload_manager is not None:
             if "image_uris" in full_message and full_message["image_uris"]:
                 # Handle image uploads with optional sources information
@@ -127,30 +155,26 @@ class TemporaryMessageAccumulator:
             else:
                 audio_segment = None
 
-            with self._temporary_messages_lock:
-                sources = full_message.get("sources")
-                self.temporary_messages.append(
-                    (
-                        timestamp,
-                        {
-                            "image_uris": image_file_ref_placeholders,
-                            "sources": sources,
-                            "audio_segments": audio_segment,
-                            "message": full_message["message"],
-                        },
-                    )
-                )
+            # ✅ TASK 3 - Modification 4: Store message in Redis instead of in-memory list
+            message_data = {
+                "image_uris": image_file_ref_placeholders,
+                "sources": full_message.get("sources"),
+                "audio_segments": audio_segment,
+                "message": full_message["message"],
+            }
+            add_message_to_redis(user_id, timestamp, message_data)
 
-                # Print accumulation statistics
-                total_messages = len(self.temporary_messages)
-                total_images = sum(
-                    len(item.get("image_uris", []) or [])
-                    for _, item in self.temporary_messages
-                )
-                total_voice_segments = sum(
-                    len(item.get("audio_segments", []) or [])
-                    for _, item in self.temporary_messages
-                )
+            # Print accumulation statistics (read from Redis)
+            total_messages = get_message_count_from_redis(user_id)
+            all_messages = get_messages_from_redis(user_id)
+            total_images = sum(
+                len(item.get("image_uris", []) or [])
+                for _, item in all_messages
+            )
+            total_voice_segments = sum(
+                len(item.get("audio_segments", []) or [])
+                for _, item in all_messages
+            )
 
             if delete_after_upload and full_message["image_uris"]:
                 threading.Thread(
@@ -169,45 +193,62 @@ class TemporaryMessageAccumulator:
                 voice_files = []
             voice_count = len(voice_files)
 
-            with self._temporary_messages_lock:
-                sources = full_message.get("sources")
-                image_uris = full_message.get("image_uris", [])
-                self.temporary_messages.append(
-                    (
-                        timestamp,
-                        {
-                            "image_uris": image_uris,
-                            "sources": sources,
-                            "audio_segments": full_message.get("voice_files", []),
-                            "message": full_message["message"],
-                            "delete_after_upload": delete_after_upload,  # Store delete flag for OpenAI models
-                        },
-                    )
-                )
+            # ✅ TASK 3 - Modification 5: Store message in Redis for non-GEMINI models
+            message_data = {
+                "image_uris": full_message.get("image_uris", []),
+                "sources": full_message.get("sources"),
+                "audio_segments": full_message.get("voice_files", []),
+                "message": full_message["message"],
+                "delete_after_upload": delete_after_upload,  # Store delete flag for OpenAI models
+            }
+            add_message_to_redis(user_id, timestamp, message_data)
 
-                # # Print accumulation statistics
-                # total_messages = len(self.temporary_messages)
-                # total_images = sum(len(item.get('image_uris', []) or []) for _, item in self.temporary_messages)
-                # total_voice_files = sum(len(item.get('audio_segments', []) or []) for _, item in self.temporary_messages)
+            # # Print accumulation statistics
+            # total_messages = get_message_count_from_redis(self.user_id)
+            # all_messages = get_messages_from_redis(self.user_id)
+            # total_images = sum(len(item.get('image_uris', []) or []) for _, item in all_messages)
+            # total_voice_files = sum(len(item.get('audio_segments', []) or []) for _, item in all_messages)
 
-    def add_user_conversation(self, user_message, assistant_response):
-        """Add user conversation to temporary storage."""
-        self.temporary_user_messages[-1].extend(
-            [
-                {"role": "user", "content": user_message},
-                {"role": "assistant", "content": assistant_response},
-            ]
-        )
+    def add_user_conversation(self, user_message, assistant_response, user_id):
+        """Add user conversation to Redis for multi-user isolation.
+        
+        Args:
+            user_message: User's message
+            assistant_response: Assistant's response
+            user_id: User ID for Redis isolation (required)
+            
+        Raises:
+            ValueError: If user_id is None
+        """
+        # ✅ FIX: Store conversations in Redis for multi-user concurrency safety
+        if user_id is None:
+            raise ValueError("user_id is required for add_user_conversation")
+        
+        add_conversation_to_redis(user_id, user_message, assistant_response)
 
-    def should_absorb_content(self):
-        """Check if content should be absorbed into memory and return ready messages."""
+    def should_absorb_content(self, user_id):
+        """Check if content should be absorbed into memory and return ready messages.
+        
+        Args:
+            user_id: User ID for Redis isolation (required)
+            
+        Returns:
+            List of ready messages or empty list
+            
+        Raises:
+            ValueError: If user_id is None
+        """
+        # ✅ TASK 3 - Modification 6: Validate user_id for multi-user isolation
+        if user_id is None:
+            raise ValueError("user_id is required for should_absorb_content")
 
         if self.needs_upload:
-            with self._temporary_messages_lock:
-                ready_messages = []
+            # ✅ TASK 3 - Modification 6a: Get messages from Redis for GEMINI models
+            all_messages = get_messages_from_redis(user_id)
+            ready_messages = []
 
-                # Process messages in temporal order
-                for i, (timestamp, item) in enumerate(self.temporary_messages):
+            # Process messages in temporal order
+            for i, (timestamp, item) in enumerate(all_messages):
                     item_copy = copy.deepcopy(item)
                     has_pending_uploads = False
 
@@ -259,149 +300,168 @@ class TemporaryMessageAccumulator:
                         # No images or already processed, add to ready list
                         ready_messages.append((timestamp, item_copy))
 
-                # Check if we have enough ready messages to process
-                if len(ready_messages) >= self.temporary_message_limit:
-                    return ready_messages
-                else:
-                    return []
+            # Check if we have enough ready messages to process
+            if len(ready_messages) >= self.temporary_message_limit:
+                return ready_messages
+            else:
+                return []
         else:
+            # ✅ TASK 3 - Modification 6b: Get messages from Redis for non-GEMINI models
             # For non-GEMINI models: no uploads needed, just check message count
-            with self._temporary_messages_lock:
-                # Since there are no pending uploads to wait for, all messages are ready
-                if len(self.temporary_messages) >= self.temporary_message_limit:
-                    # Return all messages as ready for processing
-                    ready_messages = []
-                    for timestamp, item in self.temporary_messages:
-                        item_copy = copy.deepcopy(item)
-                        ready_messages.append((timestamp, item_copy))
-                    return ready_messages
-                else:
-                    return []
+            all_messages = get_messages_from_redis(user_id)
+            
+            # Since there are no pending uploads to wait for, all messages are ready
+            if len(all_messages) >= self.temporary_message_limit:
+                # Return all messages as ready for processing
+                return all_messages[:self.temporary_message_limit]
+            else:
+                return []
 
-    def get_recent_images_for_chat(self, current_timestamp):
+    def get_recent_images_for_chat(self, current_timestamp, user_id):
         """Get the most recent images for chat context (non-blocking).
+
+        Args:
+            current_timestamp: Current timestamp to filter recent images
+            user_id: User ID for Redis isolation (required)
 
         Returns:
             List of tuples: (timestamp, file_ref, sources) where sources may be None
+            
+        Raises:
+            ValueError: If user_id is None
         """
-        with self._temporary_messages_lock:
-            # Get the most recent content
-            recent_limit = min(
-                self.temporary_message_limit, len(self.temporary_messages)
-            )
-            most_recent_content = (
-                self.temporary_messages[-recent_limit:] if recent_limit > 0 else []
-            )
+        # ✅ TASK 3 - Modification 9: Validate user_id and get recent messages from Redis
+        if user_id is None:
+            raise ValueError("user_id is required for get_recent_images_for_chat")
+        
+        all_messages = get_messages_from_redis(user_id)
+        
+        # Get the most recent content
+        recent_limit = min(
+            self.temporary_message_limit, len(all_messages)
+        )
+        most_recent_content = (
+            all_messages[-recent_limit:] if recent_limit > 0 else []
+        )
 
-            # Calculate timestamp cutoff (1 minute ago)
-            cutoff_time = current_timestamp - timedelta(minutes=1)
+        # Calculate timestamp cutoff (1 minute ago)
+        cutoff_time = current_timestamp - timedelta(minutes=1)
 
-            # Extract only images for the current message context
-            most_recent_images = []
-            for timestamp, item in most_recent_content:
-                # Handle different timestamp formats that might be used
-                if isinstance(timestamp, str):
-                    # Try to parse timestamp string and make it timezone-aware
-                    timestamp_dt = datetime.fromisoformat(
-                        timestamp.replace("Z", "+00:00")
-                    )
-                    # If timezone-naive, localize it to match the cutoff_time timezone awareness
-                    if timestamp_dt.tzinfo is None:
-                        timestamp_dt = self.timezone.localize(timestamp_dt)
-                elif isinstance(timestamp, datetime):
-                    timestamp_dt = timestamp
-                    # If timezone-naive, localize it to match the cutoff_time timezone awareness
-                    if timestamp_dt.tzinfo is None:
-                        timestamp_dt = self.timezone.localize(timestamp_dt)
-                elif isinstance(timestamp, (int, float)):
-                    # Unix timestamp - make it timezone-aware
-                    timestamp_dt = datetime.fromtimestamp(timestamp, tz=self.timezone)
-                else:
-                    # Skip if we can't parse the timestamp
-                    continue
+        # Extract only images for the current message context
+        most_recent_images = []
+        for timestamp, item in most_recent_content:
+            # Handle different timestamp formats that might be used
+            if isinstance(timestamp, str):
+                # Try to parse timestamp string and make it timezone-aware
+                timestamp_dt = datetime.fromisoformat(
+                    timestamp.replace("Z", "+00:00")
+                )
+                # If timezone-naive, localize it to match the cutoff_time timezone awareness
+                if timestamp_dt.tzinfo is None:
+                    timestamp_dt = self.timezone.localize(timestamp_dt)
+            elif isinstance(timestamp, datetime):
+                timestamp_dt = timestamp
+                # If timezone-naive, localize it to match the cutoff_time timezone awareness
+                if timestamp_dt.tzinfo is None:
+                    timestamp_dt = self.timezone.localize(timestamp_dt)
+            elif isinstance(timestamp, (int, float)):
+                # Unix timestamp - make it timezone-aware
+                timestamp_dt = datetime.fromtimestamp(timestamp, tz=self.timezone)
+            else:
+                # Skip if we can't parse the timestamp
+                continue
 
-                # Check if timestamp is within the past 1 minute
-                if timestamp_dt < cutoff_time:
-                    continue
+            # Check if timestamp is within the past 1 minute
+            if timestamp_dt < cutoff_time:
+                continue
 
-                # Check if this item has images
-                if "image_uris" in item and item["image_uris"]:
-                    for j, file_ref in enumerate(item["image_uris"]):
-                        if self.needs_upload and self.upload_manager is not None:
-                            # For GEMINI models: Resolve pending uploads for immediate use (non-blocking check)
-                            if isinstance(file_ref, dict) and file_ref.get("pending"):
-                                placeholder_id = id(file_ref)
+            # Check if this item has images
+            if "image_uris" in item and item["image_uris"]:
+                for j, file_ref in enumerate(item["image_uris"]):
+                    if self.needs_upload and self.upload_manager is not None:
+                        # For GEMINI models: Resolve pending uploads for immediate use (non-blocking check)
+                        if isinstance(file_ref, dict) and file_ref.get("pending"):
+                            placeholder_id = id(file_ref)
 
-                                # Get upload status
-                                upload_status = self.upload_manager.get_upload_status(
-                                    file_ref
+                            # Get upload status
+                            upload_status = self.upload_manager.get_upload_status(
+                                file_ref
+                            )
+
+                            if upload_status["status"] == "completed":
+                                original_placeholder = (
+                                    file_ref  # Store original before modifying
                                 )
+                                file_ref = upload_status["result"]
+                                # Note: Don't clean up here, this is just for chat context
+                            elif upload_status["status"] == "failed":
+                                # Upload failed, skip this image
+                                # Note: Don't clean up here, this is just for chat context
+                                continue
+                            elif upload_status["status"] == "unknown":
+                                # Upload was cleaned up, treat as failed
+                                # Note: Don't clean up here, this is just for chat context
+                                continue
+                            else:
+                                continue  # Still pending, skip
 
-                                if upload_status["status"] == "completed":
-                                    original_placeholder = (
-                                        file_ref  # Store original before modifying
-                                    )
-                                    file_ref = upload_status["result"]
-                                    # Note: Don't clean up here, this is just for chat context
-                                elif upload_status["status"] == "failed":
-                                    # Upload failed, skip this image
-                                    # Note: Don't clean up here, this is just for chat context
-                                    continue
-                                elif upload_status["status"] == "unknown":
-                                    # Upload was cleaned up, treat as failed
-                                    # Note: Don't clean up here, this is just for chat context
-                                    continue
-                                else:
-                                    continue  # Still pending, skip
+                    # For non-GEMINI models: file_ref is already the image URI, use as-is
+                    # Include sources information if available
+                    sources = item.get("sources")
+                    most_recent_images.append(
+                        (timestamp, file_ref, sources[j] if sources else None)
+                    )
 
-                        # For non-GEMINI models: file_ref is already the image URI, use as-is
-                        # Include sources information if available
-                        sources = item.get("sources")
-                        most_recent_images.append(
-                            (timestamp, file_ref, sources[j] if sources else None)
-                        )
-
-            return most_recent_images
+        return most_recent_images
 
     def absorb_content_into_memory(
         self, agent_states, ready_messages=None, user_id=None
     ):
-        """Process accumulated content and send to memory agents."""
+        """Process accumulated content and send to memory agents.
+        
+        Args:
+            agent_states: Agent states object
+            ready_messages: Pre-processed ready messages (optional)
+            user_id: User ID for Redis isolation (required)
+            
+        Raises:
+            ValueError: If user_id is None
+        """
+        # ✅ TASK 3 - Modification 7: Validate user_id for multi-user isolation
+        if user_id is None:
+            raise ValueError("user_id is required for absorb_content_into_memory")
 
         if ready_messages is not None:
             # Use the pre-processed ready messages
             ready_to_process = ready_messages
 
-            # Remove the processed messages from temporary_messages and clean up placeholders
-            with self._temporary_messages_lock:
-                # Remove processed messages from the beginning (they were processed in temporal order)
-                num_to_remove = len(ready_messages)
+            # ✅ TASK 3 - Modification 7: Remove processed messages from Redis and clean up placeholders
+            num_to_remove = len(ready_messages)
 
-                # Clean up placeholders from the messages being removed
-                if self.needs_upload and self.upload_manager is not None:
-                    for i in range(min(num_to_remove, len(self.temporary_messages))):
-                        timestamp, item = self.temporary_messages[i]
-                        if "image_uris" in item and item["image_uris"]:
-                            for file_ref in item["image_uris"]:
-                                if isinstance(file_ref, dict) and file_ref.get(
-                                    "pending"
-                                ):
-                                    placeholder_id = id(file_ref)
-                                    # Clean up upload manager status and local tracking
-                                    self.upload_manager.cleanup_resolved_upload(
-                                        file_ref
-                                    )
-                                    self.upload_start_times.pop(placeholder_id, None)
+            # Clean up placeholders from the messages being removed
+            if self.needs_upload and self.upload_manager is not None:
+                for i in range(min(num_to_remove, len(ready_messages))):
+                    timestamp, item = ready_messages[i]
+                    if "image_uris" in item and item["image_uris"]:
+                        for file_ref in item["image_uris"]:
+                            if isinstance(file_ref, dict) and file_ref.get("pending"):
+                                placeholder_id = id(file_ref)
+                                # Clean up upload manager status and local tracking
+                                self.upload_manager.cleanup_resolved_upload(file_ref)
+                                self.upload_start_times.pop(placeholder_id, None)
 
-                self.temporary_messages = self.temporary_messages[num_to_remove:]
+            # Remove processed messages from Redis
+            remove_messages_from_redis(user_id, num_to_remove)
         else:
+            # ✅ TASK 3 - Modification 7b: Use Redis for else branch (when ready_messages is None)
             # Use the existing logic to separate and process messages
-            with self._temporary_messages_lock:
-                # Separate uploaded images, pending images, and text content
-                ready_to_process = []  # Items that are ready to be processed
-                pending_items = []  # Items that need to stay for next cycle
+            all_messages = get_messages_from_redis(user_id)
+            
+            # Separate uploaded images, pending images, and text content
+            ready_to_process = []  # Items that are ready to be processed
+            pending_items = []  # Items that need to stay for next cycle
 
-                for timestamp, item in self.temporary_messages:
+            for timestamp, item in all_messages:
                     item_copy = copy.deepcopy(item)
                     has_pending_uploads = False
 
@@ -474,8 +534,12 @@ class TemporaryMessageAccumulator:
                         # No images or already processed, add to ready list
                         ready_to_process.append((timestamp, item_copy))
 
-                # Keep only items that are still pending (for GEMINI models) or clear all (for non-GEMINI models)
-                self.temporary_messages = pending_items
+            # ✅ TASK 3 - Modification 7c: Update Redis with pending items
+            # Keep only items that are still pending (for GEMINI models) or clear all (for non-GEMINI models)
+            # Clear all messages from Redis and re-add pending ones
+            num_processed = len(all_messages) - len(pending_items)
+            if num_processed > 0:
+                remove_messages_from_redis(user_id, num_processed)
 
         # Extract voice content from ready_to_process messages
         voice_content = []
@@ -532,7 +596,8 @@ class TemporaryMessageAccumulator:
         message = self._build_memory_message(ready_to_process, voice_content)
 
         # Handle user conversation if exists
-        message, user_message_added = self._add_user_conversation_to_message(message)
+        # ✅ FIX: Pass user_id for multi-user concurrency safety
+        message, user_message_added = self._add_user_conversation_to_message(message, user_id)
 
         if SKIP_META_MEMORY_MANAGER:
             # Add system instruction
@@ -586,7 +651,8 @@ class TemporaryMessageAccumulator:
         #     )
 
         # Clean up processed content
-        self._cleanup_processed_content(ready_to_process, user_message_added)
+        # ✅ FIX: Pass user_id for multi-user concurrency safety
+        self._cleanup_processed_content(ready_to_process, user_message_added, user_id)
 
     def _build_memory_message(self, ready_to_process, voice_content):
         """Build the message content for memory agents."""
@@ -721,19 +787,35 @@ class TemporaryMessageAccumulator:
 
         return message_parts
 
-    def _add_user_conversation_to_message(self, message):
-        """Add user conversation to the message if it exists."""
+    def _add_user_conversation_to_message(self, message, user_id):
+        """Add user conversation to the message if it exists.
+        
+        Args:
+            message: Message parts to append to
+            user_id: User ID for Redis isolation (required)
+            
+        Returns:
+            Tuple of (message, user_message_added)
+            
+        Raises:
+            ValueError: If user_id is None
+        """
+        # ✅ FIX: Get conversations from Redis for multi-user concurrency safety
+        if user_id is None:
+            raise ValueError("user_id is required for _add_user_conversation_to_message")
+        
         user_message_added = False
-        if len(self.temporary_user_messages[-1]) > 0:
+        conversations = get_conversations_from_redis(user_id)
+        
+        if len(conversations) > 0:
             user_conversation = "The following are the conversations between the user and the Chat Agent while capturing this content:\n"
-            for idx, user_message in enumerate(self.temporary_user_messages[-1]):
-                user_conversation += f"role: {user_message['role']}; content: {user_message['content']}\n"
+            for conversation in conversations:
+                user_conversation += f"role: {conversation['role']}; content: {conversation['content']}\n"
             user_conversation = user_conversation.strip()
 
             message.append({"type": "text", "text": user_conversation})
-
-            self.temporary_user_messages.append([])
             user_message_added = True
+            
         return message, user_message_added
 
     def _send_to_meta_memory_agent(
@@ -800,8 +882,21 @@ class TemporaryMessageAccumulator:
 
         overall_end = time.time()
 
-    def _cleanup_processed_content(self, ready_to_process, user_message_added):
-        """Clean up processed content and mark files as processed."""
+    def _cleanup_processed_content(self, ready_to_process, user_message_added, user_id):
+        """Clean up processed content and mark files as processed.
+        
+        Args:
+            ready_to_process: Messages that were processed
+            user_message_added: Whether user messages were added
+            user_id: User ID for Redis isolation (required)
+            
+        Raises:
+            ValueError: If user_id is None
+        """
+        # ✅ FIX: Validate user_id for multi-user concurrency safety
+        if user_id is None:
+            raise ValueError("user_id is required for _cleanup_processed_content")
+        
         # Mark processed files as processed in database and cleanup upload results (only for GEMINI models)
         if self.needs_upload and self.upload_manager is not None:
             for timestamp, item in ready_to_process:
@@ -835,9 +930,9 @@ class TemporaryMessageAccumulator:
                             self._delete_local_image_file(image_uri)
 
         # Clean up user messages if added
+        # ✅ FIX: Clear conversations from Redis for multi-user concurrency safety
         if user_message_added:
-            if len(self.temporary_user_messages) > 1:
-                self.temporary_user_messages.pop(0)
+            clear_conversations_from_redis(user_id)
 
     def _delete_local_image_file(self, image_path):
         """Delete a local image file with retry logic."""
@@ -918,15 +1013,42 @@ class TemporaryMessageAccumulator:
                 except Exception:
                     pass
 
-    def get_message_count(self):
-        """Get the current count of temporary messages."""
-        with self._temporary_messages_lock:
-            return len(self.temporary_messages)
+    def get_message_count(self, user_id):
+        """Get the current count of temporary messages.
+        
+        Args:
+            user_id: User ID for Redis isolation (required)
+            
+        Returns:
+            Number of messages for the specified user
+            
+        Raises:
+            ValueError: If user_id is None
+        """
+        # ✅ TASK 3 - Modification 8: Validate user_id and get message count from Redis
+        if user_id is None:
+            raise ValueError("user_id is required for get_message_count")
+        
+        return get_message_count_from_redis(user_id)
 
-    def get_upload_status_summary(self):
-        """Get a summary of current upload statuses for debugging."""
+    def get_upload_status_summary(self, user_id):
+        """Get a summary of current upload statuses for debugging.
+        
+        Args:
+            user_id: User ID for Redis isolation (required)
+            
+        Returns:
+            Summary dictionary with upload status information
+            
+        Raises:
+            ValueError: If user_id is None
+        """
+        # ✅ TASK 3 - Modification 10: Validate user_id and get message count from Redis
+        if user_id is None:
+            raise ValueError("user_id is required for get_upload_status_summary")
+        
         summary = {
-            "total_messages": len(self.temporary_messages),
+            "total_messages": get_message_count_from_redis(user_id),
         }
 
         # Get upload manager status if available
