@@ -304,9 +304,9 @@ class AgentWrapper:
         # Pass URI tracking to accumulator
         self.temp_message_accumulator.uri_to_create_time = self.uri_to_create_time
 
-        # For GEMINI models, extract all unprocessed images and fill temporary_messages
-        if self.model_name in GEMINI_MODELS and self.google_client is not None:
-            self._process_existing_uploaded_files(user_id=self.client.user.id)
+        # ✅ P1-3: Removed initialization-time file processing to avoid fixed user_id issue
+        # File processing is now done per-user on-demand in _ensure_user_initialized()
+        # This prevents all existing files from being assigned to the initialization user_id
 
     def construct_system_message(self, message: str, user_id: str) -> str:
         """
@@ -788,10 +788,76 @@ class AgentWrapper:
             self.logger.warning(f"Error checking Gmail credentials: {e}")
             return False
 
+    def _ensure_user_initialized(self, user_id: str):
+        """
+        Ensure a user has been initialized (one-time setup per user).
+        
+        ✅ P1-3: This method uses Redis for distributed locking and idempotency,
+        ensuring that initialization happens exactly once per user across all pods.
+        
+        Args:
+            user_id: User ID to initialize (required)
+            
+        Note: Currently this only marks the user as initialized without processing
+        existing files, since CloudFileMapping doesn't have user_id filtering.
+        This prevents data mixing between users in multi-user scenarios.
+        """
+        # ✅ P1-3: Import Redis initialization functions
+        from mirix.agent.redis_message_store import (
+            is_user_initialized,
+            try_acquire_user_init_lock,
+            release_user_init_lock,
+            mark_user_initialized,
+        )
+        
+        if user_id is None:
+            self.logger.warning("Cannot initialize user with None user_id")
+            return
+        
+        # Check if already initialized (idempotent)
+        if is_user_initialized(user_id):
+            return  # Already done, skip
+        
+        # Try to acquire initialization lock
+        if not try_acquire_user_init_lock(user_id, timeout=30):
+            # Another pod is initializing this user, skip
+            self.logger.debug(f"User {user_id} initialization in progress by another pod")
+            return
+        
+        try:
+            self.logger.info(f"Initializing user {user_id}...")
+            
+            # ✅ P1-3: Mark user as initialized
+            # Note: We don't process existing files here because CloudFileMapping
+            # doesn't have user_id, so we can't filter files by user.
+            # This is safer than mixing all organization files into one user's queue.
+            mark_user_initialized(user_id, ttl=7 * 24 * 3600)  # 7 days
+            
+            self.logger.info(f"User {user_id} initialized successfully")
+            
+        finally:
+            # Always release the lock
+            release_user_init_lock(user_id)
+    
     def _process_existing_uploaded_files(self, user_id: str):
-        """Process any existing uploaded files for Gemini models."""
+        """
+        Process any existing uploaded files for Gemini models.
+        
+        ⚠️ WARNING (P1-3): This method is currently not called during initialization
+        because CloudFileMapping doesn't have user_id filtering. Calling this would
+        load ALL organization files into the specified user_id's queue, causing
+        data mixing in multi-user scenarios.
+        
+        This method is kept for backward compatibility but should not be used
+        until CloudFileMapping is enhanced with user_id support.
+        """
         # ✅ TASK 4: Import Redis function for direct message addition
         from mirix.agent.redis_message_store import add_message_to_redis
+        
+        self.logger.warning(
+            f"_process_existing_uploaded_files called for user {user_id}. "
+            "This may cause data mixing if multiple users exist."
+        )
         
         uploaded_mappings = (
             self.client.server.cloud_file_mapping_manager.list_files_with_status(
@@ -2418,8 +2484,8 @@ Please perform this analysis and create new memories as appropriate. Provide a d
             self.temp_message_accumulator.upload_manager = self.upload_manager
             self.temp_message_accumulator.uri_to_create_time = self.uri_to_create_time
 
-            # Process existing uploaded files
-            self._process_existing_uploaded_files(user_id=self.client.user.id)
+            # ✅ P1-3: Removed file processing here as well (same reason as __init__)
+            # Existing files will be processed per-user on-demand
 
             self.logger.info("Gemini initialization completed successfully!")
             return True

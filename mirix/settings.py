@@ -150,6 +150,12 @@ class Settings(BaseSettings):
     redis_db: int = 0
     redis_socket_timeout: float = 5.0
     redis_max_connections: int = 50
+    
+    # ✅ P1-4: Redis TTL and capacity limits for message queues
+    redis_message_ttl: int = 86400  # 24 hours (seconds)
+    redis_message_max_length: int = 100  # Maximum messages per user queue
+    redis_conversation_ttl: int = 3600  # 1 hour (seconds)
+    redis_conversation_max_length: int = 50  # Maximum conversation pairs per user
 
     # multi agent settings
     multi_agent_send_message_max_retries: int = 3
