@@ -44,10 +44,10 @@ class MessageQueue:
         with self._message_queue_lock:
             self.message_queue[message_uuid]["started"] = True
 
-        user_id = self.message_queue[message_uuid]["kwargs"]["user_id"]
+        # user_id = self.message_queue[message_uuid]["kwargs"]["user_id"]
         try:
             response = client.send_message(
-                user_id=user_id,
+                # user_id=user_id,
                 agent_id=agent_id,
                 role="user",
                 **self.message_queue[message_uuid]["kwargs"],

@@ -14,11 +14,39 @@ import json
 import redis
 from typing import List, Optional, Dict, Any
 
+from mirix.schemas.mirix_message import MirixMessage, ReasoningMessage
+
 from mirix.settings import settings
 
 
 # Global Redis client singleton
 _redis_client = None
+
+
+def _coerce_conversation_content(value: Any) -> str:
+    """
+    Ensure conversation entries are JSON serializable strings.
+
+    Args:
+        value: Content to store
+
+    Returns:
+        String representation safe for JSON storage
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, ReasoningMessage):
+        return value.reasoning
+    if isinstance(value, MirixMessage):
+        try:
+            return value.model_dump_json()
+        except TypeError:
+            return json.dumps(value.model_dump(mode="json"), ensure_ascii=False)
+    if value is None:
+        return "None"
+    return str(value)
 
 
 def get_redis_client() -> redis.Redis:
@@ -303,10 +331,16 @@ def add_conversation_to_redis(user_id: str, user_message: str, assistant_respons
     client = get_redis_client()
     key = f'mirix:user_conversations:{user_id}'
     
-    conversation_data = json.dumps([
-        {"role": "user", "content": user_message},
-        {"role": "assistant", "content": assistant_response}
-    ])
+    conversation_data = json.dumps(
+        [
+            {"role": "user", "content": _coerce_conversation_content(user_message)},
+            {
+                "role": "assistant",
+                "content": _coerce_conversation_content(assistant_response),
+            },
+        ],
+        ensure_ascii=False,
+    )
     
     client.rpush(key, conversation_data)
 
