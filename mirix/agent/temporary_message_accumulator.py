@@ -27,10 +27,6 @@ from mirix.agent.redis_message_store import (
     add_conversation_to_redis,
     get_conversations_from_redis,
     clear_conversations_from_redis,
-    # ✅ P0-1: Import distributed lock and atomic operations for multi-pod safety
-    acquire_user_lock,
-    release_user_lock,
-    atomic_pop_messages,
 )
 
 
@@ -423,12 +419,6 @@ class TemporaryMessageAccumulator:
     ):
         """Process accumulated content and send to memory agents.
         
-        ✅ P0-1: This method is now protected by a distributed lock to prevent
-        concurrent processing by multiple pods, which could lead to:
-        - Duplicate message processing
-        - Data loss from race conditions
-        - Inconsistent state across pods
-        
         Args:
             agent_states: Agent states object
             ready_messages: Pre-processed ready messages (optional)
@@ -441,246 +431,228 @@ class TemporaryMessageAccumulator:
         if user_id is None:
             raise ValueError("user_id is required for absorb_content_into_memory")
 
-        # ✅ P0-1: Acquire distributed lock to prevent concurrent absorption by multiple pods
-        lock_acquired = acquire_user_lock(user_id, timeout=30)
-        
-        if not lock_acquired:
-            # Another pod is currently processing this user's messages
-            self.logger.info(
-                f"[P0-1] Absorption already in progress for user {user_id} by another pod. Skipping."
-            )
-            return
-        
-        try:
-            # Lock acquired successfully, proceed with absorption
-            self.logger.debug(f"[P0-1] Acquired absorption lock for user {user_id}")
+        if ready_messages is not None:
+            # Use the pre-processed ready messages
+            ready_to_process = ready_messages
+
+            # ✅ TASK 3 - Modification 7: Remove processed messages from Redis and clean up placeholders
+            num_to_remove = len(ready_messages)
+
+            # Clean up placeholders from the messages being removed
+            if self.needs_upload and self.upload_manager is not None:
+                for i in range(min(num_to_remove, len(ready_messages))):
+                    timestamp, item = ready_messages[i]
+                    if "image_uris" in item and item["image_uris"]:
+                        for file_ref in item["image_uris"]:
+                            if isinstance(file_ref, dict) and file_ref.get("pending"):
+                                placeholder_id = id(file_ref)
+                                # Clean up upload manager status and local tracking
+                                self.upload_manager.cleanup_resolved_upload(file_ref)
+                                self.upload_start_times.pop(placeholder_id, None)
+
+            # Remove processed messages from Redis
+            remove_messages_from_redis(user_id, num_to_remove)
+        else:
+            # ✅ TASK 3 - Modification 7b: Use Redis for else branch (when ready_messages is None)
+            # Use the existing logic to separate and process messages
+            all_messages = get_messages_from_redis(user_id)
             
-            if ready_messages is not None:
-                # Use the pre-processed ready messages
-                ready_to_process = ready_messages
+            # Separate uploaded images, pending images, and text content
+            ready_to_process = []  # Items that are ready to be processed
+            pending_items = []  # Items that need to stay for next cycle
 
-                # ✅ TASK 3 - Modification 7: Remove processed messages from Redis and clean up placeholders
-                num_to_remove = len(ready_messages)
+            for timestamp, item in all_messages:
+                    item_copy = copy.deepcopy(item)
+                    has_pending_uploads = False
 
-                # Clean up placeholders from the messages being removed
-                if self.needs_upload and self.upload_manager is not None:
-                    for i in range(min(num_to_remove, len(ready_messages))):
-                        timestamp, item = ready_messages[i]
-                        if "image_uris" in item and item["image_uris"]:
-                            for file_ref in item["image_uris"]:
-                                if isinstance(file_ref, dict) and file_ref.get("pending"):
+                    # Process image URIs if they exist
+                    if "image_uris" in item and item["image_uris"]:
+                        processed_image_uris = []
+                        for file_ref in item["image_uris"]:
+                            if self.needs_upload and self.upload_manager is not None:
+                                # For GEMINI models: Check if this is a pending placeholder
+                                if isinstance(file_ref, dict) and file_ref.get(
+                                    "pending"
+                                ):
                                     placeholder_id = id(file_ref)
-                                    # Clean up upload manager status and local tracking
-                                    self.upload_manager.cleanup_resolved_upload(file_ref)
-                                    self.upload_start_times.pop(placeholder_id, None)
+                                    # Get upload status
+                                    upload_status = (
+                                        self.upload_manager.get_upload_status(file_ref)
+                                    )
 
-                # Remove processed messages from Redis
-                remove_messages_from_redis(user_id, num_to_remove)
-            else:
-                # ✅ TASK 3 - Modification 7b: Use Redis for else branch (when ready_messages is None)
-                # Use the existing logic to separate and process messages
-                all_messages = get_messages_from_redis(user_id)
-                
-                # Separate uploaded images, pending images, and text content
-                ready_to_process = []  # Items that are ready to be processed
-                pending_items = []  # Items that need to stay for next cycle
-
-                for timestamp, item in all_messages:
-                        item_copy = copy.deepcopy(item)
-                        has_pending_uploads = False
-
-                        # Process image URIs if they exist
-                        if "image_uris" in item and item["image_uris"]:
-                            processed_image_uris = []
-                            for file_ref in item["image_uris"]:
-                                if self.needs_upload and self.upload_manager is not None:
-                                    # For GEMINI models: Check if this is a pending placeholder
-                                    if isinstance(file_ref, dict) and file_ref.get(
-                                        "pending"
-                                    ):
-                                        placeholder_id = id(file_ref)
-                                        # Get upload status
-                                        upload_status = (
-                                            self.upload_manager.get_upload_status(file_ref)
+                                    if upload_status["status"] == "completed":
+                                        # Upload completed, use the result
+                                        processed_image_uris.append(
+                                            upload_status["result"]
                                         )
-
-                                        if upload_status["status"] == "completed":
-                                            # Upload completed, use the result
-                                            processed_image_uris.append(
-                                                upload_status["result"]
-                                            )
-                                            # Clean up both upload manager and local tracking
-                                            self.upload_manager.cleanup_resolved_upload(
-                                                file_ref
-                                            )
-                                            self.upload_start_times.pop(
-                                                placeholder_id, None
-                                            )
-                                        elif upload_status["status"] == "failed":
-                                            # Upload failed, skip this image but continue processing
-                                            # Clean up both upload manager and local tracking
-                                            self.upload_manager.cleanup_resolved_upload(
-                                                file_ref
-                                            )
-                                            self.upload_start_times.pop(
-                                                placeholder_id, None
-                                            )
-                                            continue
-                                        elif upload_status["status"] == "unknown":
-                                            # Upload was cleaned up, treat as failed
-                                            print(
-                                                "Skipping unknown/cleaned upload in absorb_content_into_memory"
-                                            )
-                                            # Only clean up local tracking since upload manager already cleaned up
-                                            self.upload_start_times.pop(
-                                                placeholder_id, None
-                                            )
-                                            continue
-                                        else:
-                                            # Still pending, keep original for next cycle
-                                            has_pending_uploads = True
-                                            break
+                                        # Clean up both upload manager and local tracking
+                                        self.upload_manager.cleanup_resolved_upload(
+                                            file_ref
+                                        )
+                                        self.upload_start_times.pop(
+                                            placeholder_id, None
+                                        )
+                                    elif upload_status["status"] == "failed":
+                                        # Upload failed, skip this image but continue processing
+                                        # Clean up both upload manager and local tracking
+                                        self.upload_manager.cleanup_resolved_upload(
+                                            file_ref
+                                        )
+                                        self.upload_start_times.pop(
+                                            placeholder_id, None
+                                        )
+                                        continue
+                                    elif upload_status["status"] == "unknown":
+                                        # Upload was cleaned up, treat as failed
+                                        print(
+                                            "Skipping unknown/cleaned upload in absorb_content_into_memory"
+                                        )
+                                        # Only clean up local tracking since upload manager already cleaned up
+                                        self.upload_start_times.pop(
+                                            placeholder_id, None
+                                        )
+                                        continue
                                     else:
-                                        # Already uploaded file reference
-                                        processed_image_uris.append(file_ref)
+                                        # Still pending, keep original for next cycle
+                                        has_pending_uploads = True
+                                        break
                                 else:
-                                    # For non-GEMINI models: store the image URI directly for base64 conversion later
+                                    # Already uploaded file reference
                                     processed_image_uris.append(file_ref)
-
-                            if has_pending_uploads:
-                                # Keep for next cycle if any uploads are still pending
-                                pending_items.append((timestamp, item))
                             else:
-                                # All uploads completed, update the item
-                                item_copy["image_uris"] = processed_image_uris
-                                ready_to_process.append((timestamp, item_copy))
+                                # For non-GEMINI models: store the image URI directly for base64 conversion later
+                                processed_image_uris.append(file_ref)
+
+                        if has_pending_uploads:
+                            # Keep for next cycle if any uploads are still pending
+                            pending_items.append((timestamp, item))
                         else:
-                            # No images or already processed, add to ready list
+                            # All uploads completed, update the item
+                            item_copy["image_uris"] = processed_image_uris
                             ready_to_process.append((timestamp, item_copy))
+                    else:
+                        # No images or already processed, add to ready list
+                        ready_to_process.append((timestamp, item_copy))
 
-                # ✅ TASK 3 - Modification 7c: Update Redis with pending items
-                # Keep only items that are still pending (for GEMINI models) or clear all (for non-GEMINI models)
-                # Clear all messages from Redis and re-add pending ones
-                num_processed = len(all_messages) - len(pending_items)
-                if num_processed > 0:
-                    remove_messages_from_redis(user_id, num_processed)
+            # ✅ TASK 3 - Modification 7c: Update Redis with pending items
+            # Keep only items that are still pending (for GEMINI models) or clear all (for non-GEMINI models)
+            # Clear all messages from Redis and re-add pending ones
+            num_processed = len(all_messages) - len(pending_items)
+            if num_processed > 0:
+                remove_messages_from_redis(user_id, num_processed)
 
-            # Extract voice content from ready_to_process messages
-            voice_content = []
-            for _, item in ready_to_process:
-                if "audio_segments" in item and item["audio_segments"] is not None:
-                    # audio_segments can be a list of audio segments that can be directly combined
-                    voice_content.extend(item["audio_segments"])
+        # Extract voice content from ready_to_process messages
+        voice_content = []
+        for _, item in ready_to_process:
+            if "audio_segments" in item and item["audio_segments"] is not None:
+                # audio_segments can be a list of audio segments that can be directly combined
+                voice_content.extend(item["audio_segments"])
 
-            # Save voice content to folder if any exists
-            if voice_content:
-                current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[
-                    :-3
-                ]  # Include milliseconds
-                voice_folder = f"tmp_voice_content_{current_timestamp}"
+        # Save voice content to folder if any exists
+        if voice_content:
+            current_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[
+                :-3
+            ]  # Include milliseconds
+            voice_folder = f"tmp_voice_content_{current_timestamp}"
 
-                try:
-                    os.makedirs(voice_folder, exist_ok=True)
-                    self.logger.info(f"Created voice content folder: {voice_folder}")
+            try:
+                os.makedirs(voice_folder, exist_ok=True)
+                self.logger.info(f"Created voice content folder: {voice_folder}")
 
-                    for i, audio_segment in enumerate(voice_content):
-                        try:
-                            # Save audio segment to file
-                            if hasattr(audio_segment, "export"):
-                                # AudioSegment object
-                                filename = f"voice_segment_{i + 1:03d}.wav"
-                                filepath = os.path.join(voice_folder, filename)
-                                audio_segment.export(filepath, format="wav")
-                                self.logger.info(
-                                    f"Saved voice segment {i + 1} to {filepath}"
-                                )
-                            else:
-                                # Handle other audio formats (e.g., raw bytes)
-                                filename = f"voice_segment_{i + 1:03d}.dat"
-                                filepath = os.path.join(voice_folder, filename)
-                                with open(filepath, "wb") as f:
-                                    if isinstance(audio_segment, bytes):
-                                        f.write(audio_segment)
-                                    else:
-                                        # Convert to bytes if needed
-                                        f.write(str(audio_segment).encode())
-                                self.logger.info(f"Saved voice data {i + 1} to {filepath}")
-                        except Exception as e:
-                            self.logger.error(f"Failed to save voice segment {i + 1}: {e}")
+                for i, audio_segment in enumerate(voice_content):
+                    try:
+                        # Save audio segment to file
+                        if hasattr(audio_segment, "export"):
+                            # AudioSegment object
+                            filename = f"voice_segment_{i + 1:03d}.wav"
+                            filepath = os.path.join(voice_folder, filename)
+                            audio_segment.export(filepath, format="wav")
+                            self.logger.info(
+                                f"Saved voice segment {i + 1} to {filepath}"
+                            )
+                        else:
+                            # Handle other audio formats (e.g., raw bytes)
+                            filename = f"voice_segment_{i + 1:03d}.dat"
+                            filepath = os.path.join(voice_folder, filename)
+                            with open(filepath, "wb") as f:
+                                if isinstance(audio_segment, bytes):
+                                    f.write(audio_segment)
+                                else:
+                                    # Convert to bytes if needed
+                                    f.write(str(audio_segment).encode())
+                            self.logger.info(f"Saved voice data {i + 1} to {filepath}")
+                    except Exception as e:
+                        self.logger.error(f"Failed to save voice segment {i + 1}: {e}")
 
-                    self.logger.info(
-                        f"Successfully saved {len(voice_content)} voice segments to {voice_folder}"
-                    )
-                except Exception as e:
-                    self.logger.error(
-                        f"Failed to create voice content folder {voice_folder}: {e}"
-                    )
-
-            # Process content and build message
-            message = self._build_memory_message(ready_to_process, voice_content)
-
-            # Handle user conversation if exists
-            # ✅ FIX: Pass user_id for multi-user concurrency safety
-            message, user_message_added = self._add_user_conversation_to_message(message, user_id)
-
-            if SKIP_META_MEMORY_MANAGER:
-                # Add system instruction
-                if user_message_added:
-                    system_message = "[System Message] Interpret the provided content and the conversations between the user and the chat agent, according to what the user is doing, trigger the appropriate memory update."
-                else:
-                    system_message = "[System Message] Interpret the provided content, according to what the user is doing, extract the important information matching your memory type and save it into the memory."
-            else:
-                # Add system instruction for meta memory manager
-                if user_message_added:
-                    system_message = "[System Message] As the meta memory manager, analyze the provided content and the conversations between the user and the chat agent. Based on what the user is doing, determine which memory should be updated (episodic, procedural, knowledge vault, semantic, core, and resource)."
-                else:
-                    system_message = "[System Message] As the meta memory manager, analyze the provided content. Based on the content, determine what memories need to be updated (episodic, procedural, knowledge vault, semantic, core, and resource)"
-
-            message.append({"type": "text", "text": system_message})
-
-            t1 = time.time()
-            if SKIP_META_MEMORY_MANAGER:
-                # Send to memory agents in parallel
-                self._send_to_memory_agents_separately(
-                    message,
-                    set(list(self.uri_to_create_time.keys())),
-                    agent_states,
-                    user_id=user_id,
+                self.logger.info(
+                    f"Successfully saved {len(voice_content)} voice segments to {voice_folder}"
                 )
-            else:
-                # Send to meta memory agent
-                response, agent_type = self._send_to_meta_memory_agent(
-                    message,
-                    set(list(self.uri_to_create_time.keys())),
-                    agent_states,
-                    user_id=user_id,
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to create voice content folder {voice_folder}: {e}"
                 )
 
-            t2 = time.time()
-            self.logger.info(f"Time taken to send to memory agents: {t2 - t1} seconds")
+        # Process content and build message
+        message = self._build_memory_message(ready_to_process, voice_content)
 
-            # # write the logic to send the message to all the agents one by one
-            # payloads = {
-            #     'message': message,
-            #     'chaining': CHAINING_FOR_MEMORY_UPDATE
-            # }
+        # Handle user conversation if exists
+        # ✅ FIX: Pass user_id for multi-user concurrency safety
+        message, user_message_added = self._add_user_conversation_to_message(message, user_id)
 
-            # for agent_type in ['episodic_memory', 'procedural_memory', 'knowledge_vault',
-            #                  'semantic_memory', 'core_memory', 'resource_memory']:
-            #     self.message_queue.send_message_in_queue(
-            #         self.client,
-            #         agent_states,
-            #         payloads,
-            #         agent_type
-            #     )
+        if SKIP_META_MEMORY_MANAGER:
+            # Add system instruction
+            if user_message_added:
+                system_message = "[System Message] Interpret the provided content and the conversations between the user and the chat agent, according to what the user is doing, trigger the appropriate memory update."
+            else:
+                system_message = "[System Message] Interpret the provided content, according to what the user is doing, extract the important information matching your memory type and save it into the memory."
+        else:
+            # Add system instruction for meta memory manager
+            if user_message_added:
+                system_message = "[System Message] As the meta memory manager, analyze the provided content and the conversations between the user and the chat agent. Based on what the user is doing, determine which memory should be updated (episodic, procedural, knowledge vault, semantic, core, and resource)."
+            else:
+                system_message = "[System Message] As the meta memory manager, analyze the provided content. Based on the content, determine what memories need to be updated (episodic, procedural, knowledge vault, semantic, core, and resource)"
 
-            # Clean up processed content
-            # ✅ FIX: Pass user_id for multi-user concurrency safety
-            self._cleanup_processed_content(ready_to_process, user_message_added, user_id)
-        finally:
-            # ✅ P0-1: Always release the lock, even if an exception occurred
-            release_user_lock(user_id)
-            self.logger.debug(f"[P0-1] Released absorption lock for user {user_id}")
+        message.append({"type": "text", "text": system_message})
+
+        t1 = time.time()
+        if SKIP_META_MEMORY_MANAGER:
+            # Send to memory agents in parallel
+            self._send_to_memory_agents_separately(
+                message,
+                set(list(self.uri_to_create_time.keys())),
+                agent_states,
+                user_id=user_id,
+            )
+        else:
+            # Send to meta memory agent
+            response, agent_type = self._send_to_meta_memory_agent(
+                message,
+                set(list(self.uri_to_create_time.keys())),
+                agent_states,
+                user_id=user_id,
+            )
+
+        t2 = time.time()
+        self.logger.info(f"Time taken to send to memory agents: {t2 - t1} seconds")
+
+        # # write the logic to send the message to all the agents one by one
+        # payloads = {
+        #     'message': message,
+        #     'chaining': CHAINING_FOR_MEMORY_UPDATE
+        # }
+
+        # for agent_type in ['episodic_memory', 'procedural_memory', 'knowledge_vault',
+        #                  'semantic_memory', 'core_memory', 'resource_memory']:
+        #     self.message_queue.send_message_in_queue(
+        #         self.client,
+        #         agent_states,
+        #         payloads,
+        #         agent_type
+        #     )
+
+        # Clean up processed content
+        # ✅ FIX: Pass user_id for multi-user concurrency safety
+        self._cleanup_processed_content(ready_to_process, user_message_added, user_id)
 
     def _build_memory_message(self, ready_to_process, voice_content):
         """Build the message content for memory agents."""
@@ -758,21 +730,12 @@ class TemporaryMessageAccumulator:
                     )
 
                     # Handle different types of file references
-                    # ✅ P0-2: Support both object format (original) and dict format (from Redis)
                     if hasattr(file_ref, "uri"):
-                        # GEMINI models: use Google Cloud file URI (object format)
+                        # GEMINI models: use Google Cloud file URI
                         message_parts.append(
                             {
                                 "type": "google_cloud_file_uri",
                                 "google_cloud_file_uri": file_ref.uri,
-                            }
-                        )
-                    elif isinstance(file_ref, dict) and "uri" in file_ref:
-                        # GEMINI models: Google Cloud file URI from Redis (dict format)
-                        message_parts.append(
-                            {
-                                "type": "google_cloud_file_uri",
-                                "google_cloud_file_uri": file_ref["uri"],
                             }
                         )
                     else:

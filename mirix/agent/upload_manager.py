@@ -7,13 +7,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from PIL import Image
 
-# ✅ P0-2: Import Redis upload status functions for cross-pod visibility
-from mirix.agent.redis_message_store import (
-    set_upload_status as redis_set_upload_status,
-    get_upload_status as redis_get_upload_status,
-    delete_upload_status as redis_delete_upload_status,
-)
-
 
 class UploadManager:
     """
@@ -78,20 +71,11 @@ class UploadManager:
                     x for x in self.existing_files if x.name == cloud_file_name
                 ][0]
 
-                # ✅ P0-2: Update both local and Redis status for cross-pod visibility
                 with self._upload_lock:
                     self._upload_status[upload_uuid] = {
                         "status": "completed",
                         "result": file_ref,
                     }
-                
-                # Write to Redis so other pods can see the status
-                redis_set_upload_status(
-                    upload_uuid, 
-                    status='completed', 
-                    result=file_ref,
-                    filename=filename
-                )
                 return
 
             # Choose file to upload (compressed if available, otherwise original)
@@ -134,35 +118,18 @@ class UploadManager:
                 except:
                     pass  # Ignore cleanup errors
 
-            # ✅ P0-2: Mark as completed in both local and Redis storage
+            # Mark as completed
             with self._upload_lock:
                 self._upload_status[upload_uuid] = {
                     "status": "completed",
                     "result": file_ref,
                 }
-            
-            # Write to Redis for cross-pod visibility
-            redis_set_upload_status(
-                upload_uuid,
-                status='completed',
-                result=file_ref,
-                filename=filename
-            )
 
         except Exception as e:
             self.logger.error(f"Upload failed for {filename}: {e}")
-            
-            # ✅ P0-2: Mark as failed in both local and Redis storage
+            # Mark as failed
             with self._upload_lock:
                 self._upload_status[upload_uuid] = {"status": "failed", "result": None}
-            
-            # Write to Redis for cross-pod visibility
-            redis_set_upload_status(
-                upload_uuid,
-                status='failed',
-                result=None,
-                filename=filename
-            )
 
             # Clean up compressed file on failure too
             if (
@@ -184,17 +151,9 @@ class UploadManager:
         if compress and filename.lower().endswith((".png", ".jpg", ".jpeg")):
             compressed_file = self._compress_image(filename)
 
-        # ✅ P0-2: Initialize status in both local and Redis storage
+        # Initialize status
         with self._upload_lock:
             self._upload_status[upload_uuid] = {"status": "pending", "result": None}
-        
-        # Write initial status to Redis for cross-pod visibility
-        redis_set_upload_status(
-            upload_uuid,
-            status='pending',
-            result=None,
-            filename=filename
-        )
 
         # Submit upload task with 5-second timeout
         future = self._executor.submit(
@@ -213,15 +172,6 @@ class UploadManager:
                         "status": "failed",
                         "result": None,
                     }
-                    
-                    # ✅ P0-2: Update Redis status for cross-pod visibility
-                    redis_set_upload_status(
-                        upload_uuid,
-                        status='failed',
-                        result=None,
-                        filename=filename
-                    )
-                    
                     future.cancel()  # Try to cancel the upload
 
         # Start timeout handler in separate thread
@@ -232,25 +182,12 @@ class UploadManager:
         return {"upload_uuid": upload_uuid, "filename": filename, "pending": True}
 
     def get_upload_status(self, placeholder):
-        """
-        Get upload status and result in one call.
-        
-        ✅ P0-2: Now checks Redis first for cross-pod visibility.
-        This allows any pod to check the status of an upload initiated by another pod.
-        """
+        """Get upload status and result in one call"""
         if not isinstance(placeholder, dict) or not placeholder.get("pending"):
             return {"status": "completed", "result": placeholder}  # Already resolved
 
         upload_uuid = placeholder["upload_uuid"]
 
-        # ✅ P0-2: Check Redis first for cross-pod visibility
-        redis_status = redis_get_upload_status(upload_uuid)
-        
-        if redis_status['status'] != 'unknown':
-            # Found in Redis, use this status (may be from another pod)
-            return redis_status
-        
-        # Fallback to local status (for backward compatibility)
         with self._upload_lock:
             if upload_uuid not in self._upload_status:
                 # Upload was either never started or already cleaned up
@@ -300,22 +237,13 @@ class UploadManager:
         )  # Reduced timeout since individual uploads timeout at 5s
 
     def cleanup_resolved_upload(self, placeholder):
-        """
-        Clean up resolved upload from tracking.
-        
-        ✅ P0-2: Now also deletes from Redis to prevent memory leak.
-        """
+        """Clean up resolved upload from tracking"""
         if not isinstance(placeholder, dict) or not placeholder.get("pending"):
             return  # Not a pending placeholder
 
         upload_uuid = placeholder["upload_uuid"]
-        
-        # ✅ P0-2: Clean up both local and Redis storage
         with self._upload_lock:
             self._upload_status.pop(upload_uuid, None)
-        
-        # Delete from Redis
-        redis_delete_upload_status(upload_uuid)
 
     def cleanup_upload_workers(self):
         """Gracefully shut down the thread pool"""
