@@ -306,7 +306,7 @@ class AgentWrapper:
 
         # For GEMINI models, extract all unprocessed images and fill temporary_messages
         if self.model_name in GEMINI_MODELS and self.google_client is not None:
-            self._process_existing_uploaded_files(user_id=self.client.user.id)
+            self._process_existing_uploaded_files()
 
     def construct_system_message(self, message: str, user_id: str) -> str:
         """
@@ -788,7 +788,7 @@ class AgentWrapper:
             self.logger.warning(f"Error checking Gmail credentials: {e}")
             return False
 
-    def _process_existing_uploaded_files(self, user_id: str):
+    def _process_existing_uploaded_files(self):
         """Process any existing uploaded files for Gemini models."""
         # ✅ TASK 4: Import Redis function for direct message addition
         from mirix.agent.redis_message_store import add_message_to_redis
@@ -814,12 +814,12 @@ class AgentWrapper:
                 "message": None,
                 "sources": None,
             }
-            add_message_to_redis(user_id, mapping.timestamp, message_data)
+            add_message_to_redis(mapping.user_id, mapping.timestamp, message_data)
             
             count += 1
             if count == TEMPORARY_MESSAGE_LIMIT:
                 self.temp_message_accumulator.absorb_content_into_memory(
-                    self.agent_states, user_id=user_id
+                    self.agent_states, user_id=mapping.user_id
                 )
                 count = 0
 
