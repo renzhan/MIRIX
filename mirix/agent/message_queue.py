@@ -100,6 +100,7 @@ class MessageQueue:
             "core_memory": "core_memory_agent_state",
             "resource_memory": "resource_memory_agent_state",
             "meta_memory_agent": "meta_memory_agent_state",  # Alias
+            "email_reply": "email_reply_agent_state"
         }
 
         state_name = agent_type_to_state_mapping.get(agent_type)

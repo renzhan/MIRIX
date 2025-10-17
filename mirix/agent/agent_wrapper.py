@@ -148,6 +148,9 @@ class AgentWrapper:
                 elif agent_state.name == "background_agent":
                     self.agent_states.background_agent_state = agent_state
 
+                elif agent_state.name == 'email_reply_agent':
+                    self.agent_states.email_reply_agent_state = agent_state
+
                 if self.system_prompt_folder is not None and os.path.exists(os.path.join(self.system_prompt_folder, agent_state.name + ".txt")):
                     system_prompt = gpt_system.get_system_text(os.path.join(self.system_prompt_folder, agent_state.name))
                 else:
@@ -200,6 +203,24 @@ class AgentWrapper:
                 setattr(
                     self.agent_states, "background_agent_state", background_agent_state
                 )
+
+            if self.agent_states.email_reply_agent_state is None:
+                if self.system_prompt_folder is not None and os.path.exists(os.path.join(self.system_prompt_folder, "email_reply_agent.txt")):
+                    email_reply_system_prompt = gpt_system.get_system_text(
+                        os.path.join(self.system_prompt_folder, "email_reply_agent")
+                    )
+                else:
+                    email_reply_system_prompt = gpt_system.get_system_text("base/email_reply_agent")
+                email_reply_agent_state = self.client.create_agent(
+                    name="email_reply_agent",
+                    agent_type=AgentType.email_reply_agent,
+                    memory=self.agent_states.agent_state.memory,
+                    system=email_reply_system_prompt,
+                )
+                setattr(
+                    self.agent_states, "email_reply_agent_state", email_reply_agent_state
+                )   
+
 
         else:
             core_memory = ChatMemory(

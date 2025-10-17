@@ -18,6 +18,8 @@ from ..agent.agent_wrapper import AgentWrapper
 from ..functions.mcp_client import StdioServerConfig, get_mcp_client_manager
 from ..services.mcp_marketplace import get_mcp_marketplace
 from ..services.mcp_tool_registry import get_mcp_tool_registry
+from ..utils import parse_json
+from ..schemas.mirix_message import MessageType
 
 logger = logging.getLogger(__name__)
 
@@ -569,6 +571,13 @@ class ReflexionResponse(BaseModel):
     message: str
     processing_time: Optional[float] = None
 
+
+class EmailReplyRequest(BaseModel):
+    email_content: str
+    user_id: str
+
+class EmailReplyResponse(BaseModel):
+    reply_content: str
 
 @app.on_event("startup")
 async def startup_event():
@@ -2269,6 +2278,103 @@ async def create_user(request: CreateUserRequest):
         return CreateUserResponse(
             success=False, message=f"Error creating user: {str(e)}"
         )
+
+
+@app.post("/email/reply", response_model=EmailReplyResponse)
+async def reply_to_email(request: EmailReplyRequest):
+    """
+    智能邮件回复接口
+
+    参数:
+    - email_content: 需要回复的邮件内容（必需）
+    - reply_instruction: 回复指令/要求（可选，默认："请生成专业的邮件回复"）
+    - user_id: 用户标识（必需）
+
+    返回:
+    - reply_content: 生成的邮件回复内容
+    """
+    if agent is None:
+        raise HTTPException(status_code=500, detail="Agent not initialized")
+
+    # Register tools for restored MCP connections (one-time only)
+    global _mcp_tools_registered
+    if not _mcp_tools_registered:
+        register_mcp_tools_for_restored_connections()
+        _mcp_tools_registered = True
+
+    # Check for missing API keys
+    api_key_check = check_missing_api_keys(agent)
+    if "error" in api_key_check:
+        raise HTTPException(status_code=500, detail=api_key_check["error"][0])
+
+    if api_key_check["missing_keys"]:
+        # Return a special response indicating missing API keys
+        raise HTTPException(status_code=500, detail=f"Missing API keys for {api_key_check['model_type']} model: {', '.join(api_key_check['missing_keys'])}. Please provide the required API keys.")
+
+    try:
+        # 参数验证
+        if not request.user_id.strip():
+            raise HTTPException(status_code=400, detail="user_id不能为空")
+
+        if not request.email_content.strip():
+            raise HTTPException(status_code=400, detail="email_content不能为空")
+
+        response, _ = agent.message_queue.send_message_in_queue(
+            agent.client,
+            agent.agent_states.email_reply_agent_state.id,
+            {
+                "user_id": request.user_id,
+                "message": request.email_content,
+                "force_response": True
+            },
+            agent_type="email_reply",
+        )
+
+        # Check if response is an error string
+        if response == "ERROR":
+            return "ERROR_RESPONSE_FAILED"
+
+        # Check if response has the expected structure
+        if not hasattr(response, "messages") or len(response.messages) < 2:
+            return "ERROR_INVALID_RESPONSE_STRUCTURE"
+
+        try:
+            # find how many tools are called
+            num_tools_called = 0
+            for message in response.messages[::-1]:
+                if message.message_type == MessageType.tool_return_message:
+                    num_tools_called += 1
+                else:
+                    break
+
+            # Check if the message has tool_call attribute
+            # 1->3; 2->5
+            if not hasattr(
+                    response.messages[-(num_tools_called * 2 + 1)], "tool_call"
+            ):
+                return "ERROR_NO_TOOL_CALL"
+
+            tool_call = response.messages[-(num_tools_called * 2 + 1)].tool_call
+
+            parsed_args = parse_json(tool_call.arguments)
+
+            if "message" not in parsed_args:
+                return "ERROR_NO_MESSAGE_IN_ARGS"
+
+            response_text = parsed_args["message"]
+
+            return EmailReplyResponse(
+                reply_content=response_text
+            )
+        except (AttributeError, KeyError, IndexError, json.JSONDecodeError):
+            raise HTTPException(status_code=500, detail="Error parsing response")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[EMAIL_REPLY_API] 处理失败: {str(e)}")
+        logger.error(f"[EMAIL_REPLY_API] 错误堆栈: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"邮件回复生成失败: {str(e)}")
 
 
 if __name__ == "__main__":
