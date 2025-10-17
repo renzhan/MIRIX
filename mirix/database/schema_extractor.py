@@ -273,6 +273,8 @@ CREATE TABLE procedural_memory (
     tree_path TEXT NOT NULL,
     last_modify TEXT NOT NULL,
     metadata_ TEXT,
+    email_tag TEXT,
+    flow_tag TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_deleted BOOLEAN DEFAULT FALSE,

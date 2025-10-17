@@ -81,6 +81,22 @@ class ProceduralMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
         doc="Arbitrary additional metadata as a JSON object",
     )
 
+    # Email tags for categorization
+    email_tag: Mapped[list] = mapped_column(
+        JSON,
+        default=list,
+        nullable=True,
+        doc="Array of email-related tags for categorization",
+    )
+
+    # Flow tags for workflow categorization
+    flow_tag: Mapped[list] = mapped_column(
+        JSON,
+        default=list,
+        nullable=True,
+        doc="Array of workflow/flow-related tags for categorization",
+    )
+
     embedding_config: Mapped[Optional[dict]] = mapped_column(
         EmbeddingConfigColumn, nullable=True, doc="Embedding configuration"
     )

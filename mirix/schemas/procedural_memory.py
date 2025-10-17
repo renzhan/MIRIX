@@ -26,6 +26,14 @@ class ProceduralMemoryItemBase(MirixBase):
         ...,
         description="Hierarchical categorization path as an array of strings (e.g., ['workflows', 'development', 'testing'])",
     )
+    email_tag: List[str] = Field(
+        default_factory=list,
+        description="Array of email-related tags for categorization",
+    )
+    flow_tag: List[str] = Field(
+        default_factory=list,
+        description="Array of workflow/flow-related tags for categorization",
+    )
 
 
 class ProceduralMemoryItem(ProceduralMemoryItemBase):
@@ -98,6 +106,14 @@ class ProceduralMemoryItemUpdate(MirixBase):
     tree_path: Optional[List[str]] = Field(
         None,
         description="Hierarchical categorization path as an array of strings (e.g., ['workflows', 'development', 'testing'])",
+    )
+    email_tag: Optional[List[str]] = Field(
+        None,
+        description="Array of email-related tags for categorization",
+    )
+    flow_tag: Optional[List[str]] = Field(
+        None,
+        description="Array of workflow/flow-related tags for categorization",
     )
     metadata_: Optional[Dict[str, Any]] = Field(
         None, description="Arbitrary additional metadata"
