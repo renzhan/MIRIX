@@ -18,6 +18,7 @@ __all__ = [
     "UploadManager",
     "app_constants",
     "app_utils",
+    "EmailReplyAgent"
 ]
 
 from mirix.agent.agent import Agent, AgentState, save_agent
@@ -30,3 +31,4 @@ from mirix.agent.procedural_memory_agent import ProceduralMemoryAgent
 from mirix.agent.reflexion_agent import ReflexionAgent
 from mirix.agent.resource_memory_agent import ResourceMemoryAgent
 from mirix.agent.semantic_memory_agent import SemanticMemoryAgent
+from mirix.agent.email_reply_agent import EmailReplyAgent

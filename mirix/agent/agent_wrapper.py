@@ -148,6 +148,9 @@ class AgentWrapper:
                 elif agent_state.name == "background_agent":
                     self.agent_states.background_agent_state = agent_state
 
+                elif agent_state.name == 'email_reply_agent':
+                    self.agent_states.email_reply_agent_state = agent_state
+
                 if self.system_prompt_folder is not None and os.path.exists(os.path.join(self.system_prompt_folder, agent_state.name + ".txt")):
                     system_prompt = gpt_system.get_system_text(os.path.join(self.system_prompt_folder, agent_state.name))
                 else:
@@ -200,6 +203,24 @@ class AgentWrapper:
                 setattr(
                     self.agent_states, "background_agent_state", background_agent_state
                 )
+
+            if self.agent_states.email_reply_agent_state is None:
+                if self.system_prompt_folder is not None and os.path.exists(os.path.join(self.system_prompt_folder, "email_reply_agent.txt")):
+                    email_reply_system_prompt = gpt_system.get_system_text(
+                        os.path.join(self.system_prompt_folder, "email_reply_agent")
+                    )
+                else:
+                    email_reply_system_prompt = gpt_system.get_system_text("base/email_reply_agent")
+                email_reply_agent_state = self.client.create_agent(
+                    name="email_reply_agent",
+                    agent_type=AgentType.email_reply_agent,
+                    memory=self.agent_states.agent_state.memory,
+                    system=email_reply_system_prompt,
+                )
+                setattr(
+                    self.agent_states, "email_reply_agent_state", email_reply_agent_state
+                )   
+
 
         else:
             core_memory = ChatMemory(
@@ -306,7 +327,7 @@ class AgentWrapper:
 
         # For GEMINI models, extract all unprocessed images and fill temporary_messages
         if self.model_name in GEMINI_MODELS and self.google_client is not None:
-            self._process_existing_uploaded_files(user_id=self.client.user.id)
+            self._process_existing_uploaded_files()
 
     def construct_system_message(self, message: str, user_id: str) -> str:
         """
@@ -788,8 +809,11 @@ class AgentWrapper:
             self.logger.warning(f"Error checking Gmail credentials: {e}")
             return False
 
-    def _process_existing_uploaded_files(self, user_id: str):
+    def _process_existing_uploaded_files(self):
         """Process any existing uploaded files for Gemini models."""
+        # ✅ TASK 4: Import Redis function for direct message addition
+        from mirix.agent.redis_message_store import add_message_to_redis
+        
         uploaded_mappings = (
             self.client.server.cloud_file_mapping_manager.list_files_with_status(
                 status="uploaded"
@@ -804,16 +828,19 @@ class AgentWrapper:
                 if file.name == mapping.cloud_file_id
             ][0]
 
-            self.temp_message_accumulator.temporary_messages.append(
-                (
-                    mapping.timestamp,
-                    {"image_uris": [file_ref], "audio_segments": None, "message": None},
-                )
-            )
+            # ✅ TASK 4: Use Redis directly instead of accessing temporary_messages list
+            message_data = {
+                "image_uris": [file_ref],
+                "audio_segments": None,
+                "message": None,
+                "sources": None,
+            }
+            add_message_to_redis(mapping.user_id, mapping.timestamp, message_data)
+            
             count += 1
             if count == TEMPORARY_MESSAGE_LIMIT:
                 self.temp_message_accumulator.absorb_content_into_memory(
-                    self.agent_states, user_id=user_id
+                    self.agent_states, user_id=mapping.user_id
                 )
                 count = 0
 
@@ -1978,6 +2005,7 @@ Please perform this analysis and create new memories as appropriate. Provide a d
                     image.save(filename)
                     image_uris.append(filename)
 
+            # ✅ TASK 4: Pass user_id parameter for multi-user Redis isolation
             self.temp_message_accumulator.add_message(
                 {
                     "message": message,
@@ -1986,12 +2014,14 @@ Please perform this analysis and create new memories as appropriate. Provide a d
                     "voice_files": voice_files,
                 },
                 timestamp,
+                user_id,
                 delete_after_upload=delete_after_upload,
                 async_upload=async_upload,
             )
 
             # Check if we should trigger memory absorption
-            ready_messages = self.temp_message_accumulator.should_absorb_content()
+            # ✅ TASK 4: Pass user_id parameter for multi-user Redis isolation
+            ready_messages = self.temp_message_accumulator.should_absorb_content(user_id)
             if force_absorb_content or ready_messages:
                 t1 = time.time()
                 # Pass the ready messages to absorb_content_into_memory if availabl, user_id=user_ide
@@ -2033,9 +2063,11 @@ Please perform this analysis and create new memories as appropriate. Provide a d
 
                 extra_messages = []
 
+                # ✅ TASK 4: Pass user_id parameter for multi-user Redis isolation
                 most_recent_images = (
                     self.temp_message_accumulator.get_recent_images_for_chat(
-                        current_timestamp=datetime.now(self.timezone)
+                        current_timestamp=datetime.now(self.timezone),
+                        user_id=user_id,
                     )
                 )
 
@@ -2163,7 +2195,8 @@ Please perform this analysis and create new memories as appropriate. Provide a d
                 return "ERROR_PARSING_EXCEPTION"
 
             # Add conversation to accumulator
-            self.temp_message_accumulator.add_user_conversation(message, response_text)
+            # ✅ FIX: Pass user_id for multi-user concurrency safety
+            self.temp_message_accumulator.add_user_conversation(message, response_text, user_id)
 
             if not is_screen_monitoring:
                 # we need to call meta memory manager to update the memory

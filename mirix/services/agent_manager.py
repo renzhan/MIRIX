@@ -210,6 +210,14 @@ class AgentManager:
                 + EXTRAS_TOOLS
             )
 
+        if agent_state.agent_type == AgentType.email_reply_agent:
+            # Email reply agent needs chat tools for sending messages and extra tools for flexibility
+            tool_names.extend(
+                BASE_TOOLS
+                + CHAT_AGENT_TOOLS
+                + EXTRAS_TOOLS
+                + MCP_TOOLS)
+
         ## extract the existing tool names for the agent
         existing_tools = agent_state.tools
         existing_tool_names = set([tool.name for tool in existing_tools])

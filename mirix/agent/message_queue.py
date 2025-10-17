@@ -44,10 +44,10 @@ class MessageQueue:
         with self._message_queue_lock:
             self.message_queue[message_uuid]["started"] = True
 
-        user_id = self.message_queue[message_uuid]["kwargs"]["user_id"]
+        # user_id = self.message_queue[message_uuid]["kwargs"]["user_id"]
         try:
             response = client.send_message(
-                user_id=user_id,
+                # user_id=user_id,
                 agent_id=agent_id,
                 role="user",
                 **self.message_queue[message_uuid]["kwargs"],
@@ -100,6 +100,7 @@ class MessageQueue:
             "core_memory": "core_memory_agent_state",
             "resource_memory": "resource_memory_agent_state",
             "meta_memory_agent": "meta_memory_agent_state",  # Alias
+            "email_reply": "email_reply_agent_state"
         }
 
         state_name = agent_type_to_state_mapping.get(agent_type)

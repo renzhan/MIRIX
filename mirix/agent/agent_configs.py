@@ -62,4 +62,10 @@ AGENT_CONFIGS = [
         "attr_name": "agent_state",
         "include_base_tools": True,
     },
+    {
+        'name': 'email_reply_agent',
+        'agent_type': AgentType.email_reply_agent,
+        'attr_name': 'email_reply_agent_state',
+        'include_base_tools': True
+    }
 ]

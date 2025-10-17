@@ -27,6 +27,7 @@ from mirix.agent import (
     ResourceMemoryAgent,
     SemanticMemoryAgent,
     save_agent,
+    EmailReplyAgent,
 )
 
 # TODO use custom interface
@@ -610,6 +611,11 @@ class SyncServer(Server):
                 )
             elif agent_state.agent_type == AgentType.background_agent:
                 agent = BackgroundAgent(
+                    agent_state=agent_state, interface=interface, user=actor
+                )
+            
+            elif agent_state.agent_type == AgentType.email_reply_agent:
+                agent = EmailReplyAgent(
                     agent_state=agent_state, interface=interface, user=actor
                 )
             else:

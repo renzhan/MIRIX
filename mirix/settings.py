@@ -143,6 +143,14 @@ class Settings(BaseSettings):
     pg_pool_recycle: int = 1800  # When to recycle connections
     pg_echo: bool = False  # Logging
 
+    # ✅ TASK 1: Redis configuration for temporary message storage (multi-pod user isolation)
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_password: Optional[str] = None
+    redis_db: int = 0
+    redis_socket_timeout: float = 5.0
+    redis_max_connections: int = 50
+
     # multi agent settings
     multi_agent_send_message_max_retries: int = 3
     multi_agent_send_message_timeout: int = 20 * 60
