@@ -112,11 +112,11 @@ class AgentWrapper:
         self.logger.setLevel(logging.INFO)
 
         self.client = create_client()
-        self.client.set_default_llm_config(LLMConfig.default_config("gpt-4o-mini"))
-        # self.client.set_default_embedding_config(EmbeddingConfig.default_config("text-embedding-3-small"))
-        self.client.set_default_embedding_config(
-            EmbeddingConfig.default_config("text-embedding-004")
-        )
+        self.client.set_default_llm_config(LLMConfig.default_config("gpt-5"))
+        self.client.set_default_embedding_config(EmbeddingConfig.default_config("text-embedding-3-small"))
+        # self.client.set_default_embedding_config(
+        #     EmbeddingConfig.default_config("text-embedding-004")
+        # )
 
         # Initialize agent states container
         self.agent_states = AgentStates()

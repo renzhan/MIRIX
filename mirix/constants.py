@@ -43,7 +43,7 @@ EMBEDDING_TO_TOKENIZER_MAP = {
 EMBEDDING_TO_TOKENIZER_DEFAULT = "cl100k_base"
 
 
-DEFAULT_MIRIX_MODEL = "gpt-4"  # TODO: fixme
+DEFAULT_MIRIX_MODEL = "gpt-5"  # Updated to GPT-5
 DEFAULT_PERSONA = "sam_pov"
 DEFAULT_HUMAN = "basic"
 DEFAULT_PRESET = "memgpt_chat"
@@ -107,7 +107,7 @@ DEFAULT_MESSAGE_TOOL = "send_message"
 DEFAULT_MESSAGE_TOOL_KWARG = "message"
 
 # Structured output models
-STRUCTURED_OUTPUT_MODELS = {"gpt-4o", "gpt-4o-mini"}
+STRUCTURED_OUTPUT_MODELS = {"gpt-4o", "gpt-4o-mini", "gpt-5", "gpt-5-pro", "gpt-5-mini", "gpt-5-nano"}
 
 # LOGGER_LOG_LEVEL is use to convert Text to Logging level value for logging mostly for Cli input to setting level
 LOGGER_LOG_LEVELS = {
@@ -144,6 +144,11 @@ NON_USER_MSG_PREFIX = "[This is an automated system message hidden from the user
 LLM_MAX_TOKENS = {
     "DEFAULT": 8192,
     ## OpenAI models: https://platform.openai.com/docs/models/overview
+    # GPT-5 series
+    "gpt-5": 128000,
+    "gpt-5-pro": 128000,
+    "gpt-5-mini": 128000,
+    "gpt-5-nano": 128000,
     # "o1-preview
     "chatgpt-4o-latest": 128000,
     # "o1-preview-2024-09-12

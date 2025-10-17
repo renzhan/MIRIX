@@ -582,10 +582,10 @@ async def startup_event():
     if getattr(sys, "frozen", False):
         # Running in PyInstaller bundle
         bundle_dir = Path(sys._MEIPASS)
-        config_path = bundle_dir / "mirix" / "configs" / "mirix_monitor.yaml"
+        config_path = bundle_dir / "mirix" / "configs" / "mirix_gpt5.yaml"
     else:
         # Running in development
-        config_path = Path("mirix/configs/mirix_monitor.yaml")
+        config_path = Path("mirix/configs/mirix_gpt5.yaml")
 
     agent = AgentWrapper(str(config_path))
     print("Agent initialized successfully")
@@ -1466,10 +1466,8 @@ async def get_episodic_memory(user_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail="Agent not initialized")
 
     try:
-        # Find the current active user
-        users = agent.client.server.user_manager.list_users()
-        active_user = next((user for user in users if user.status == "active"), None)
-        target_user = active_user if active_user else (users[0] if users else None)
+        # Get target user based on user_id parameter
+        target_user = get_user_or_default(agent, user_id)
 
         # Access the episodic memory manager through the client
         client = agent.client
@@ -1513,10 +1511,8 @@ async def get_semantic_memory(user_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail="Agent not initialized")
 
     try:
-        # Find the current active user
-        users = agent.client.server.user_manager.list_users()
-        active_user = next((user for user in users if user.status == "active"), None)
-        target_user = active_user if active_user else (users[0] if users else None)
+        # Get target user based on user_id parameter
+        target_user = get_user_or_default(agent, user_id)
 
         client = agent.client
         semantic_items_list = []
@@ -1560,10 +1556,8 @@ async def get_procedural_memory(user_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail="Agent not initialized")
 
     try:
-        # Find the current active user
-        users = agent.client.server.user_manager.list_users()
-        active_user = next((user for user in users if user.status == "active"), None)
-        target_user = active_user if active_user else (users[0] if users else None)
+        # Get target user based on user_id parameter
+        target_user = get_user_or_default(agent, user_id)
 
         client = agent.client
         procedural_items_list = []
@@ -1633,10 +1627,8 @@ async def get_resource_memory(user_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail="Agent not initialized")
 
     try:
-        # Find the current active user
-        users = agent.client.server.user_manager.list_users()
-        active_user = next((user for user in users if user.status == "active"), None)
-        target_user = active_user if active_user else (users[0] if users else None)
+        # Get target user based on user_id parameter
+        target_user = get_user_or_default(agent, user_id)
 
         client = agent.client
         resource_manager = client.server.resource_memory_manager
@@ -1682,15 +1674,21 @@ async def get_resource_memory(user_id: Optional[str] = None):
 
 
 @app.get("/memory/core")
-async def get_core_memory():
+async def get_core_memory(user_id: Optional[str] = None):
     """Get core memory (understanding of user)"""
     if agent is None:
         raise HTTPException(status_code=500, detail="Agent not initialized")
 
     try:
-        # Get core memory from the main agent
-        core_memory = agent.client.get_in_context_memory(
-            agent.agent_states.agent_state.id
+        # Get target user based on user_id parameter
+        target_user = get_user_or_default(agent, user_id)
+        
+        print(f"📝 /memory/core: Fetching core memory for user: {target_user.name} (ID: {target_user.id})")
+        
+        # Get core memory from the main agent using target_user as actor
+        core_memory = agent.client.server.get_agent_memory(
+            agent_id=agent.agent_states.agent_state.id,
+            actor=target_user
         )
 
         core_understanding = []
@@ -1721,23 +1719,24 @@ async def get_core_memory():
 
 
 @app.get("/memory/credentials")
-async def get_credentials_memory():
+async def get_credentials_memory(user_id: Optional[str] = None):
     """Get credentials memory (knowledge vault with masked content)"""
     if agent is None:
         raise HTTPException(status_code=500, detail="Agent not initialized")
 
     try:
+        # Get target user based on user_id parameter
+        target_user = get_user_or_default(agent, user_id)
+        
         client = agent.client
         knowledge_vault_manager = client.server.knowledge_vault_manager
 
         # Get knowledge vault items using correct method name
         vault_items = knowledge_vault_manager.list_knowledge(
-            actor=agent.client.user,
+            actor=target_user,
             agent_state=agent.agent_states.knowledge_vault_agent_state,
             limit=50,
-            timezone_str=agent.client.server.user_manager.get_user_by_id(
-                agent.client.user.id
-            ).timezone,
+            timezone_str=target_user.timezone,
         )
 
         # Transform to frontend format with masked content

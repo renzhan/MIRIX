@@ -4,7 +4,7 @@ import queuedFetch from '../utils/requestQueue';
 import LocalModelModal from './LocalModelModal';
 import { useTranslation } from 'react-i18next';
 
-const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequired, isVisible }) => {
+const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequired, isVisible, onUserSwitch }) => {
   const { t, i18n } = useTranslation();
   const [personaDetails, setPersonaDetails] = useState({});
   const [selectedPersonaText, setSelectedPersonaText] = useState('');
@@ -221,7 +221,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
     } finally {
       setIsLoadingMcp(false);
     }
-  }, [settings.serverUrl]);
+  }, [settings.serverUrl, t]);
 
   const fetchUsers = useCallback(async () => {
     if (!settings.serverUrl) {
@@ -240,11 +240,10 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
         
         // Set current user (find user with active status)
         const activeUser = usersList.find(user => user.status === 'active');
-        if (activeUser) {
-          setCurrentUser(activeUser);
-        } else if (!currentUser && usersList.length > 0) {
-          // Fallback: if no active user found, use first user
-          setCurrentUser(usersList[0]);
+        const userToSet = activeUser || usersList[0];
+        
+        if (userToSet) {
+          setCurrentUser(userToSet);
         }
       } else {
         console.error('Failed to fetch users');
@@ -255,6 +254,14 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       setIsLoadingUsers(false);
     }
   }, [settings.serverUrl]);
+
+  // Initialize currentUserId when currentUser is first set
+  useEffect(() => {
+    if (currentUser && !settings.currentUserId) {
+      console.log('🔧 Initializing currentUserId to:', currentUser.id);
+      onSettingsChange({ currentUserId: currentUser.id });
+    }
+  }, [currentUser, settings.currentUserId, onSettingsChange]);
 
   const searchMcpMarketplace = useCallback(async (query = '') => {
     if (!settings.serverUrl) {
@@ -284,7 +291,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
     } finally {
       setIsLoadingMcp(false);
     }
-  }, [settings.serverUrl, selectedCategory]);
+  }, [settings.serverUrl, selectedCategory, t]);
 
   const refreshMcpStatus = useCallback(async () => {
     if (!settings.serverUrl) {
@@ -428,12 +435,27 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
+          console.log('✅ Successfully switched to user:', selectedUser.name, 'ID:', selectedUser.id);
+          
+          // 1. Update local state
           setCurrentUser(selectedUser);
-          console.log('Successfully switched to user:', data.user);
-          // Refresh users list to update status
+          
+          // 2. Update settings with currentUserId (this triggers ExistingMemory to reload)
+          console.log('📝 Updating settings.currentUserId to:', selectedUser.id);
+          onSettingsChange({ 
+            currentUserId: selectedUser.id,
+            lastBackendRefresh: Date.now() 
+          });
+          
+          // 3. Notify parent component to clear chat
+          if (onUserSwitch) {
+            onUserSwitch(selectedUser);
+          }
+          
+          // 4. Refresh users list to update status indicators
           await fetchUsers();
         } else {
-          console.error('Failed to switch user:', data.message);
+          console.error('❌ Failed to switch user:', data.message);
         }
       } else {
         console.error('Failed to switch user - server error');
@@ -443,7 +465,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
     } finally {
       setIsUserDropdownOpen(false);
     }
-  }, [settings.serverUrl, fetchUsers]);
+  }, [settings.serverUrl, fetchUsers, onUserSwitch, onSettingsChange]);
 
   const handleCreateUser = useCallback(async () => {
     if (!settings.serverUrl || !newUserName.trim()) {
@@ -568,10 +590,10 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       fetchCurrentMemoryModel();
       fetchCurrentTimezone();
       fetchCustomModels();
-      fetchMcpMarketplace();
+      // fetchMcpMarketplace();  // ✅ MCP 功能已禁用
       fetchUsers();
     }
-  }, [settings.serverUrl, fetchPersonaDetails, fetchCoreMemoryPersona, fetchCurrentModel, fetchCurrentMemoryModel, fetchCurrentTimezone, fetchCustomModels, fetchMcpMarketplace, fetchUsers]);
+  }, [settings.serverUrl, fetchPersonaDetails, fetchCoreMemoryPersona, fetchCurrentModel, fetchCurrentMemoryModel, fetchCurrentTimezone, fetchCustomModels, fetchUsers]);
 
   // Fetch current models and timezone whenever settings panel becomes visible
   useEffect(() => {
@@ -581,12 +603,12 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       fetchCurrentMemoryModel();
       fetchCurrentTimezone();
       fetchCustomModels();
-      fetchMcpMarketplace();
+      // fetchMcpMarketplace();  // ✅ MCP 功能已禁用
       fetchUsers();
       // Also refresh MCP status to ensure connections are shown correctly
-      refreshMcpStatus();
+      // refreshMcpStatus();  // ✅ MCP 功能已禁用
     }
-  }, [isVisible, settings.serverUrl, fetchCurrentModel, fetchCurrentMemoryModel, fetchCurrentTimezone, fetchCustomModels, fetchMcpMarketplace, fetchUsers, refreshMcpStatus]);
+  }, [isVisible, settings.serverUrl, fetchCurrentModel, fetchCurrentMemoryModel, fetchCurrentTimezone, fetchCustomModels, fetchUsers]);
 
   // Refresh all backend data when backend reconnects
   useEffect(() => {
@@ -598,17 +620,19 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
       fetchCurrentMemoryModel();
       fetchCurrentTimezone();
       fetchCustomModels();
-      fetchMcpMarketplace();
+      // fetchMcpMarketplace();  // ✅ MCP 功能已禁用
       fetchUsers();
     }
-  }, [settings.lastBackendRefresh, settings.serverUrl, fetchPersonaDetails, fetchCoreMemoryPersona, fetchCurrentModel, fetchCurrentMemoryModel, fetchCurrentTimezone, fetchCustomModels, fetchMcpMarketplace, fetchUsers]);
+  }, [settings.lastBackendRefresh, settings.serverUrl, fetchPersonaDetails, fetchCoreMemoryPersona, fetchCurrentModel, fetchCurrentMemoryModel, fetchCurrentTimezone, fetchCustomModels, fetchUsers]);
 
-  // Handle MCP search and filtering
-  useEffect(() => {
-    if (settings.serverUrl && mcpMarketplace.servers.length > 0) {
-      searchMcpMarketplace(mcpSearchQuery);
-    }
-  }, [mcpSearchQuery, selectedCategory, searchMcpMarketplace, settings.serverUrl, mcpMarketplace.servers.length]);
+  // Handle MCP search and filtering - ✅ MCP 功能已禁用
+  // useEffect(() => {
+  //   if (settings.serverUrl && mcpMarketplace.servers.length > 0) {
+  //     searchMcpMarketplace(mcpSearchQuery);
+  //   }
+  //   // Note: Don't add mcpMarketplace.servers.length to dependencies to avoid infinite loop
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [mcpSearchQuery, selectedCategory, searchMcpMarketplace, settings.serverUrl]);
 
   const handlePersonaChange = async (newPersona) => {
     console.log('handlePersonaChange called with:', newPersona);
@@ -1301,6 +1325,8 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
           </div>
         </div>
 
+        {/* ✅ MCP 工具市场功能已禁用 - 需要时可以设置为 true */}
+        {false && (
         <div className="settings-section">
           <div className="section-header-with-action">
             <div>
@@ -1423,6 +1449,7 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
             </div>
           </div>
         </div>
+        )}
 
         <div className="settings-section">
           <h3>👥 {t('settings.userSelection.title')}</h3>

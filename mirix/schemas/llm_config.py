@@ -168,9 +168,41 @@ class LLMConfig(BaseModel):
         Convenience function to generate a default `LLMConfig` from a model name. Only some models are supported in this function.
 
         Args:
-            model_name (str): The name of the model (gpt-4, gpt-4o-mini, letta).
+            model_name (str): The name of the model (gpt-4, gpt-4o-mini, gpt-5, letta).
         """
-        if model_name == "gpt-4":
+        if model_name == "gpt-5":
+            return cls(
+                model="gpt-5",
+                model_endpoint_type="openai",
+                model_endpoint="https://api.openai.com/v1",
+                model_wrapper=None,
+                context_window=128000,
+            )
+        elif model_name == "gpt-5-pro":
+            return cls(
+                model="gpt-5-pro",
+                model_endpoint_type="openai",
+                model_endpoint="https://api.openai.com/v1",
+                model_wrapper=None,
+                context_window=128000,
+            )
+        elif model_name == "gpt-5-mini":
+            return cls(
+                model="gpt-5-mini",
+                model_endpoint_type="openai",
+                model_endpoint="https://api.openai.com/v1",
+                model_wrapper=None,
+                context_window=128000,
+            )
+        elif model_name == "gpt-5-nano":
+            return cls(
+                model="gpt-5-nano",
+                model_endpoint_type="openai",
+                model_endpoint="https://api.openai.com/v1",
+                model_wrapper=None,
+                context_window=128000,
+            )
+        elif model_name == "gpt-4":
             return cls(
                 model="gpt-4",
                 model_endpoint_type="openai",

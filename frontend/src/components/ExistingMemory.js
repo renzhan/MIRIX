@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './ExistingMemory.css';
 import MemoryTreeVisualization from './MemoryTreeVisualization';
 import UploadExportModal from './UploadExportModal';
@@ -86,7 +86,7 @@ const ExistingMemory = ({ settings }) => {
   };
 
   // Fetch memory data for each type
-  const fetchMemoryData = async (memoryType) => {
+  const fetchMemoryData = useCallback(async (memoryType) => {
     try {
       setLoading(true);
       setError(null);
@@ -111,16 +111,26 @@ const ExistingMemory = ({ settings }) => {
         case 'credentials':
           endpoint = '/memory/credentials';
           break;
-        default:
-          return;
+      default:
+        return;
       }
 
-      const response = await queuedFetch(`${settings.serverUrl}${endpoint}`);
+      // Build URL with user_id parameter if available
+      const url = settings.currentUserId 
+        ? `${settings.serverUrl}${endpoint}?user_id=${settings.currentUserId}`
+        : `${settings.serverUrl}${endpoint}`;
+      
+      console.log(`🔄 Fetching ${memoryType} for user: ${settings.currentUserId || 'default (no userId set)'}`);
+      console.log(`   URL: ${url}`);
+      
+      const response = await queuedFetch(url);
       if (!response.ok) {
         throw new Error(`Failed to fetch ${memoryType}: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log(`✅ Loaded ${data.length || Object.keys(data).length} items for ${memoryType}`);
+      
       setMemoryData(prev => ({
         ...prev,
         [memoryType]: data
@@ -131,7 +141,7 @@ const ExistingMemory = ({ settings }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [settings.serverUrl, settings.currentUserId]);
 
   // Filter memories based on search query
   const filterMemories = (memories, query) => {
@@ -221,8 +231,18 @@ const ExistingMemory = ({ settings }) => {
     }
   }, [searchQuery, memoryData, activeSubTab]);
 
-  // Fetch data when component mounts or active tab changes
+  // Monitor currentUserId changes
   useEffect(() => {
+    console.log('👤 ExistingMemory: currentUserId changed to:', settings.currentUserId);
+  }, [settings.currentUserId]);
+
+  // Fetch data when component mounts, active tab changes, or user switches
+  useEffect(() => {
+    console.log('🔄 ExistingMemory: Reloading data due to change in:', { 
+      activeSubTab, 
+      serverUrl: settings.serverUrl, 
+      currentUserId: settings.currentUserId 
+    });
     fetchMemoryData(activeSubTab);
     // Clear expanded items when switching tabs
     setExpandedItems(new Set());
@@ -234,7 +254,7 @@ const ExistingMemory = ({ settings }) => {
       setSaveErrors({});
       setSaveSuccesses({});
     }
-  }, [activeSubTab, settings.serverUrl]);
+  }, [activeSubTab, settings.serverUrl, settings.currentUserId, fetchMemoryData]);
 
   // Refresh data when backend reconnects
   useEffect(() => {
@@ -242,7 +262,7 @@ const ExistingMemory = ({ settings }) => {
       console.log('ExistingMemory: backend reconnected, refreshing data');
       fetchMemoryData(activeSubTab);
     }
-  }, [settings.lastBackendRefresh, settings.serverUrl, activeSubTab]);
+  }, [settings.lastBackendRefresh, settings.serverUrl, activeSubTab, fetchMemoryData]);
 
   const renderMemoryContent = () => {
     const currentViewMode = getCurrentViewMode();

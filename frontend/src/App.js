@@ -338,7 +338,13 @@ function App() {
     setSettings(prev => ({ ...prev, ...newSettings }));
   };
 
-
+  // Handle user switch - clear chat messages and trigger data refresh
+  const handleUserSwitch = useCallback((user) => {
+    console.log('🔄 User switched to:', user.name);
+    // Clear chat messages for the new user
+    setChatMessages([]);
+    console.log('✅ Chat messages cleared for new user');
+  }, []);
 
   return (
     <div className="App">
@@ -406,9 +412,10 @@ function App() {
             onMonitoringStatusChange={setIsScreenMonitoring}
           />
         </div>
-        {activeTab === 'memory' && (
+        {/* Keep ExistingMemory always mounted to respond to user switches */}
+        <div style={{ display: activeTab === 'memory' ? 'block' : 'none' }}>
           <ExistingMemory settings={settings} />
-        )}
+        </div>
         {activeTab === 'settings' && (
           <SettingsPanel
             settings={settings}
@@ -426,6 +433,7 @@ function App() {
                 retryFunction: retryFunction
               });
             }}
+            onUserSwitch={handleUserSwitch}
             isVisible={activeTab === 'settings'}
           />
         )}
