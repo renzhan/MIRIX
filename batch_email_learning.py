@@ -43,13 +43,88 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # 加载.env文件中的环境变量
 load_dotenv()
 
-# 配置日志
+# 创建日志文件名（带时间戳）
+log_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+log_filename = f"batch_email_learning_{log_timestamp}.log"
+
+# 配置日志 - 同时输出到控制台和文件
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[
+        # 控制台处理器
+        logging.StreamHandler(sys.stdout),
+        # 文件处理器（同步写入）
+        logging.FileHandler(log_filename, mode='w', encoding='utf-8')
+    ]
 )
 logger = logging.getLogger(__name__)
+
+# 启用 MIRIX 内部的详细日志，以便看到工具调用
+logging.getLogger('Mirix').setLevel(logging.DEBUG)  # MIRIX 主日志
+logging.getLogger('mirix').setLevel(logging.DEBUG)  # mirix 所有模块
+logging.getLogger('mirix.agent').setLevel(logging.DEBUG)  # Agent 相关
+logging.getLogger('mirix.agent.agent').setLevel(logging.DEBUG)  # Agent 日志（包括工具调用）
+logging.getLogger('mirix.services').setLevel(logging.DEBUG)  # 服务层日志
+logging.getLogger('mirix.server').setLevel(logging.DEBUG)  # 服务器日志
+
+# 打印日志文件位置
+log_dir = os.path.abspath(os.path.dirname(log_filename))
+print(f"📝 日志将同步保存到以下文件:")
+print(f"   1️⃣ 标准日志: {os.path.abspath(log_filename)}")
+print(f"   2️⃣ 控制台输出: {os.path.abspath(log_filename.replace('.log', '_print.log'))}")
+print(f"   📂 日志目录: {log_dir}")
+logger.info(f"日志文件: {log_filename}")
+
+# 创建一个同时输出到控制台和日志的打印函数
+def log_print(message):
+    """同时打印到控制台和日志文件"""
+    print(message)
+    # 使用 INFO 级别记录打印内容
+    logger.info(message)
+
+
+# Tee 类：同时输出到多个流（控制台 + 日志文件）
+class TeeOutput:
+    """将输出同时写入到多个文件对象"""
+    def __init__(self, *files):
+        self.files = files
+    
+    def write(self, data):
+        for f in self.files:
+            f.write(data)
+            f.flush()  # 立即刷新，确保同步写入
+    
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
+
+# 打开日志文件用于 print 输出
+print_log_file = open(log_filename.replace('.log', '_print.log'), 'w', encoding='utf-8')
+
+# 重定向 print 输出到 Tee（同时输出到控制台和文件）
+original_stdout = sys.stdout
+sys.stdout = TeeOutput(original_stdout, print_log_file)
+
+
+# 清理函数：在程序退出时恢复 stdout 并关闭日志文件
+def cleanup_logging():
+    """恢复标准输出并关闭日志文件"""
+    global original_stdout, print_log_file
+    try:
+        sys.stdout = original_stdout
+        if print_log_file and not print_log_file.closed:
+            print_log_file.close()
+            print(f"📝 所有日志已保存完毕")
+    except Exception as e:
+        print(f"清理日志时出错: {e}")
+
+
+# 注册清理函数，确保程序退出时执行
+import atexit
+atexit.register(cleanup_logging)
 
 
 
@@ -590,6 +665,8 @@ class LatestEmailProcessor:
             {email_data.get('content_text', '无内容')}
 
             🎯 请根据上述邮件内容，作为Meta Memory Manager进行分析并协调相应的记忆管理器。
+
+            ⚠️ [重要提示] 当前数据的来源分类是 "{email_data.get('category_name', '未分类')}"，如果你从这些内容中提取了工作流程并保存到程序记忆体，请将此来源分类添加到 email_tag 字段中。
             """
 
             # 记录发送给 Mirix 的内容
@@ -607,15 +684,91 @@ class LatestEmailProcessor:
             print(email_content_message)
 
             # 使用底层方法，可以指定user_id或设为None
-            memory_agent._agent.send_message(
+            print("\n" + "="*80)
+            print(f"📤 发送邮件 {entry_id} 到 MIRIX 进行学习...")
+            print("="*80)
+            
+            response = memory_agent._agent.send_message(
                 message=email_content_message,
                 memorizing=True,
                 force_absorb_content=True,
                 user_id="user-0ff6f5b1-2cc1-46bf-b5bc-d4fa40cb7784"  # 所有记忆数据保存到此用户下
             )
 
-            logger.info(f"✅ 邮件 {entry_id} 已成功发送给 Mirix 进行处理")
-            print(f"✅ 邮件 {entry_id} 已发送给 Mirix")
+            print("\n" + "="*80)
+            print(f"📥 MIRIX 处理结果:")
+            print("="*80)
+            if response:
+                # 打印响应中的关键信息
+                if hasattr(response, 'messages'):
+                    messages = response.messages
+                elif isinstance(response, dict) and 'messages' in response:
+                    messages = response['messages']
+                else:
+                    messages = []
+                
+                if messages:
+                    print(f"📝 生成了 {len(messages)} 条消息\n")
+                    # 遍历所有消息，找出工具调用
+                    tool_call_count = 0
+                    for i, msg in enumerate(messages):
+                        msg_dict = msg if isinstance(msg, dict) else (msg.to_dict() if hasattr(msg, 'to_dict') else None)
+                        if msg_dict:
+                            role = msg_dict.get('role', 'unknown')
+                            
+                            # 检查 tool_calls (新格式)
+                            if 'tool_calls' in msg_dict and msg_dict['tool_calls']:
+                                for tool_call in msg_dict['tool_calls']:
+                                    tool_call_count += 1
+                                    if isinstance(tool_call, dict):
+                                        func_name = tool_call.get('function', {}).get('name', 'unknown')
+                                        func_args = tool_call.get('function', {}).get('arguments', '')
+                                    else:
+                                        func_name = tool_call.function.name if hasattr(tool_call, 'function') else 'unknown'
+                                        func_args = tool_call.function.arguments if hasattr(tool_call, 'function') else ''
+                                    
+                                    print(f"🔧 工具调用 #{tool_call_count}: {func_name}")
+                                    print(f"   参数: {func_args[:300]}{'...' if len(func_args) > 300 else ''}\n")
+                            
+                            # 检查 function_call (旧格式)
+                            elif 'function_call' in msg_dict and msg_dict['function_call']:
+                                tool_call_count += 1
+                                func_call = msg_dict['function_call']
+                                func_name = func_call.get('name', 'unknown') if isinstance(func_call, dict) else func_call.name
+                                func_args = func_call.get('arguments', '') if isinstance(func_call, dict) else func_call.arguments
+                                print(f"🔧 工具调用 #{tool_call_count}: {func_name}")
+                                print(f"   参数: {func_args[:300]}{'...' if len(func_args) > 300 else ''}\n")
+                            
+                            # 打印工具返回结果
+                            elif role == 'tool' and 'content' in msg_dict:
+                                content = msg_dict['content']
+                                print(f"✅ 工具返回: {content[:200]}{'...' if len(str(content)) > 200 else ''}\n")
+                    
+                    if tool_call_count == 0:
+                        print("⚠️ 未检测到工具调用\n")
+                    else:
+                        print(f"📊 共调用了 {tool_call_count} 个工具\n")
+                
+                # 打印 token 使用情况
+                usage = None
+                if hasattr(response, 'usage'):
+                    usage = response.usage
+                elif isinstance(response, dict) and 'usage' in response:
+                    usage = response['usage']
+                
+                if usage:
+                    if isinstance(usage, dict):
+                        print(f"📊 Token使用: {usage}")
+                    else:
+                        print(f"📊 Token使用: {usage}")
+                
+                print(f"✅ 处理完成")
+            else:
+                print("⚠️ 未返回响应数据")
+            print("="*80 + "\n")
+
+            logger.info(f"✅ 邮件 {entry_id} 已成功处理")
+            print(f"✅ 邮件 {entry_id} 处理完毕")
 
             total_time = time.time() - start_time
             return {
@@ -810,9 +963,18 @@ def main():
         print("🔄 正在初始化 Mirix...")
         logger.info("正在初始化 Mirix...")
 
+        # 设置环境变量启用调试模式
+        os.environ['DEBUG'] = 'true'
+        
         memory_agent = Mirix(
             config_path="mirix/configs/mirix_gpt5.yaml",
             api_key=os.getenv("OPENAI_API_KEY"))
+        
+        # 启用 CLIInterface 的详细输出
+        if hasattr(memory_agent._agent, 'client') and hasattr(memory_agent._agent.client, 'interface'):
+            # 让 interface 显示更多信息
+            print("✅ 已启用详细日志输出模式")
+            logger.info("已启用详细日志输出模式")
 
         print("✅ Mirix 初始化成功")
         logger.info("Mirix 初始化成功")

@@ -334,9 +334,9 @@ function App() {
     };
   }, [checkBackendHealth]);
 
-  const handleSettingsChange = (newSettings) => {
+  const handleSettingsChange = useCallback((newSettings) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
-  };
+  }, []);
 
   // Handle user switch - clear chat messages and trigger data refresh
   const handleUserSwitch = useCallback((user) => {

@@ -238,13 +238,19 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
         const usersList = data.users || [];
         setUsers(usersList);
         
-        // Set current user (find user with active status)
+        // Set current user (find user with active status) - only on initial load
         const activeUser = usersList.find(user => user.status === 'active');
         const userToSet = activeUser || usersList[0];
         
-        if (userToSet) {
-          setCurrentUser(userToSet);
-        }
+        // Only set currentUser if it's not already set (initial load only)
+        // Subsequent user changes should go through handleUserSelection
+        setCurrentUser(prevUser => {
+          if (!prevUser && userToSet) {
+            console.log('📝 Initial user set to:', userToSet.name, 'ID:', userToSet.id);
+            return userToSet;
+          }
+          return prevUser;
+        });
       } else {
         console.error('Failed to fetch users');
       }
@@ -257,11 +263,14 @@ const SettingsPanel = ({ settings, onSettingsChange, onApiKeyCheck, onApiKeyRequ
 
   // Initialize currentUserId when currentUser is first set
   useEffect(() => {
-    if (currentUser && !settings.currentUserId) {
+    // Only initialize if currentUserId is not set or different from currentUser
+    if (currentUser && settings.currentUserId !== currentUser.id) {
       console.log('🔧 Initializing currentUserId to:', currentUser.id);
       onSettingsChange({ currentUserId: currentUser.id });
     }
-  }, [currentUser, settings.currentUserId, onSettingsChange]);
+    // Intentionally NOT including onSettingsChange in deps to avoid infinite loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, settings.currentUserId]);
 
   const searchMcpMarketplace = useCallback(async (query = '') => {
     if (!settings.serverUrl) {

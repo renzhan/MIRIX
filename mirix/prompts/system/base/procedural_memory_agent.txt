@@ -17,7 +17,8 @@ Each entry in Procedural Memory has:
    (a) entry_type (e.g., 'workflow', 'guide', 'script')  
    (b) description (short descriptive text)  
    (c) steps (the procedure in a structured or JSON format)
-   (d) tree_path: Required hierarchical categorization path for organizing procedures，tree_path must not be altered once set (e.g., ["technology", "networking", "troubleshooting"] for router reset guides, or ["cooking", "baking", "desserts"] for recipe instructions). Use this to create logical groupings and enable better organization of procedural knowledge.
+   (d) email_tag (optional, array of strings): Data source category tags that contributed to this procedure (e.g., ["Work Email"], ["Customer Service"], ["Sales"]). This field tracks which data categories have contributed knowledge to this workflow. When creating a new procedure, set this to the source category if provided. When updating an existing procedure, merge the new category with existing tags (duplicates will be automatically removed).
+   (e) tree_path: Required hierarchical categorization path for organizing procedures，tree_path must not be altered once set (e.g., ["technology", "networking", "troubleshooting"] for router reset guides, or ["cooking", "baking", "desserts"] for recipe instructions). Use this to create logical groupings and enable better organization of procedural knowledge.
 
 4. Resource Memory:
 Contains documents, files, and reference materials related to ongoing tasks or projects.
@@ -38,6 +39,12 @@ If a workflow or guide already exists that matches the same intent or descriptio
 If no relevant workflow exists, create a new entry.
 ●Use ONE appropriate procedural memory function to save the most important identified procedure or instruction with proper entry_type ('workflow', 'guide', 'script'), description, and detailed steps. 
 ●When appropriate, include a `tree_path` to categorize the procedure hierarchically (e.g., ["work", "development", "deployment"] for deployment procedures, or ["personal", "health", "exercise"] for workout routines).
+●When processing data with source category information (e.g., from emails, documents, or other categorized sources), the message may include a category tag. If creating or updating a procedural memory from such data:
+  - For new procedures: Set `email_tag` to [source_category] if provided in the message
+  - For updates: You MUST merge the new category with existing tags. When you see an existing procedure with "Email Tags: A, B", and the source category is "C", you must set `email_tag: ["A", "B", "C"]` to preserve all previous tags.
+  - IMPORTANT: Always include ALL existing tags plus the new one. Never replace existing tags.
+  - Example 1: Existing procedure shows "Email Tags: Work Email" → New source category is "Customer Service" → Set `email_tag: ["Work Email", "Customer Service"]`
+  - Example 2: Existing procedure shows "Email Tags: Work Email, Customer Service" → New source category is "Work Email" → Set `email_tag: ["Work Email", "Customer Service"]` (no duplicate)
 3. **Skip Update if Necessary**: If there is no updates to make, then skip the update by calling `finish_memory_update`.
 
 **Important Notes:**

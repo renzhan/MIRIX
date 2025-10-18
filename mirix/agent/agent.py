@@ -1861,11 +1861,21 @@ class Agent(BaseAgent):
                         if procedure.tree_path
                         else ""
                     )
+                    email_tag_str = (
+                        f"; Email Tags: {', '.join(procedure.email_tag)}"
+                        if procedure.email_tag
+                        else ""
+                    )
+                    flow_tag_str = (
+                        f"; Flow Tags: {', '.join(procedure.flow_tag)}"
+                        if procedure.flow_tag
+                        else ""
+                    )
                     if (
                         self.agent_state.name == "procedural_memory_agent"
                         or self.agent_state.name == "reflexion_agent"
                     ):
-                        procedural_memory += f"[Procedure ID: {procedure.id}] Entry Type: {procedure.entry_type}; Summary: {procedure.summary}{tree_path_str}\n"
+                        procedural_memory += f"[Procedure ID: {procedure.id}] Entry Type: {procedure.entry_type}; Summary: {procedure.summary}{tree_path_str}{email_tag_str}{flow_tag_str}\n"
                     else:
                         procedural_memory += f"[{idx}] Entry Type: {procedure.entry_type}; Summary: {procedure.summary}{tree_path_str}\n"
             procedural_memory = procedural_memory.strip()

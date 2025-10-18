@@ -1692,8 +1692,6 @@ async def get_core_memory(user_id: Optional[str] = None):
         # Get target user based on user_id parameter
         target_user = get_user_or_default(agent, user_id)
         
-        print(f"📝 /memory/core: Fetching core memory for user: {target_user.name} (ID: {target_user.id})")
-        
         # Get core memory from the main agent using target_user as actor
         core_memory = agent.client.server.get_agent_memory(
             agent_id=agent.agent_states.agent_state.id,
@@ -1704,7 +1702,12 @@ async def get_core_memory(user_id: Optional[str] = None):
         total_characters = 0
 
         # Extract understanding from memory blocks (skip persona block)
+        # Filter blocks by target_user.id to ensure data isolation
         for block in core_memory.blocks:
+            # Only include blocks that belong to the target user
+            if block.user_id != target_user.id:
+                continue
+                
             if block.value and block.value.strip() and block.label.lower() != "persona":
                 block_chars = len(block.value)
                 total_characters += block_chars
@@ -1723,7 +1726,6 @@ async def get_core_memory(user_id: Optional[str] = None):
         return core_understanding
 
     except Exception as e:
-        print(f"Error retrieving core memory: {str(e)}")
         return []
 
 

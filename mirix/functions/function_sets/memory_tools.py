@@ -258,6 +258,8 @@ def procedural_memory_insert(self: "Agent", items: List[ProceduralMemoryItemBase
             actor=self.user,
             organization_id=self.user.organization_id,
             tree_path=item.get("tree_path"),
+            email_tag=item.get("email_tag"),
+            flow_tag=item.get("flow_tag"),
         )
 
 
@@ -288,6 +290,8 @@ def procedural_memory_update(
             actor=self.user,
             organization_id=self.user.organization_id,
             tree_path=item.get("tree_path"),
+            email_tag=item.get("email_tag"),
+            flow_tag=item.get("flow_tag"),
         )
 
 
