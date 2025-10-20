@@ -2,7 +2,7 @@ import datetime as dt
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import JSON, Column, String
+from sqlalchemy import ARRAY, JSON, Column, String
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 
 from mirix.constants import MAX_EMBEDDING_DIM
@@ -83,7 +83,7 @@ class ProceduralMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
 
     # Email tags for categorization
     email_tag: Mapped[list] = mapped_column(
-        JSON,
+        ARRAY(String),
         default=list,
         nullable=True,
         doc="Array of email-related tags for categorization",
@@ -91,7 +91,7 @@ class ProceduralMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
 
     # Flow tags for workflow categorization
     flow_tag: Mapped[list] = mapped_column(
-        JSON,
+        ARRAY(String),
         default=list,
         nullable=True,
         doc="Array of workflow/flow-related tags for categorization",

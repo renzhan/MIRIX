@@ -574,12 +574,15 @@ def trigger_memory_update(
                     f"Memory type '{memory_type}' is not supported. Please choose from 'core', 'episodic', 'resource', 'procedural', 'knowledge_vault', 'semantic'."
                 )
 
-        if user_message["message"][-1]["type"] == "text" and user_message["message"][
-            -1
-        ]["text"].startswith("[System Message]"):
-            user_message["message"][-1]["text"] = (
-                "[System Message] Interpret the provided content, extract the important information matching your memory type and save it into the memory."
-            )
+        # 添加类型检查：只有当 message 是列表时才执行
+        if isinstance(user_message.get("message"), list):
+            if user_message["message"] and len(user_message["message"]) > 0:
+                last_msg = user_message["message"][-1]
+                if isinstance(last_msg, dict) and last_msg.get("type") == "text":
+                    if last_msg.get("text", "").startswith("[System Message]"):
+                        user_message["message"][-1]["text"] = (
+                            "[System Message] Interpret the provided content, extract the important information matching your memory type and save it into the memory."
+                        )
 
         # Prepare payloads for message queue
         payloads = {

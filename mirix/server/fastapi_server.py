@@ -15,7 +15,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ..agent.agent_wrapper import AgentWrapper
+from ..agent.message_queue import MessageQueue
 from ..functions.mcp_client import StdioServerConfig, get_mcp_client_manager
+from ..prompts import gpt_system
 from ..services.mcp_marketplace import get_mcp_marketplace
 from ..services.mcp_tool_registry import get_mcp_tool_registry
 from ..utils import parse_json
@@ -341,11 +343,28 @@ class MessageRequest(BaseModel):
     voice_files: Optional[List[str]] = None  # Base64 encoded voice files
     memorizing: bool = False
     is_screen_monitoring: Optional[bool] = False
+    user_id: Optional[str] = None  # User ID for multi-user support
 
 
 class MessageResponse(BaseModel):
     response: str
     status: str = "success"
+
+
+class ProcessMysqlEmailRequest(BaseModel):
+    email_data: Dict[str, Any]
+    user_id: Optional[str] = None
+
+
+class ProcessMysqlEmailResponse(BaseModel):
+    status: str
+    message: str
+    email_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    user_email_account: Optional[str] = None
+    agents_triggered: int = 0
+    triggered_memory_types: List[str] = []
+    processing_time: str = "N/A"
 
 
 class ConfirmationRequest(BaseModel):
@@ -591,10 +610,10 @@ async def startup_event():
     if getattr(sys, "frozen", False):
         # Running in PyInstaller bundle
         bundle_dir = Path(sys._MEIPASS)
-        config_path = bundle_dir / "mirix" / "configs" / "mirix_gpt5.yaml"
+        config_path = bundle_dir / "mirix" / "configs" / "mirix_gpt4o.yaml"
     else:
         # Running in development
-        config_path = Path("mirix/configs/mirix_gpt5.yaml")
+        config_path = Path("mirix/configs/mirix_gpt4o.yaml")
 
     agent = AgentWrapper(str(config_path))
     print("Agent initialized successfully")
@@ -639,8 +658,10 @@ async def send_message_endpoint(request: MessageRequest):
         if request.user_id:
             switch_user_context(agent, request.user_id)
 
+        # 简化日志输出：只显示消息长度和关键参数
+        message_preview = request.message[:100] + "..." if len(request.message) > 100 else request.message
         print(
-            f"Starting agent.send_message (non-streaming) with: message='{request.message}', memorizing={request.memorizing}, user_id={request.user_id}"
+            f"📨 API请求: user_id={request.user_id} | memorizing={request.memorizing} | message_len={len(request.message)} | preview={message_preview}"
         )
 
         # Run the blocking agent.send_message() in a background thread to avoid blocking other requests
@@ -657,7 +678,9 @@ async def send_message_endpoint(request: MessageRequest):
             ),
         )
 
-        print(f"Agent response (non-streaming): {response}")
+        # 简化响应日志：只显示前100个字符
+        response_preview = response[:100] + "..." if response and len(response) > 100 else response
+        print(f"✅ API响应: {response_preview}")
 
         if response == "ERROR":
             raise HTTPException(status_code=500, detail="Agent returned an error")
@@ -1692,22 +1715,27 @@ async def get_core_memory(user_id: Optional[str] = None):
         # Get target user based on user_id parameter
         target_user = get_user_or_default(agent, user_id)
         
-        # Get core memory from the main agent using target_user as actor
-        core_memory = agent.client.server.get_agent_memory(
-            agent_id=agent.agent_states.agent_state.id,
-            actor=target_user
-        )
+        # Directly query blocks table by user_id
+        from mirix.orm import Block
+        from mirix.server.server import db_context
+        from sqlalchemy import select
+        
+        print(f"🔍 查询核心记忆 - user_id: {target_user.id}, user_name: {target_user.name}")
+        
+        with db_context() as session:
+            stmt = select(Block).where(Block.user_id == target_user.id)
+            blocks = session.execute(stmt).scalars().all()
+            
+            print(f"🔍 查询到 {len(blocks)} 个 blocks:")
+            for b in blocks:
+                value_preview = b.value[:100] if b.value else 'None'
+                print(f"  - label={b.label}, user_id={b.user_id}, value前100字={value_preview}")
 
         core_understanding = []
         total_characters = 0
 
         # Extract understanding from memory blocks (skip persona block)
-        # Filter blocks by target_user.id to ensure data isolation
-        for block in core_memory.blocks:
-            # Only include blocks that belong to the target user
-            if block.user_id != target_user.id:
-                continue
-                
+        for block in blocks:
             if block.value and block.value.strip() and block.label.lower() != "persona":
                 block_chars = len(block.value)
                 total_characters += block_chars
@@ -1718,14 +1746,19 @@ async def get_core_memory(user_id: Optional[str] = None):
                     "character_count": block_chars,
                     "total_characters": total_characters,
                     "max_characters": block.limit,
-                    "last_updated": None,  # Core memory doesn't track individual updates
+                    "last_updated": None,
                 }
 
                 core_understanding.append(core_item)
+                print(f"✅ 返回 human block，内容前50字: {block.value[:50]}")
 
+        print(f"🔍 最终返回 {len(core_understanding)} 个记忆项")
         return core_understanding
 
     except Exception as e:
+        print(f"❌ 查询失败: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 
@@ -2376,6 +2409,186 @@ async def reply_to_email(request: EmailReplyRequest):
         logger.error(f"[EMAIL_REPLY_API] 处理失败: {str(e)}")
         logger.error(f"[EMAIL_REPLY_API] 错误堆栈: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"邮件回复生成失败: {str(e)}")
+
+
+@app.post("/api/process_mysql_email", response_model=ProcessMysqlEmailResponse)
+async def process_mysql_email(request: ProcessMysqlEmailRequest):
+    """
+    处理MySQL阿里云数据库的邮件数据
+    
+    该接口接收结构化的邮件数据，调用 Meta Memory Agent 进行分析，
+    并返回触发的 memory agents 和处理时间。
+    """
+    try:
+        # 检查agent是否已初始化
+        if agent is None or not hasattr(agent, 'agent_states'):
+            raise HTTPException(status_code=500, detail="Agent未初始化")
+        
+        # 验证参数
+        if not request.email_data:
+            raise HTTPException(status_code=400, detail="缺少required参数: email_data")
+        
+        email_data = request.email_data
+        user_id = request.user_id
+        
+        # 验证邮件数据字段
+        required_fields = ['id', 'subject', 'content_text', 'sent_date_time']
+        for field in required_fields:
+            if field not in email_data:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"邮件数据缺少必需字段: {field}"
+                )
+        
+        # 构建统一的数据格式
+        email_id = str(email_data['id'])
+        conversation_id = str(email_data.get('conversation_id', ''))
+        user_email_account = email_data.get('user_email_account', '未知邮箱账户')
+        
+        # 加载提示词并构造消息
+        email_analysis_prompt = gpt_system.get_system_text("base/meta_memory_agent")
+        
+        # 构建参与者信息
+        participants_info = []
+        if email_data.get('senders'):
+            participants_info.append(f"发件人: {email_data['senders']}")
+        if email_data.get('froms'):
+            participants_info.append(f"来源: {email_data['froms']}")
+        if email_data.get('recipients'):
+            participants_info.append(f"收件人: {email_data['recipients']}")
+        if email_data.get('cc_recipients'):
+            participants_info.append(f"抄送: {email_data['cc_recipients']}")
+        if email_data.get('bcc_recipients'):
+            participants_info.append(f"密送: {email_data['bcc_recipients']}")
+        if email_data.get('reply_to'):
+            participants_info.append(f"回复地址: {email_data['reply_to']}")
+        
+        participants_text = '\n'.join(participants_info) if participants_info else '参与者信息不完整'
+        
+        # 获取邮件分类信息
+        category_name = email_data.get('category_name', '未分类')
+        source_category_text = f"\n- 📂 邮件分类: {category_name}" if category_name and category_name != '未分类' else ""
+        
+        email_content_message = f"""
+邮件内容分析请求：
+
+📧 邮件基本信息：
+- 邮箱账户: {user_email_account}
+- 主题: {email_data.get('subject', '无主题')}
+- 时间: {email_data.get('sent_date_time', '未知时间')}
+- 邮件类型: {email_data.get('mail_type', '未知')}{source_category_text}
+- 是否有附件: {email_data.get('has_attachments', False)}
+
+👥 参与者信息：
+{participants_text}
+
+📝 邮件正文：
+{email_data.get('content_text', '无内容')}
+
+🎯 请根据上述邮件内容，作为Meta Memory Manager进行分析并协调相应的记忆管理器。
+{f'📌 注意：此邮件属于"{category_name}"分类，请在相关记忆中使用此分类作为 source_category 标签。' if category_name and category_name != '未分类' else ''}
+"""
+        
+        # 构造完整的分析消息（提示词 + 邮件数据）
+        full_analysis_message = f"{email_analysis_prompt}\n\n{email_content_message}"
+        
+        # 调用Meta Memory Agent处理
+        agent_states = agent.agent_states
+        if agent_states.meta_memory_agent_state is None:
+            raise HTTPException(
+                status_code=500,
+                detail="Meta Memory Agent not initialized"
+            )
+        
+        meta_agent_id = agent_states.meta_memory_agent_state.id
+        start_time = datetime.now()
+        meta_response = None
+        
+        try:
+            loop = asyncio.get_event_loop()
+            
+            # 🎯 确定用于记忆存储的用户ID
+            active_user_id = None
+            if user_id:
+                # 使用传入的user_id
+                active_user_id = user_id
+                logger.info(f"📋 使用指定用户进行记忆存储: {user_id}")
+            else:
+                # 回退到查询活跃用户
+                try:
+                    users = agent.client.server.user_manager.list_users()
+                    active_user = next((user for user in users if user.status == 'active'), None)
+                    if active_user:
+                        active_user_id = active_user.id
+                        logger.info(f"📋 使用活跃用户进行记忆存储: {active_user.name} (ID: {active_user_id})")
+                    else:
+                        logger.warning("⚠️ 未找到活跃用户，使用系统默认用户")
+                except Exception as e:
+                    logger.error(f"❌ 查询活跃用户失败，使用系统默认用户: {e}")
+            
+            # 创建消息队列以启用Memory Agent并发处理
+            message_queue = MessageQueue()
+            agent_client = agent.client
+            
+            meta_response = await loop.run_in_executor(
+                None,
+                lambda: agent_client.send_message(
+                    agent_id=meta_agent_id,
+                    message=full_analysis_message,
+                    role='user',
+                    message_queue=message_queue,  # 🔑 关键：启用并发处理
+                    chaining=True,  # 启用链式调用
+                    user_id=active_user_id  # 🎯 传递活跃用户ID
+                )
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Meta Memory Agent调用失败: {e}")
+            meta_response = None
+        
+        # 从Meta Memory Agent响应中提取信息
+        triggered_count = 0
+        triggered_memory_types = []
+        
+        if meta_response and hasattr(meta_response, 'messages') and meta_response.messages:
+            # 从tool_call中提取memory_types
+            for msg in meta_response.messages:
+                if hasattr(msg, 'tool_call') and msg.tool_call and msg.tool_call.name == 'trigger_memory_update':
+                    try:
+                        args = json.loads(msg.tool_call.arguments)
+                        if 'memory_types' in args:
+                            triggered_memory_types = args['memory_types']
+                            triggered_count = len(triggered_memory_types)
+                            logger.info(f"✅ 从tool_call提取成功: {triggered_count} agents, types: {triggered_memory_types}")
+                            break
+                    except Exception as e:
+                        logger.error(f"❌ 解析tool_call失败: {e}")
+        
+        processing_time = (datetime.now() - start_time).total_seconds()
+        
+        return ProcessMysqlEmailResponse(
+            status="success",
+            message=f"MySQL邮件处理完成：{user_email_account}",
+            email_id=email_id,
+            conversation_id=conversation_id,
+            user_email_account=user_email_account,
+            agents_triggered=triggered_count,
+            triggered_memory_types=triggered_memory_types,
+            processing_time=f"{processing_time:.2f}s"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        processing_time = (datetime.now() - start_time).total_seconds() if 'start_time' in locals() else 0
+        email_id_display = email_data.get('id', 'unknown') if 'email_data' in locals() else "unknown"
+        
+        logger.error(f"❌ MySQL邮件处理失败: {email_id_display} | {str(e)}")
+        
+        raise HTTPException(
+            status_code=500,
+            detail=f"MySQL邮件处理失败: {str(e)}"
+        )
 
 
 if __name__ == "__main__":

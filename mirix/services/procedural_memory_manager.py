@@ -272,7 +272,7 @@ class ProceduralMemoryManager:
                 SELECT 
                     id, created_at, entry_type, summary, steps, tree_path,
                     steps_embedding, summary_embedding, embedding_config,
-                    organization_id, metadata_, last_modify, user_id,
+                    organization_id, metadata_, last_modify, email_tag, flow_tag, user_id,
                     {rank_sql} as rank_score
                 FROM procedural_memory 
                 WHERE {tsvector_sql} @@ to_tsquery('english', :tsquery)
@@ -328,7 +328,7 @@ class ProceduralMemoryManager:
                 SELECT 
                     id, created_at, entry_type, summary, steps, tree_path,
                     steps_embedding, summary_embedding, embedding_config,
-                    organization_id, metadata_, last_modify, user_id,
+                    organization_id, metadata_, last_modify, email_tag, flow_tag, user_id,
                     {rank_sql} as rank_score
                 FROM procedural_memory 
                 WHERE {tsvector_sql} @@ to_tsquery('english', :tsquery)
@@ -575,6 +575,8 @@ class ProceduralMemoryManager:
                     ProceduralMemoryItem.metadata_.label("metadata_"),
                     ProceduralMemoryItem.last_modify.label("last_modify"),
                     ProceduralMemoryItem.tree_path.label("tree_path"),
+                    ProceduralMemoryItem.email_tag.label("email_tag"),
+                    ProceduralMemoryItem.flow_tag.label("flow_tag"),
                     ProceduralMemoryItem.user_id.label("user_id"),
                 ).where(ProceduralMemoryItem.user_id == actor.id)
 

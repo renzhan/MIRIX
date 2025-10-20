@@ -9,35 +9,32 @@ from datetime import datetime
 from typing import List, Dict, Optional
 import time
 from dotenv import load_dotenv
-from mirix import Mirix
+import requests  # 用于调用 HTTP API
 import base64
 import hashlib
 import binascii
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 
-# 导入 MIRIX 相关模块
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 """
-🚀 邮件批处理脚本 (优化版)
+🚀 邮件批处理脚本 (HTTP API 版本)
 
-性能改进：
-- ✅ 直接使用 agent.send_message() 替代 HTTP API 调用
-- ✅ 零网络开销，处理速度提升 2-3倍
-- ✅ 复用完整的 Redis 机制和记忆学习流程
-- ✅ memorizing=True 启用自动记忆学习
+架构改进：
+- ✅ 调用 FastAPI 服务的 /api/process_mysql_email 接口
+- ✅ 先启动 python main.py，然后运行此脚本
+- ✅ 接口内部直接调用 Meta Memory Agent 处理邮件
+- ✅ 每封邮件独立调用 API 并返回触发的 memory agents
 
 工作流程：
-1. ChatAgent 分析邮件内容
-2. Redis 临时消息累加器存储对话
-3. 达到阈值时异步触发记忆吸收
-4. Meta Memory Agent 协调各记忆Agent进行学习
+1. 读取邮件数据（MySQL）
+2. 调用 HTTP API: POST /api/process_mysql_email
+3. Meta Memory Agent 分析并触发对应的 memory agents
+4. 记录处理状态、触发的 agents 和处理时间
 
 使用方法：
-1. 确保 MIRIX 系统正常运行
-2. 配置 .env 文件中的数据库连接
-3. 运行: python batch_process_latest_emails_aliyun.py
+1. 先启动 MIRIX 服务: python main.py
+2. 配置 .env 文件中的数据库连接和 API 地址
+3. 运行: python email_learning.py
 """
 
 # 加载.env文件中的环境变量
@@ -61,13 +58,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 启用 MIRIX 内部的详细日志，以便看到工具调用
-logging.getLogger('Mirix').setLevel(logging.DEBUG)  # MIRIX 主日志
-logging.getLogger('mirix').setLevel(logging.DEBUG)  # mirix 所有模块
-logging.getLogger('mirix.agent').setLevel(logging.DEBUG)  # Agent 相关
-logging.getLogger('mirix.agent.agent').setLevel(logging.DEBUG)  # Agent 日志（包括工具调用）
-logging.getLogger('mirix.services').setLevel(logging.DEBUG)  # 服务层日志
-logging.getLogger('mirix.server').setLevel(logging.DEBUG)  # 服务器日志
+# HTTP API 模式不需要额外的 MIRIX 内部日志配置
+# 所有日志将从 FastAPI 服务端输出
 
 # 打印日志文件位置
 log_dir = os.path.abspath(os.path.dirname(log_filename))
@@ -76,6 +68,13 @@ print(f"   1️⃣ 标准日志: {os.path.abspath(log_filename)}")
 print(f"   2️⃣ 控制台输出: {os.path.abspath(log_filename.replace('.log', '_print.log'))}")
 print(f"   📂 日志目录: {log_dir}")
 logger.info(f"日志文件: {log_filename}")
+
+# MIRIX API 配置
+MIRIX_API_URL = os.getenv("MIRIX_API_URL", "http://localhost:47283")
+MIRIX_USER_ID = os.getenv("MIRIX_USER_ID", "user-43a92772-e76b-4e5d-a1bd-3d32992580f9")
+
+print(f"🌐 MIRIX API: {MIRIX_API_URL}")
+print(f"👤 User ID: {MIRIX_USER_ID}\n")
 
 # 创建一个同时输出到控制台和日志的打印函数
 def log_print(message):
@@ -188,8 +187,7 @@ class AesEncryptionHelper:
             if not encrypted_text:
                 return ""
 
-            print(f"[解密前] 密文: {encrypted_text[:50]}{'...' if len(encrypted_text) > 50 else ''}")
-            print(f"[解密前] 密钥: {key}")
+            # 静默解密，不打印详情
 
             # 使用MD5哈希处理密钥，与C#实现保持一致
             md5 = hashlib.md5()
@@ -211,12 +209,10 @@ class AesEncryptionHelper:
             # 转换为字符串
             decrypted_text = decrypted_bytes.decode('utf-8')
 
-            print(f"[解密后] 原文: {decrypted_text[:50]}{'...' if len(decrypted_text) > 50 else ''}")
             return decrypted_text
         except Exception as e:
-            print(f"解密失败: {str(e)}")
-            print(f"解密失败的密文: {encrypted_text[:50]}{'...' if len(encrypted_text) > 50 else ''}")
-            return encrypted_text  # 解密失败时返回空字符串，与C#实现保持一致
+            logger.error(f"解密失败: {str(e)}")
+            return encrypted_text  # 解密失败时返回原文
 
     @staticmethod
     def decrypt_from_hex(encrypted_text: str, key: str) -> str:
@@ -489,14 +485,8 @@ class LatestEmailProcessor:
             conn.close()
 
             if row:
-                # 打印原始数据库查询结果，用于调试
-                print(f"📊 邮件 {entry_id} 数据库查询结果:")
-                print(
-                    f"   - subject: {row.get('subject', 'NULL')[:100] if row.get('subject') else 'NULL'}{'...' if len(str(row.get('subject', ''))) > 100 else ''}")
-                print(
-                    f"   - content_text: {row.get('content_text', 'NULL')[:100] if row.get('content_text') else 'NULL'}{'...' if len(str(row.get('content_text', ''))) > 100 else ''}")
-                print(f"   - content_text is None: {row.get('content_text') is None}")
-                print(f"   - content_text length: {len(str(row.get('content_text', '')))}")
+                # 简化数据库查询结果输出
+                print(f"📊 邮件 {entry_id}: 主题长度={len(str(row.get('subject', '')))} | 内容长度={len(str(row.get('content_text', '')))}")
 
                 # 解密密钥
                 encryption_key = "item-ai-agent-999"
@@ -505,18 +495,13 @@ class LatestEmailProcessor:
                 encrypted_subject = row.get('subject', '')
                 content_text = row.get('content_text', '')  # content_text不需要解密，直接使用原始值
 
-                print(f"🔓 开始解密邮件 {entry_id} 的subject")
-                print(f"   - 加密的subject长度: {len(encrypted_subject) if encrypted_subject else 0}")
-                print(f"   - content_text长度: {len(content_text) if content_text else 0}")
-
+                print(f"🔓 解密主题...", end=" ")
                 # 解密subject
                 decrypted_subject = AesEncryptionHelper.decrypt_from_hex(encrypted_subject,
                                                                          encryption_key) if encrypted_subject else ''
-                print(f"   - 解密后subject: {decrypted_subject[:100]}{'...' if len(decrypted_subject) > 100 else ''}")
+                print(f"完成: {decrypted_subject[:50]}..." if len(decrypted_subject) > 50 else f"完成: {decrypted_subject}")
 
-                # content_text直接使用原始值
-                print(
-                    f"   - content_text预览: {content_text[:200] if content_text else ''}{'...' if len(str(content_text)) > 200 else ''}")
+                # content_text直接使用原始值（不再打印预览）
 
                 print(f"✅ 邮件 {entry_id} 处理完成")
 
@@ -582,18 +567,10 @@ class LatestEmailProcessor:
             return False
 
     async def process_single_email(self, entry_id: str, conversation_id: str, email_index: int = 0,
-                                   total_emails: int = 0, memory_agent=None) -> Dict:
+                                   total_emails: int = 0) -> Dict:
         """通过HTTP API处理单个邮件"""
         try:
             start_time = time.time()
-
-            if memory_agent is None:
-                return {
-                    "entry_id": entry_id,
-                    "conversation_id": conversation_id,
-                    "status": "error",
-                    "message": "memory_agent 未提供"
-                }
 
             # 获取邮件数据用于显示
             email_data = self.fetch_email_by_entry_id(entry_id)
@@ -605,13 +582,6 @@ class LatestEmailProcessor:
                     "message": f"无法获取邮件数据: {entry_id}"
                 }
 
-            # # 🌐 调用已启动服务器的API处理邮件
-            # # api_url = f"{self.server_url}/pams/api/process_mysql_email"
-            # request_data = {"email_data": email_data, "user_id": self.user_id}
-            #
-            # email_data = request['email_data']
-            # user_id = request.get('user_id', None)  # 获取可选的user_id参数
-
             # 验证邮件数据字段（检查字段存在且值不为空）
             required_fields = ['id', 'subject', 'content_text', 'sent_date_time']
             for field in required_fields:
@@ -621,151 +591,61 @@ class LatestEmailProcessor:
                         "message": f"邮件数据缺少或为空的必需字段: {field}"
                     }
 
-            # 构建统一的数据格式以适配现有处理逻辑
-            email_id = str(email_data['id'])
-            conversation_id = str(email_data.get('conversation_id', ''))
-
             # 直接使用传递过来的邮箱账户信息（已在SQL中JOIN获取）
             user_email_account = email_data.get('user_email_account', '未知邮箱账户')
-
-            # 加载提示词并构造消息
-            # email_analysis_prompt = gpt_system.get_system_text("base/meta_memory_agent")
-            # 构建参与者信息
-            participants_info = []
-            if email_data.get('senders'):
-                participants_info.append(f"发件人: {email_data['senders']}")
-            if email_data.get('froms'):
-                participants_info.append(f"来源: {email_data['froms']}")
-            if email_data.get('recipients'):
-                participants_info.append(f"收件人: {email_data['recipients']}")
-            if email_data.get('cc_recipients'):
-                participants_info.append(f"抄送: {email_data['cc_recipients']}")
-            if email_data.get('bcc_recipients'):
-                participants_info.append(f"密送: {email_data['bcc_recipients']}")
-            if email_data.get('reply_to'):
-                participants_info.append(f"回复地址: {email_data['reply_to']}")
-
-            participants_text = '\n'.join(participants_info) if participants_info else '参与者信息不完整'
-
-            email_content_message = f"""
-            邮件内容分析请求：
-
-            📧 邮件基本信息：
-            - 邮箱账户: {user_email_account}
-            - 主题: {email_data.get('subject', '无主题')}
-            - 时间: {email_data.get('sent_date_time', '未知时间')}
-            - 邮件类型: {email_data.get('mail_type', '未知')}
-            - 邮件分类: {email_data.get('category_name', '未分类')}
-            - 是否有附件: {email_data.get('has_attachments', False)}
-
-            👥 参与者信息：
-            {participants_text}
-
-            📝 邮件正文：
-            {email_data.get('content_text', '无内容')}
-
-            🎯 请根据上述邮件内容，作为Meta Memory Manager进行分析并协调相应的记忆管理器。
-
-            ⚠️ [重要提示] 当前数据的来源分类是 "{email_data.get('category_name', '未分类')}"，如果你从这些内容中提取了工作流程并保存到程序记忆体，请将此来源分类添加到 email_tag 字段中。
-            """
-
-            # 记录发送给 Mirix 的内容
-            # logger.info("=" * 80)
-            # logger.info(f"🚀 向 Mirix 发送邮件内容分析请求")
-            # logger.info(f"📧 邮件ID: {entry_id}")
-            # logger.info(f"📩 对话ID: {conversation_id}")
-            # logger.info(f"👤 用户ID: user-0ff6f5b1-2cc1-46bf-b5bc-d4fa40cb7784")
-            # logger.info(f"📨 邮件主题: {email_data.get('subject', '无主题')[:100]}{'...' if len(email_data.get('subject', '')) > 100 else ''}")
-            # logger.info("📝 发送给 Mirix 的完整消息内容:")
-            # logger.info("-" * 60)
-            # logger.info(email_content_message)
-
-            print(f"🔄 正在向 Mirix 发送邮件 {entry_id} 的分析请求...")
-            print(email_content_message)
-
-            # 使用底层方法，可以指定user_id或设为None
-            print("\n" + "="*80)
-            print(f"📤 发送邮件 {entry_id} 到 MIRIX 进行学习...")
-            print("="*80)
             
-            response = memory_agent._agent.send_message(
-                message=email_content_message,
-                memorizing=True,
-                force_absorb_content=True,
-                user_id="user-0ff6f5b1-2cc1-46bf-b5bc-d4fa40cb7784"  # 所有记忆数据保存到此用户下
-            )
+            # 简化日志输出
+            print(f"🔄 正在向 MIRIX API 发送邮件 {entry_id} 的分析请求...")
+            subject = email_data.get('subject', '无主题')
+            subject_preview = subject[:50] + "..." if len(subject) > 50 else subject
+            print(f"📧 主题: {subject_preview}")
+            print(f"👤 账户: {user_email_account}")
 
-            print("\n" + "="*80)
-            print(f"📥 MIRIX 处理结果:")
-            print("="*80)
-            if response:
-                # 打印响应中的关键信息
-                if hasattr(response, 'messages'):
-                    messages = response.messages
-                elif isinstance(response, dict) and 'messages' in response:
-                    messages = response['messages']
-                else:
-                    messages = []
+            # 调用 HTTP API - 使用 /api/process_mysql_email 接口
+            print(f"📤 API调用: {MIRIX_API_URL}/api/process_mysql_email")
+            
+            # 构建请求数据
+            api_request = {
+                "email_data": email_data,
+                "user_id": MIRIX_USER_ID
+            }
+            
+            # 发送 HTTP 请求
+            try:
+                api_response = requests.post(
+                    f"{MIRIX_API_URL}/api/process_mysql_email",
+                    json=api_request,
+                    timeout=120  # 2分钟超时
+                )
                 
-                if messages:
-                    print(f"📝 生成了 {len(messages)} 条消息\n")
-                    # 遍历所有消息，找出工具调用
-                    tool_call_count = 0
-                    for i, msg in enumerate(messages):
-                        msg_dict = msg if isinstance(msg, dict) else (msg.to_dict() if hasattr(msg, 'to_dict') else None)
-                        if msg_dict:
-                            role = msg_dict.get('role', 'unknown')
-                            
-                            # 检查 tool_calls (新格式)
-                            if 'tool_calls' in msg_dict and msg_dict['tool_calls']:
-                                for tool_call in msg_dict['tool_calls']:
-                                    tool_call_count += 1
-                                    if isinstance(tool_call, dict):
-                                        func_name = tool_call.get('function', {}).get('name', 'unknown')
-                                        func_args = tool_call.get('function', {}).get('arguments', '')
-                                    else:
-                                        func_name = tool_call.function.name if hasattr(tool_call, 'function') else 'unknown'
-                                        func_args = tool_call.function.arguments if hasattr(tool_call, 'function') else ''
-                                    
-                                    print(f"🔧 工具调用 #{tool_call_count}: {func_name}")
-                                    print(f"   参数: {func_args[:300]}{'...' if len(func_args) > 300 else ''}\n")
-                            
-                            # 检查 function_call (旧格式)
-                            elif 'function_call' in msg_dict and msg_dict['function_call']:
-                                tool_call_count += 1
-                                func_call = msg_dict['function_call']
-                                func_name = func_call.get('name', 'unknown') if isinstance(func_call, dict) else func_call.name
-                                func_args = func_call.get('arguments', '') if isinstance(func_call, dict) else func_call.arguments
-                                print(f"🔧 工具调用 #{tool_call_count}: {func_name}")
-                                print(f"   参数: {func_args[:300]}{'...' if len(func_args) > 300 else ''}\n")
-                            
-                            # 打印工具返回结果
-                            elif role == 'tool' and 'content' in msg_dict:
-                                content = msg_dict['content']
-                                print(f"✅ 工具返回: {content[:200]}{'...' if len(str(content)) > 200 else ''}\n")
+                if api_response.status_code == 200:
+                    result = api_response.json()
+                    status = result.get("status", "error")
+                    agents_triggered = result.get("agents_triggered", 0)
+                    triggered_memory_types = result.get("triggered_memory_types", [])
+                    processing_time = result.get("processing_time", "N/A")
                     
-                    if tool_call_count == 0:
-                        print("⚠️ 未检测到工具调用\n")
+                    if status == "success":
+                        print(f"✅ API调用成功 - 触发{agents_triggered}个Agent")
+                        if triggered_memory_types:
+                            print(f"📊 Memory Types: {', '.join(triggered_memory_types)}")
+                        print(f"⏱️ 处理时间: {processing_time}")
+                        response = "success"
                     else:
-                        print(f"📊 共调用了 {tool_call_count} 个工具\n")
-                
-                # 打印 token 使用情况
-                usage = None
-                if hasattr(response, 'usage'):
-                    usage = response.usage
-                elif isinstance(response, dict) and 'usage' in response:
-                    usage = response['usage']
-                
-                if usage:
-                    if isinstance(usage, dict):
-                        print(f"📊 Token使用: {usage}")
-                    else:
-                        print(f"📊 Token使用: {usage}")
-                
-                print(f"✅ 处理完成")
-            else:
-                print("⚠️ 未返回响应数据")
-            print("="*80 + "\n")
+                        print(f"⚠️ 处理状态: {status}")
+                        response = None
+                else:
+                    print(f"❌ API返回错误: {api_response.status_code}")
+                    print(f"错误详情: {api_response.text[:200]}...")
+                    response = None
+            except requests.exceptions.Timeout:
+                print(f"⏱️ API 请求超时")
+                response = None
+            except Exception as api_error:
+                print(f"❌ API 调用失败: {api_error}")
+                response = None
+
+            print("-" * 80)
 
             logger.info(f"✅ 邮件 {entry_id} 已成功处理")
             print(f"✅ 邮件 {entry_id} 处理完毕")
@@ -789,28 +669,12 @@ class LatestEmailProcessor:
                 "total_time": f"{total_time:.2f}s"
             }
 
-    async def batch_process_latest_emails(self, page_size: int = 10, memory_agent=None):
+    async def batch_process_latest_emails(self, page_size: int = 10):
         """批量处理最新对话邮件 - 分页查询直到全部处理完毕"""
         logger.info("🚀 开始批量处理邮件 (分页查询，每页10条)")
 
-        if memory_agent is None:
-            logger.error("memory_agent 未提供，无法继续处理")
-            return []
-
-        # 🎯 可选：仍然测试服务器连接以确保系统健康状态
-        print("🔄 测试服务器连接...")
-        try:
-            server_connected = await self.test_server_connection()
-            if not server_connected:
-                print("⚠️ 服务器连接测试失败，但继续使用直接Agent调用")
-                logger.warning("⚠️ 服务器连接测试失败，但继续使用直接Agent调用")
-            else:
-                print("✅ 服务器连接测试成功")
-                logger.info("服务器连接测试成功")
-        except Exception as conn_error:
-            print(f"❌ 服务器连接测试异常: {conn_error}")
-            logger.error(f"服务器连接测试异常: {conn_error}")
-            # 继续处理，不退出
+        # 移除了 memory_agent 参数，直接使用 HTTP API
+        print("🔄 使用 HTTP API 模式处理邮件...")
 
         # 分页处理所有邮件
         processed_results = []
@@ -857,13 +721,12 @@ class LatestEmailProcessor:
                     logger.info(f"处理邮件 {current_index + 1}: {user_email_account}")
 
                     try:
-                        # 🚀 注意：process_single_email 现在是异步方法，需要传入 memory_agent
+                        # 🚀 调用 HTTP API 处理邮件
                         result = await self.process_single_email(
                             entry_id=entry_id,
                             conversation_id=conversation_id,
                             email_index=current_index,
-                            total_emails=0,  # 总数未知，设为0
-                            memory_agent=memory_agent  # 传递 memory_agent
+                            total_emails=0  # 总数未知，设为0
                         )
                         processed_results.append(result)
 
@@ -959,25 +822,22 @@ def main():
     logger.info(f"使用指定用户ID: {user_id}")
 
     try:
-        # 在main函数内初始化 memory_agent
-        print("🔄 正在初始化 Mirix...")
-        logger.info("正在初始化 Mirix...")
-
-        # 设置环境变量启用调试模式
-        os.environ['DEBUG'] = 'true'
+        # 检查 MIRIX API 是否可用
+        print(f"🔄 正在检查 MIRIX API 连接: {MIRIX_API_URL}")
+        logger.info(f"检查 MIRIX API: {MIRIX_API_URL}")
         
-        memory_agent = Mirix(
-            config_path="mirix/configs/mirix_gpt5.yaml",
-            api_key=os.getenv("OPENAI_API_KEY"))
-        
-        # 启用 CLIInterface 的详细输出
-        if hasattr(memory_agent._agent, 'client') and hasattr(memory_agent._agent.client, 'interface'):
-            # 让 interface 显示更多信息
-            print("✅ 已启用详细日志输出模式")
-            logger.info("已启用详细日志输出模式")
-
-        print("✅ Mirix 初始化成功")
-        logger.info("Mirix 初始化成功")
+        try:
+            response = requests.get(f"{MIRIX_API_URL}/health", timeout=5)
+            if response.status_code == 200:
+                print("✅ MIRIX API 连接成功")
+                logger.info("MIRIX API 连接成功")
+            else:
+                print(f"⚠️ MIRIX API 返回状态码: {response.status_code}")
+        except Exception as e:
+            print(f"❌ 无法连接到 MIRIX API: {e}")
+            print(f"💡 请先运行: python main.py")
+            logger.error(f"API 连接失败: {e}")
+            return
 
     except Exception as e:
         print(f"❌ Mirix 初始化失败: {e}")
@@ -1000,7 +860,7 @@ def main():
     try:
         print("🔄 开始批量处理邮件...")
         print("🔧 正在调用 asyncio.run...")
-        results = asyncio.run(processor.batch_process_latest_emails(memory_agent=memory_agent))
+        results = asyncio.run(processor.batch_process_latest_emails())
         print(f"📊 批量处理完成，获得结果: {len(results) if results else 0} 个")
 
         if results:

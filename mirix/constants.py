@@ -43,7 +43,7 @@ EMBEDDING_TO_TOKENIZER_MAP = {
 EMBEDDING_TO_TOKENIZER_DEFAULT = "cl100k_base"
 
 
-DEFAULT_MIRIX_MODEL = "gpt-5"  # Updated to GPT-5
+DEFAULT_MIRIX_MODEL = "gpt-4o"  # Updated to GPT-4o
 DEFAULT_PERSONA = "sam_pov"
 DEFAULT_HUMAN = "basic"
 DEFAULT_PRESET = "memgpt_chat"

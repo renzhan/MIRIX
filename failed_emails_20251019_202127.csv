@@ -1,0 +1,5 @@
+序号,Entry_ID,Conversation_ID,处理时间,错误信息
+1,unknown,,N/A,邮件数据缺少或为空的必需字段: content_text
+2,unknown,,N/A,邮件数据缺少或为空的必需字段: subject
+3,unknown,,N/A,邮件数据缺少或为空的必需字段: content_text
+4,unknown,,N/A,邮件数据缺少或为空的必需字段: content_text

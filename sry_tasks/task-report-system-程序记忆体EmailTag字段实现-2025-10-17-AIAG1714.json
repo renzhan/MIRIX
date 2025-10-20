@@ -1,0 +1,90 @@
+{
+  "taskId": "AIAG-1714",
+  "taskName": "AIAG|Procedural Memory|Enhancement-Email Tag数据来源追溯实现",
+  "taskBrief": "程序记忆体增加邮件分类标签追溯机制",
+  "username": "Ruoyu.Shi",
+  "completedAt": "2025-10-17T16:45:00.000Z",
+  "report": {
+    "requirements": "为程序记忆体添加email_tag字段，实现邮件数据来源追溯能力。确保AI在创建和更新流程时能够正确累积分类标签，支持多来源数据的标签合并。优化邮件学习脚本，将邮件分类信息正确传递给记忆系统。",
+    "taskBreakdown": "1. 扩展程序记忆体数据模型 2. 更新业务逻辑和MCP工具 3. 优化AI提示词和上下文检索 4. 集成邮件学习脚本分类提取 5. 测试验证标签累积机制",
+    "executionSteps": [
+      "在procedural_memory ORM模型添加email_tag和flow_tag JSON字段",
+      "更新Pydantic schemas支持List[str]类型的标签字段",
+      "修改procedural_memory_manager的insert_procedure方法支持email_tag参数",
+      "更新memory_tools的MCP工具函数添加email_tag参数定义",
+      "优化procedural_memory_agent.txt提示词，明确指导AI累积而非替换标签",
+      "修改agent.py在检索程序记忆时包含email_tag信息供AI参考",
+      "更新email_learning.py脚本SQL查询LEFT JOIN user_category表",
+      "优化process_mysql_email接口传递邮件分类信息给Meta Memory Agent",
+      "验证标签累积逻辑：邮件A创建流程后，邮件B更新流程能正确合并标签"
+    ],
+    "completionStatus": "completed"
+  },
+  "allCompletedTasks": [
+    {
+      "id": "AIAG-1714",
+      "name": "AIAG|Procedural Memory|Enhancement-Email Tag数据来源追溯实现",
+      "description": "为程序记忆体添加email_tag字段实现数据来源追溯。修改ORM模型、Pydantic schemas、业务逻辑层、MCP工具函数和AI提示词，确保邮件分类标签能够正确存储和智能累积。集成邮件学习脚本，从MySQL提取分类信息并通过API传递给记忆系统。",
+      "notes": "核心难点在于确保AI在更新流程时能看到并合并现有email_tag，而不是覆盖。需要在Agent上下文检索、提示词指导和工具参数三个层面协同实现标签累积逻辑。",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "e3f4g5h6-7i8j-9k0l-1m2n-o3p4q5r6s7t8",
+          "description": "依赖MySQL邮件入库系统"
+        }
+      ],
+      "createdAt": "2025-10-17T09:15:00.000Z",
+      "updatedAt": "2025-10-17T16:45:00.000Z",
+      "relatedFiles": [
+        {
+          "path": "mirix/orm/procedural_memory.py",
+          "type": "MODIFY",
+          "description": "添加email_tag和flow_tag JSON字段"
+        },
+        {
+          "path": "mirix/schemas/procedural_memory.py",
+          "type": "MODIFY",
+          "description": "Pydantic schemas添加List[str]标签字段"
+        },
+        {
+          "path": "mirix/services/procedural_memory_manager.py",
+          "type": "MODIFY",
+          "description": "insert_procedure方法支持email_tag参数"
+        },
+        {
+          "path": "mirix/functions/function_sets/memory_tools.py",
+          "type": "MODIFY",
+          "description": "MCP工具添加email_tag参数"
+        },
+        {
+          "path": "mirix/prompts/system/base/procedural_memory_agent.txt",
+          "type": "MODIFY",
+          "description": "优化提示词指导标签合并逻辑"
+        },
+        {
+          "path": "mirix/agent/agent.py",
+          "type": "MODIFY",
+          "description": "检索程序记忆时包含email_tag"
+        },
+        {
+          "path": "email_learning.py",
+          "type": "MODIFY",
+          "description": "SQL LEFT JOIN user_category提取分类"
+        },
+        {
+          "path": "mirix/server/fastapi_server.py",
+          "type": "MODIFY",
+          "description": "process_mysql_email接口传递分类"
+        }
+      ],
+      "implementationGuide": "在ORM层添加email_tag作为JSON字段存储字符串数组。修改procedural_memory_manager和memory_tools支持email_tag参数传递。关键是优化procedural_memory_agent.txt提示词，明确指导AI在更新流程时必须合并新旧标签。修改agent.py确保AI检索时能看到现有email_tag。在email_learning.py中通过LEFT JOIN user_category获取category_name并通过API传递。",
+      "verificationCriteria": "1. email_tag字段正确存储为JSON数组；2. 新创建程序记忆包含正确email_tag；3. 更新流程时email_tag正确累积不丢失；4. AI能识别并合并不同分类标签；5. 邮件学习脚本正确提取分类；6. 前端正确显示email_tag字段。",
+      "analysisResult": "现有程序记忆体缺少数据来源追溯，无法知道流程知识来自哪个邮件分类。多个邮件更新同一流程时会丢失来源信息。需要在数据模型层添加标签字段，在业务逻辑层支持标签传递，在AI层指导正确的累积逻辑，在数据源层提取分类信息。",
+      "taskBrief": "程序记忆体增加邮件分类标签追溯机制",
+      "parentTaskId": null,
+      "summary": "成功为程序记忆体实现email_tag数据来源追溯功能。在数据库层添加JSON字段支持多标签存储。更新完整数据流转链路：ORM模型、Pydantic schemas、业务管理器、MCP工具到AI提示词。重点优化procedural_memory_agent.txt，明确指导AI合并而非替换标签。修改agent.py确保AI能看到现有email_tag。集成email_learning.py通过LEFT JOIN user_category获取分类并通过process_mysql_email接口传递。实现智能标签累积：邮件A(客户沟通)创建流程后email_tag=['客户沟通']，邮件B(订单处理)更新后自动累积为['客户沟通', '订单处理']。系统现在能完整追溯程序记忆的数据来源。",
+      "completedAt": "2025-10-17T16:45:00.000Z"
+    }
+  ]
+}
+
