@@ -461,6 +461,15 @@ class ScreenshotSettingResponse(BaseModel):
     message: str
 
 
+class WorkflowExtractionRequest(BaseModel):
+    content: str
+    user_id: str
+
+
+class WorkflowExtractionResponse(BaseModel):
+    workflow_result: Any  # 可以是字典或字符串
+
+
 # API Key validation functionality
 def get_required_api_keys_for_model(model_endpoint_type: str) -> List[str]:
     """Get required API keys for a given model endpoint type"""
@@ -702,6 +711,61 @@ async def send_message_endpoint(request: MessageRequest):
         raise HTTPException(
             status_code=500, detail=f"Error processing message: {str(e)}"
         )
+
+
+@app.post("/workflow/extract", response_model=WorkflowExtractionResponse)
+async def extract_workflow(request: WorkflowExtractionRequest):
+    """
+    工作流程提取接口
+    
+    一次性完成：
+    1. 分析邮件/请求内容
+    2. 提取关键问题和信息
+    3. 从 procedural_memory 查询匹配的工作流程
+    4. 返回结构化的完整工作流程
+    """
+    try:
+        # 参数验证
+        if not request.user_id.strip():
+            raise HTTPException(status_code=400, detail="user_id不能为空")
+        if not request.content.strip():
+            raise HTTPException(status_code=400, detail="content不能为空")
+
+        logger.info(f"[WORKFLOW_API] 开始处理工作流程提取 - user_id: {request.user_id}, content_length: {len(request.content)}")
+
+        # 检查 agent 是否已初始化
+        if agent is None:
+            raise HTTPException(status_code=500, detail="Agent未初始化")
+
+        # 在后台线程中调用 workflow_agent
+        loop = asyncio.get_event_loop()
+        workflow_result = await loop.run_in_executor(
+            None,
+            lambda: agent.extract_workflow(
+                content=request.content,
+                user_id=request.user_id
+            )
+        )
+
+        # 处理响应
+        if workflow_result is None or (isinstance(workflow_result, str) and workflow_result.strip() == ""):
+            logger.error("[WORKFLOW_API] 返回空响应")
+            raise HTTPException(status_code=500, detail="工作流程提取失败：返回空内容")
+
+        if isinstance(workflow_result, str) and workflow_result.startswith("ERROR"):
+            logger.error(f"[WORKFLOW_API] 返回错误: {workflow_result}")
+            raise HTTPException(status_code=500, detail=f"工作流程提取失败: {workflow_result}")
+
+        logger.info(f"[WORKFLOW_API] 工作流程提取成功 - 类型: {type(workflow_result).__name__}")
+
+        return WorkflowExtractionResponse(workflow_result=workflow_result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[WORKFLOW_API] 处理失败: {str(e)}")
+        logger.error(f"[WORKFLOW_API] 错误堆栈: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"工作流程提取失败: {str(e)}")
 
 
 @app.post("/send_streaming_message")

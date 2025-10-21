@@ -218,6 +218,10 @@ class AgentManager:
                 + EXTRAS_TOOLS
                 + MCP_TOOLS)
 
+        if agent_state.agent_type == AgentType.workflow_agent:
+            # Workflow agent only needs two tools: search_in_memory and send_message
+            tool_names.extend(["search_in_memory", "send_message"])
+
         ## extract the existing tool names for the agent
         existing_tools = agent_state.tools
         existing_tool_names = set([tool.name for tool in existing_tools])
@@ -686,6 +690,9 @@ class AgentManager:
         messages = self.message_manager.get_messages_by_ids(
             message_ids=message_ids, actor=actor
         )
+        # Handle empty message list (e.g., when message_ids is [])
+        if not messages:
+            return []
         messages = [messages[0]] + [
             message for message in messages[1:] if message.user_id == actor.id
         ]
@@ -694,6 +701,9 @@ class AgentManager:
     @enforce_types
     def get_system_message(self, agent_id: str, actor: PydanticUser) -> PydanticMessage:
         message_ids = self.get_agent_by_id(agent_id=agent_id, actor=actor).message_ids
+        # Handle empty message_ids
+        if not message_ids:
+            return None
         return self.message_manager.get_message_by_id(
             message_id=message_ids[0], actor=actor
         )
