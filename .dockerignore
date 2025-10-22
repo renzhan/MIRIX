@@ -1,0 +1,103 @@
+# Git相关
+.git
+.gitignore
+
+# Python相关
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# 虚拟环境
+venv/
+mirix_env/
+.venv/
+ENV/
+env/
+
+# IDE相关
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统相关
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node.js相关 (前端会在多阶段构建中处理)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 构建产物
+build/
+dist/
+*.egg-info/
+
+# 测试相关
+tests/
+.pytest_cache/
+.coverage
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+tmp/
+temp/
+
+# 数据文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 配置文件中的敏感信息
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 文档
+README.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+CODE_STANDARDS.md
+LICENSE
+
+# 脚本
+scripts/
+samples/
+sry_tasks/
+
+# 其他
+Dockerfile
+.dockerignore
+docker-compose.yml
+*.csv
+*.spec
