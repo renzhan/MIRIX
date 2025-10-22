@@ -42,6 +42,7 @@ rich>=13.7.1,<14.0.0
 psycopg2-binary
 anyio>=4.7.0
 mcp
+redis>=4.5.0
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
