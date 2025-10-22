@@ -1,22 +1,4 @@
-# 多阶段构建 Dockerfile for Mirix AI Assistant
-# 阶段1: 构建前端
-FROM node:18-alpine AS frontend-builder
-
-WORKDIR /app/frontend
-
-# 复制前端依赖文件
-COPY frontend/package*.json ./
-
-# 安装前端依赖
-RUN npm ci --only=production
-
-# 复制前端源码
-COPY frontend/ ./
-
-# 构建前端
-RUN npm run build
-
-# 阶段2: Python后端
+# Dockerfile for Mirix AI Assistant - 支持前后端同时运行
 FROM python:3.11-slim
 
 # 设置工作目录
@@ -30,6 +12,8 @@ RUN apt-get update && apt-get install -y \
     git \
     libpq-dev \
     pkg-config \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # 设置Python环境变量
@@ -57,8 +41,15 @@ COPY database/ ./database/
 # 复制配置文件
 COPY assets/ ./assets/
 
-# 从前端构建阶段复制构建好的前端文件
-COPY --from=frontend-builder /app/frontend/build ./frontend/build
+# 复制前端源码
+COPY frontend/ ./frontend/
+
+# 安装前端依赖
+WORKDIR /app/frontend
+RUN npm ci
+
+# 回到应用根目录
+WORKDIR /app
 
 # 创建必要的目录
 RUN mkdir -p /app/data /app/logs
@@ -70,7 +61,7 @@ ENV MIRIX_CONFIG_PATH=/app/data
 ENV MIRIX_DATA_PATH=/app/data
 
 # 暴露端口
-EXPOSE 47283
+EXPOSE 47283 3000
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
@@ -82,5 +73,9 @@ RUN useradd --create-home --shell /bin/bash mirix && \
 
 USER mirix
 
-# 启动命令
-CMD ["python", "main.py", "--host", "0.0.0.0", "--port", "47283"]
+# 创建启动脚本
+COPY start.sh ./
+RUN chmod +x start.sh
+
+# 启动命令 - 同时启动前端和后端
+CMD ["./start.sh"]
