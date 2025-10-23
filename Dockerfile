@@ -1,81 +1,96 @@
-# Dockerfile for Mirix AI Assistant - 支持前后端同时运行
+# Dockerfile for Mirix AI Assistant - 支持前后端同时运行（修复 npm 404 构建失败）
 FROM python:3.11-slim
 
-# 设置工作目录
-WORKDIR /app
-
-# 安装系统依赖
-RUN apt-get update && apt-get install -y \
+# ---------------------------
+# 基础系统依赖
+# ---------------------------
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     ffmpeg \
     git \
     libpq-dev \
     pkg-config \
-    nodejs \
-    npm \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
-# 设置Python环境变量
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONPATH=/app
+# ---------------------------
+# 安装 Node.js 20.x（NodeSource）
+# ---------------------------
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+ && apt-get update && apt-get install -y --no-install-recommends nodejs \
+ && rm -rf /var/lib/apt/lists/* \
+ && node -v && npm -v
 
-# 复制Python依赖文件
-COPY requirements.txt pyproject.toml setup.py ./
-COPY MANIFEST.in ./
+# ---------------------------
+# Python 环境
+# ---------------------------
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app
 
-# 安装Python依赖
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# 复制并安装 Python 依赖
+COPY requirements.txt pyproject.toml setup.py MANIFEST.in ./
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
 
-# 复制Python源码
+# 复制项目源码
 COPY mirix/ ./mirix/
-COPY main.py ./
-COPY chat.py ./
-COPY email_learning.py ./
-
-# 复制数据库相关文件
+COPY main.py chat.py email_learning.py ./
 COPY database/ ./database/
-
-# 复制配置文件
 COPY assets/ ./assets/
 
-# 复制前端源码
-COPY frontend/ ./frontend/
-
-# 安装前端依赖
+# ---------------------------
+# 前端依赖安装（固定 registry，稳定构建）
+# ---------------------------
 WORKDIR /app/frontend
-RUN npm ci
 
-# 回到应用根目录
+# 仅复制 lockfile 与 package.json 以充分利用缓存
+COPY frontend/package.json frontend/package-lock.json ./
+
+# 忽略外部用户级 .npmrc，固定 registry（可通过 --build-arg 覆盖）
+ENV NPM_CONFIG_USERCONFIG=/dev/null
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+
+RUN npm config set registry ${NPM_REGISTRY} \
+ && npm ping \
+ && npm ci --no-audit --no-fund --registry=${NPM_REGISTRY}
+
+# 再复制剩余前端源码
+COPY frontend/ ./
+# 如果前端需要打包，请在此处开启：
+# RUN npm run build
+
+# ---------------------------
+# 回到应用根目录与运行配置
+# ---------------------------
 WORKDIR /app
 
-# 创建必要的目录
+# 必要目录
 RUN mkdir -p /app/data /app/logs
 
-# 设置环境变量
-ENV PORT=47283
-ENV HOST=0.0.0.0
-ENV MIRIX_CONFIG_PATH=/app/data
-ENV MIRIX_DATA_PATH=/app/data
+# 环境变量
+ENV PORT=47283 \
+    HOST=0.0.0.0 \
+    MIRIX_CONFIG_PATH=/app/data \
+    MIRIX_DATA_PATH=/app/data
 
-# 暴露端口
+# 暴露端口（后端 47283；前端 dev/build 可使用 3000）
 EXPOSE 47283 3000
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:47283/health || exit 1
+  CMD curl -f http://localhost:47283/health || exit 1
 
-# 复制启动脚本并设置权限
+# 启动脚本
 COPY start.sh ./
 RUN chmod +x start.sh
 
-# 创建非root用户
-RUN useradd --create-home --shell /bin/bash mirix && \
-    chown -R mirix:mirix /app
-
+# 非 root 用户
+RUN useradd --create-home --shell /bin/bash mirix && chown -R mirix:mirix /app
 USER mirix
 
-# 启动命令 - 同时启动前端和后端
+# 同时启动前后端（由 start.sh 实现）
 CMD ["./start.sh"]
