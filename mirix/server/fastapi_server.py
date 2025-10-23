@@ -595,8 +595,6 @@ class EmailReplyRequest(BaseModel):
     email_content: str
     user_id: str
 
-class EmailReplyResponse(BaseModel):
-    reply_content: str
 
 @app.on_event("startup")
 async def startup_event():
@@ -2397,9 +2395,7 @@ async def reply_to_email(request: EmailReplyRequest):
 
             response_text = parsed_args["message"]
 
-            return EmailReplyResponse(
-                reply_content=response_text
-            )
+            return response_text
         except (AttributeError, KeyError, IndexError, json.JSONDecodeError):
             raise HTTPException(status_code=500, detail="Error parsing response")
 
