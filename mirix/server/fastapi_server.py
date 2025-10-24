@@ -32,60 +32,86 @@ from ..utils import parse_json
 from ..schemas.mirix_message import MessageType
 
 def _setup_logging():
-    """Configure logging to write all backend logs to api_backend.log with rotation."""
+    """Configure logging with flexible output options (console/file/both)."""
     try:
         import os
         
-        # 使用环境变量或默认路径
-        log_dir = os.getenv('LOG_DIR', '/app/logs')
-        os.makedirs(log_dir, exist_ok=True)
+        # 日志配置环境变量
+        log_output = os.getenv('LOG_OUTPUT', 'both').lower()  # console, file, both
+        log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+        log_dir = os.getenv('LOG_DIR', './')
+        
+        # 创建日志目录（如果需要文件输出）
+        if log_output in ['file', 'both']:
+            os.makedirs(log_dir, exist_ok=True)
+        
         log_file = os.path.join(log_dir, 'api_backend.log')
-
-        logging.config.dictConfig(
-            {
-                "version": 1,
-                "disable_existing_loggers": False,
-                "formatters": {
-                    "standard": {
-                        # Example: 2025-10-19 21:05:12 - INFO - mirix.server.fastapi_server - fastapi_server.py:123 - message
-                        "format": "%(asctime)s - %(levelname)s - %(name)s - %(filename)s:%(lineno)d - %(message)s",
-                    },
+        
+        # 基础配置
+        config = {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "standard": {
+                    "format": "%(asctime)s - %(levelname)s - %(name)s - %(filename)s:%(lineno)d - %(message)s",
                 },
-                "handlers": {
-                    "console": {
-                        "class": "logging.StreamHandler",
-                        "level": "INFO",
-                        "formatter": "standard",
-                        "stream": "ext://sys.stdout",
-                    },
-                    "rotating_file": {
-                        "class": "logging.handlers.RotatingFileHandler",
-                        "level": "INFO",
-                        "formatter": "standard",
-                        "filename": log_file,
-                        "maxBytes": 52428800,  # 50MB
-                        "backupCount": 10,
-                        "encoding": "utf-8",
-                    },
+                "simple": {
+                    "format": "%(asctime)s - %(levelname)s - %(message)s",
                 },
-                "root": {
-                    "level": "INFO",
-                    "handlers": ["console", "rotating_file"],
-                },
-                "loggers": {
-                    # Ensure Uvicorn logs propagate into root file handler
-                    "uvicorn": {"level": "INFO", "propagate": True},
-                    "uvicorn.error": {"level": "INFO", "propagate": True},
-                    "uvicorn.access": {"level": "INFO", "propagate": True},
-                },
+            },
+            "handlers": {},
+            "root": {
+                "level": log_level,
+                "handlers": [],
+            },
+            "loggers": {
+                "uvicorn": {"level": "INFO", "propagate": True},
+                "uvicorn.error": {"level": "INFO", "propagate": True},
+                "uvicorn.access": {"level": "INFO", "propagate": True},
+            },
+        }
+        
+        # 根据配置添加处理器
+        if log_output in ['console', 'both']:
+            config["handlers"]["console"] = {
+                "class": "logging.StreamHandler",
+                "level": log_level,
+                "formatter": "simple",
+                "stream": "ext://sys.stdout",
             }
-        )
+            config["root"]["handlers"].append("console")
+        
+        if log_output in ['file', 'both']:
+            config["handlers"]["rotating_file"] = {
+                "class": "logging.handlers.RotatingFileHandler",
+                "level": log_level,
+                "formatter": "standard",
+                "filename": log_file,
+                "maxBytes": 52428800,  # 50MB
+                "backupCount": 10,
+                "encoding": "utf-8",
+            }
+            config["root"]["handlers"].append("rotating_file")
+        
+        # 应用配置
+        logging.config.dictConfig(config)
         
         # 记录日志配置信息
         logger = logging.getLogger(__name__)
         logger.info("=== 邮件回复服务日志配置完成 ===")
-        logger.info(f"日志文件路径: {log_file}")
-        logger.info(f"日志文件最大大小: 50MB，保留备份数: 10")
+        logger.info(f"日志输出模式: {log_output}")
+        logger.info(f"日志级别: {log_level}")
+        
+        if log_output in ['file', 'both']:
+            logger.info(f"日志文件路径: {log_file}")
+            logger.info(f"日志文件最大大小: 50MB，保留备份数: 10")
+        
+        if log_output == 'console':
+            logger.info("仅输出到控制台")
+        elif log_output == 'file':
+            logger.info("仅输出到文件")
+        else:
+            logger.info("同时输出到控制台和文件")
         
     except Exception as e:
         # Fall back gracefully without crashing the server if logging config fails
