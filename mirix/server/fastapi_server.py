@@ -74,14 +74,13 @@ def _setup_logging():
         # Fall back gracefully without crashing the server if logging config fails
         logging.basicConfig(level=logging.DEBUG)
 
-# 确保日志级别设置为INFO
-logging.basicConfig(level=logging.INFO)
-logger.setLevel(logging.INFO)
-
-
 _setup_logging()
 
 logger = logging.getLogger(__name__)
+
+# 确保日志级别设置为INFO
+logging.basicConfig(level=logging.INFO)
+logger.setLevel(logging.INFO)
 # User context switching utilities
 def switch_user_context(agent_wrapper, user_id: str):
     """Switch agent's user context and manage user status"""
