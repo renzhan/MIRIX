@@ -517,6 +517,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                 "error": "邮件回复生成失败", 
                 "task_id": task_id, 
                 "email_basic_id": email_basic_id,
+                "category_list": category_list,
                 "timing": {
                     "wait_time": round(wait_time, 2),
                     "processing_time": round(actual_processing_time, 2),
@@ -533,6 +534,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                 "error": "响应结构无效", 
                 "task_id": task_id, 
                 "email_basic_id": email_basic_id,
+                "category_list": category_list,
                 "timing": {
                     "wait_time": round(wait_time, 2),
                     "processing_time": round(actual_processing_time, 2),
@@ -559,6 +561,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                         "error": "缺少工具调用", 
                         "task_id": task_id, 
                         "email_basic_id": email_basic_id,
+                        "category_list": category_list,
                         "timing": {
                             "wait_time": round(wait_time, 2),
                             "processing_time": round(actual_processing_time, 2),
@@ -579,6 +582,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                             "error": "缺少消息内容", 
                             "task_id": task_id, 
                             "email_basic_id": email_basic_id,
+                            "category_list": category_list,
                             "timing": {
                                 "wait_time": round(wait_time, 2),
                                 "processing_time": round(actual_processing_time, 2),
@@ -598,6 +602,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                             "reply_content": parsed_args["message"],
                             "task_id": task_id,
                             "email_basic_id": email_basic_id,
+                            "category_list": category_list,
                             "timing": {
                                 "wait_time": round(wait_time, 2),
                                 "processing_time": round(actual_processing_time, 2),
@@ -614,6 +619,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                     "error": f"解析响应失败: {str(e)}", 
                     "task_id": task_id, 
                     "email_basic_id": email_basic_id,
+                    "category_list": category_list,
                     "timing": {
                         "wait_time": round(wait_time, 2),
                         "processing_time": round(actual_processing_time, 2),
@@ -665,6 +671,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                 "error": str(e), 
                 "task_id": task_id, 
                 "email_basic_id": email_basic_id,
+                "category_list": category_list,
                 "timing": {
                     "processing_time": round(actual_processing_time, 2),
                     "total_time": round(total_time, 2)
