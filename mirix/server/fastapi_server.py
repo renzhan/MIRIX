@@ -374,6 +374,8 @@ _mcp_tools_registered = False
 
 def process_email_reply_task(task_id: str, email_content: str, category_list: str, user_id: str, agent_id: str, callback_url: str):
     """后台处理邮件回复任务"""
+    processing_start_time = time.time()
+    
     try:
         logger.info(f"开始处理邮件回复任务: {task_id}")
         
@@ -384,10 +386,17 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         if not task_data:
             logger.error(f"任务不存在: {task_id}")
             return
+        
+        # 计算等待时间
+        created_at = datetime.fromisoformat(task_data.get("created_at"))
+        wait_time = processing_start_time - created_at.timestamp()
+        
+        logger.info(f"任务 {task_id} 等待处理时间: {wait_time:.2f}秒")
             
         # 更新任务状态为处理中
         redis_client.hset(task_key, "status", "processing")
         redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
+        redis_client.hset(task_key, "processing_start_time", datetime.now().isoformat())
         
         # 执行邮件回复生成
         response, _ = agent.message_queue.send_message_in_queue(
@@ -403,9 +412,37 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
 
         # 处理响应
         if response == "ERROR":
-            result = {"status": "error", "error": "邮件回复生成失败", "task_id": task_id, "agent_id": agent_id}
+            actual_processing_time = time.time() - processing_start_time
+            total_time = time.time() - created_at.timestamp()
+            logger.info(f"任务 {task_id} 处理失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+            
+            result = {
+                "status": "error", 
+                "error": "邮件回复生成失败", 
+                "task_id": task_id, 
+                "agent_id": agent_id,
+                "timing": {
+                    "wait_time": round(wait_time, 2),
+                    "processing_time": round(actual_processing_time, 2),
+                    "total_time": round(total_time, 2)
+                }
+            }
         elif not hasattr(response, "messages") or len(response.messages) < 2:
-            result = {"status": "error", "error": "响应结构无效", "task_id": task_id, "agent_id": agent_id}
+            actual_processing_time = time.time() - processing_start_time
+            total_time = time.time() - created_at.timestamp()
+            logger.info(f"任务 {task_id} 响应结构无效 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+            
+            result = {
+                "status": "error", 
+                "error": "响应结构无效", 
+                "task_id": task_id, 
+                "agent_id": agent_id,
+                "timing": {
+                    "wait_time": round(wait_time, 2),
+                    "processing_time": round(actual_processing_time, 2),
+                    "total_time": round(total_time, 2)
+                }
+            }
         else:
             try:
                 # 解析响应
@@ -417,22 +454,76 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                         break
 
                 if not hasattr(response.messages[-(num_tools_called * 2 + 1)], "tool_call"):
-                    result = {"status": "error", "error": "缺少工具调用", "task_id": task_id, "agent_id": agent_id}
+                    actual_processing_time = time.time() - processing_start_time
+                    total_time = time.time() - created_at.timestamp()
+                    logger.info(f"任务 {task_id} 缺少工具调用 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+                    
+                    result = {
+                        "status": "error", 
+                        "error": "缺少工具调用", 
+                        "task_id": task_id, 
+                        "agent_id": agent_id,
+                        "timing": {
+                            "wait_time": round(wait_time, 2),
+                            "processing_time": round(actual_processing_time, 2),
+                            "total_time": round(total_time, 2)
+                        }
+                    }
                 else:
                     tool_call = response.messages[-(num_tools_called * 2 + 1)].tool_call
                     parsed_args = parse_json(tool_call.arguments)
                     
                     if "message" not in parsed_args:
-                        result = {"status": "error", "error": "缺少消息内容", "task_id": task_id, "agent_id": agent_id}
+                        actual_processing_time = time.time() - processing_start_time
+                        total_time = time.time() - created_at.timestamp()
+                        logger.info(f"任务 {task_id} 缺少消息内容 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+                        
+                        result = {
+                            "status": "error", 
+                            "error": "缺少消息内容", 
+                            "task_id": task_id, 
+                            "agent_id": agent_id,
+                            "timing": {
+                                "wait_time": round(wait_time, 2),
+                                "processing_time": round(actual_processing_time, 2),
+                                "total_time": round(total_time, 2)
+                            }
+                        }
                     else:
+                        # 计算处理时间
+                        actual_processing_time = time.time() - processing_start_time
+                        total_time = time.time() - created_at.timestamp()
+                        
+                        logger.info(f"任务 {task_id} 实际处理时间: {actual_processing_time:.2f}秒")
+                        logger.info(f"任务 {task_id} 总处理时间: {total_time:.2f}秒")
+                        
                         result = {
                             "status": "completed",
                             "reply_content": parsed_args["message"],
                             "task_id": task_id,
-                            "agent_id": agent_id
+                            "agent_id": agent_id,
+                            "timing": {
+                                "wait_time": round(wait_time, 2),
+                                "processing_time": round(actual_processing_time, 2),
+                                "total_time": round(total_time, 2)
+                            }
                         }
             except Exception as e:
-                result = {"status": "error", "error": f"解析响应失败: {str(e)}", "task_id": task_id, "agent_id": agent_id}
+                actual_processing_time = time.time() - processing_start_time
+                total_time = time.time() - created_at.timestamp()
+                logger.info(f"任务 {task_id} 解析响应失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+                
+                result = {
+                    "status": "error", 
+                    "error": f"解析响应失败: {str(e)}", 
+                    "task_id": task_id, 
+                    "agent_id": agent_id,
+                    "timing": {
+                        "wait_time": round(wait_time, 2),
+                        "processing_time": round(actual_processing_time, 2),
+                        "total_time": round(total_time, 2)
+                    }
+                }
         
         # 发送回调
         try:
@@ -450,10 +541,20 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         
         # 清除Redis记录
         redis_client.delete(task_key)
-        logger.info(f"任务处理完成并清除: {task_id}")
+        final_time = time.time() - processing_start_time
+        logger.info(f"任务处理完成并清除: {task_id}, 最终处理时间: {final_time:.2f}秒")
         
     except Exception as e:
+        actual_processing_time = time.time() - processing_start_time
+        # 如果created_at未定义，使用当前时间作为fallback
+        try:
+            total_time = time.time() - created_at.timestamp()
+        except:
+            total_time = actual_processing_time
+            
         logger.error(f"处理邮件回复任务失败: {task_id}, 错误: {str(e)}")
+        logger.info(f"任务 {task_id} 异常失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+        
         # 更新任务状态为失败
         task_key = f"email_reply_task:{task_id}"
         redis_client.hset(task_key, "status", "failed")
@@ -462,9 +563,19 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         
         # 尝试发送失败回调
         try:
+            callback_data = {
+                "status": "error", 
+                "error": str(e), 
+                "task_id": task_id, 
+                "agent_id": agent_id,
+                "timing": {
+                    "processing_time": round(actual_processing_time, 2),
+                    "total_time": round(total_time, 2)
+                }
+            }
             requests.post(
                 callback_url,
-                json={"status": "error", "error": str(e), "task_id": task_id, "agent_id": agent_id},
+                json=callback_data,
                 timeout=30,
                 headers={"Content-Type": "application/json"}
             )
