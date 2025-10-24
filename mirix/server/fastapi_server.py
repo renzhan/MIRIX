@@ -32,11 +32,14 @@ from ..utils import parse_json
 from ..schemas.mirix_message import MessageType
 
 def _setup_logging():
-    """Configure logging to write all backend logs to project-root api_backend.log."""
+    """Configure logging to write all backend logs to api_backend.log with rotation."""
     try:
-        project_root = Path(__file__).resolve().parents[2]
-        log_file = project_root / "api_backend.log"
-        log_file.parent.mkdir(parents=True, exist_ok=True)
+        import os
+        
+        # 使用环境变量或默认路径
+        log_dir = os.getenv('LOG_DIR', '/app/logs')
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, 'api_backend.log')
 
         logging.config.dictConfig(
             {
@@ -49,18 +52,25 @@ def _setup_logging():
                     },
                 },
                 "handlers": {
-                    "file": {
-                        "class": "logging.FileHandler",
-                        "level": "DEBUG",
+                    "console": {
+                        "class": "logging.StreamHandler",
+                        "level": "INFO",
                         "formatter": "standard",
-                        "filename": str(log_file),
+                        "stream": "ext://sys.stdout",
+                    },
+                    "rotating_file": {
+                        "class": "logging.handlers.RotatingFileHandler",
+                        "level": "INFO",
+                        "formatter": "standard",
+                        "filename": log_file,
+                        "maxBytes": 52428800,  # 50MB
+                        "backupCount": 10,
                         "encoding": "utf-8",
-                        "mode": "a",
                     },
                 },
                 "root": {
-                    "level": "DEBUG",
-                    "handlers": ["file"],
+                    "level": "INFO",
+                    "handlers": ["console", "rotating_file"],
                 },
                 "loggers": {
                     # Ensure Uvicorn logs propagate into root file handler
@@ -70,17 +80,21 @@ def _setup_logging():
                 },
             }
         )
-    except Exception:
+        
+        # 记录日志配置信息
+        logger = logging.getLogger(__name__)
+        logger.info("=== 邮件回复服务日志配置完成 ===")
+        logger.info(f"日志文件路径: {log_file}")
+        logger.info(f"日志文件最大大小: 50MB，保留备份数: 10")
+        
+    except Exception as e:
         # Fall back gracefully without crashing the server if logging config fails
-        logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig(level=logging.INFO)
+        print(f"日志配置失败，使用基础配置: {e}")
 
 _setup_logging()
 
 logger = logging.getLogger(__name__)
-
-# 确保日志级别设置为INFO
-logging.basicConfig(level=logging.INFO)
-logger.setLevel(logging.INFO)
 # User context switching utilities
 def switch_user_context(agent_wrapper, user_id: str):
     """Switch agent's user context and manage user status"""
