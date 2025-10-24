@@ -493,13 +493,6 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         redis_client.hset(task_key, "status", "processing")
         redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
         redis_client.hset(task_key, "processing_start_time", datetime.now().isoformat())
-        content = f"""
-category_list:
-{category_list}
-
-email content:
-{email_content}
-"""
 
         # 执行邮件回复生成
         response, _ = agent.message_queue.send_message_in_queue(
@@ -507,7 +500,7 @@ email content:
             agent.agent_states.email_reply_agent_state.id,
             {
                 "user_id": user_id,
-                "message": content,
+                "message": email_content,
                 "force_response": True
             },
             agent_type="email_reply",
@@ -955,10 +948,15 @@ class EmailReplyResponse(BaseModel):
     message: str
 
 # Redis连接
+redis_port_str = os.getenv('REDIS_PORT', '6379')
+
+if ':' in redis_port_str and not redis_port_str.isdigit():
+    redis_port_str = redis_port_str.split(':')[-1]  # 'tcp://172.30.1.193:6379' → '6379'
+
 redis_client = redis.Redis(
     host=os.getenv('REDIS_HOST', 'localhost'),
-    port=int(os.getenv('REDIS_PORT', 6379)),
-    password=os.getenv('REDIS_PASSWORD', 'aiop123456'),  # 修复：密码应该是字符串
+    port=int(redis_port_str), 
+    password=os.getenv('REDIS_PASSWORD', 'aiop123456'),
     db=int(os.getenv('REDIS_DB', 0)),
     decode_responses=True
 )
