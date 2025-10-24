@@ -32,48 +32,91 @@ from ..utils import parse_json
 from ..schemas.mirix_message import MessageType
 
 def _setup_logging():
-    """Configure logging to write all backend logs to project-root api_backend.log."""
+    """Configure logging with flexible output options (console/file/both)."""
     try:
-        project_root = Path(__file__).resolve().parents[2]
-        log_file = project_root / "api_backend.log"
-        log_file.parent.mkdir(parents=True, exist_ok=True)
-
-        logging.config.dictConfig(
-            {
-                "version": 1,
-                "disable_existing_loggers": False,
-                "formatters": {
-                    "standard": {
-                        # Example: 2025-10-19 21:05:12 - INFO - mirix.server.fastapi_server - fastapi_server.py:123 - message
-                        "format": "%(asctime)s - %(levelname)s - %(name)s - %(filename)s:%(lineno)d - %(message)s",
-                    },
+        import os
+        
+        # 日志配置环境变量
+        log_output = os.getenv('LOG_OUTPUT', 'both').lower()  # console, file, both
+        log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+        log_dir = os.getenv('LOG_DIR', './')
+        
+        # 创建日志目录（如果需要文件输出）
+        if log_output in ['file', 'both']:
+            os.makedirs(log_dir, exist_ok=True)
+        
+        log_file = os.path.join(log_dir, 'api_backend.log')
+        
+        # 基础配置
+        config = {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "standard": {
+                    "format": "%(asctime)s - %(levelname)s - %(name)s - %(filename)s:%(lineno)d - %(message)s",
                 },
-                "handlers": {
-                    "file": {
-                        "class": "logging.FileHandler",
-                        "level": "DEBUG",
-                        "formatter": "standard",
-                        "filename": str(log_file),
-                        "encoding": "utf-8",
-                        "mode": "a",
-                    },
+                "simple": {
+                    "format": "%(asctime)s - %(levelname)s - %(message)s",
                 },
-                "root": {
-                    "level": "DEBUG",
-                    "handlers": ["file"],
-                },
-                "loggers": {
-                    # Ensure Uvicorn logs propagate into root file handler
-                    "uvicorn": {"level": "INFO", "propagate": True},
-                    "uvicorn.error": {"level": "INFO", "propagate": True},
-                    "uvicorn.access": {"level": "INFO", "propagate": True},
-                },
+            },
+            "handlers": {},
+            "root": {
+                "level": log_level,
+                "handlers": [],
+            },
+            "loggers": {
+                "uvicorn": {"level": "INFO", "propagate": True},
+                "uvicorn.error": {"level": "INFO", "propagate": True},
+                "uvicorn.access": {"level": "INFO", "propagate": True},
+            },
+        }
+        
+        # 根据配置添加处理器
+        if log_output in ['console', 'both']:
+            config["handlers"]["console"] = {
+                "class": "logging.StreamHandler",
+                "level": log_level,
+                "formatter": "simple",
+                "stream": "ext://sys.stdout",
             }
-        )
-    except Exception:
+            config["root"]["handlers"].append("console")
+        
+        if log_output in ['file', 'both']:
+            config["handlers"]["rotating_file"] = {
+                "class": "logging.handlers.RotatingFileHandler",
+                "level": log_level,
+                "formatter": "standard",
+                "filename": log_file,
+                "maxBytes": 52428800,  # 50MB
+                "backupCount": 10,
+                "encoding": "utf-8",
+            }
+            config["root"]["handlers"].append("rotating_file")
+        
+        # 应用配置
+        logging.config.dictConfig(config)
+        
+        # 记录日志配置信息
+        logger = logging.getLogger(__name__)
+        logger.info("=== 邮件回复服务日志配置完成 ===")
+        logger.info(f"日志输出模式: {log_output}")
+        logger.info(f"日志级别: {log_level}")
+        
+        if log_output in ['file', 'both']:
+            logger.info(f"日志文件路径: {log_file}")
+            logger.info(f"日志文件最大大小: 50MB，保留备份数: 10")
+        
+        if log_output == 'console':
+            logger.info("仅输出到控制台")
+        elif log_output == 'file':
+            logger.info("仅输出到文件")
+        else:
+            logger.info("同时输出到控制台和文件")
+        
+    except Exception as e:
         # Fall back gracefully without crashing the server if logging config fails
-        logging.basicConfig(level=logging.DEBUG)
-
+        logging.basicConfig(level=logging.INFO)
+        print(f"日志配置失败，使用基础配置: {e}")
 
 _setup_logging()
 
@@ -598,6 +641,7 @@ email content:
             logger.error(f"回调发送失败: {task_id}, 错误: {str(e)}")
             # 即使回调失败，也要更新Redis状态
             redis_client.hset(task_key, "callback_error", str(e))
+        logger.info(f"Url:{callback_url} \n  Body: {json.dumps(result, ensure_ascii=False, indent=2)}")
         
         # 清除Redis记录
         redis_client.delete(task_key)
