@@ -858,9 +858,9 @@ class EmailReplyResponse(BaseModel):
 
 # Redis连接
 redis_client = redis.Redis(
-    host=os.getenv('MIRIX_REDIS_HOST', 'localhost'),
-    port=int(os.getenv('MIRIX_REDIS_PORT', 6379)),
-    password=os.getenv('MIRIX_REDIS_PASSWORD', 'aiop123456'),  # 修复：密码应该是字符串
+    host=os.getenv('REDIS_HOST', 'localhost'),
+    port=int(os.getenv('REDIS_PORT', 6379)),
+    password=os.getenv('REDIS_PASSWORD', 'aiop123456'),  # 修复：密码应该是字符串
     db=int(os.getenv('REDIS_DB', 0)),
     decode_responses=True
 )
