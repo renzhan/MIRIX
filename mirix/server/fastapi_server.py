@@ -450,14 +450,21 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         redis_client.hset(task_key, "status", "processing")
         redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
         redis_client.hset(task_key, "processing_start_time", datetime.now().isoformat())
-        
+        content = f"""
+category_list:
+{category_list}
+
+email content:
+{email_content}
+"""
+
         # 执行邮件回复生成
         response, _ = agent.message_queue.send_message_in_queue(
             agent.client,
             agent.agent_states.email_reply_agent_state.id,
             {
                 "user_id": user_id,
-                "message": email_content,
+                "message": content,
                 "force_response": True
             },
             agent_type="email_reply",
