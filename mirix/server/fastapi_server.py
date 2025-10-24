@@ -32,6 +32,10 @@ from ..schemas.mirix_message import MessageType
 
 logger = logging.getLogger(__name__)
 
+# 确保日志级别设置为INFO
+logging.basicConfig(level=logging.INFO)
+logger.setLevel(logging.INFO)
+
 
 # User context switching utilities
 def switch_user_context(agent_wrapper, user_id: str):
@@ -544,6 +548,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             logger.error(f"回调发送失败: {task_id}, 错误: {str(e)}")
             # 即使回调失败，也要更新Redis状态
             redis_client.hset(task_key, "callback_error", str(e))
+        logger.info(f"Url:{callback_url} \n  Body: {json.dumps(result, ensure_ascii=False, indent=2)}")
         
         # 清除Redis记录
         redis_client.delete(task_key)
