@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import logging.config
 import os
 import queue
 import traceback
@@ -30,13 +31,57 @@ from ..services.mcp_tool_registry import get_mcp_tool_registry
 from ..utils import parse_json
 from ..schemas.mirix_message import MessageType
 
-logger = logging.getLogger(__name__)
+def _setup_logging():
+    """Configure logging to write all backend logs to project-root api_backend.log."""
+    try:
+        project_root = Path(__file__).resolve().parents[2]
+        log_file = project_root / "api_backend.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+
+        logging.config.dictConfig(
+            {
+                "version": 1,
+                "disable_existing_loggers": False,
+                "formatters": {
+                    "standard": {
+                        # Example: 2025-10-19 21:05:12 - INFO - mirix.server.fastapi_server - fastapi_server.py:123 - message
+                        "format": "%(asctime)s - %(levelname)s - %(name)s - %(filename)s:%(lineno)d - %(message)s",
+                    },
+                },
+                "handlers": {
+                    "file": {
+                        "class": "logging.FileHandler",
+                        "level": "DEBUG",
+                        "formatter": "standard",
+                        "filename": str(log_file),
+                        "encoding": "utf-8",
+                        "mode": "a",
+                    },
+                },
+                "root": {
+                    "level": "DEBUG",
+                    "handlers": ["file"],
+                },
+                "loggers": {
+                    # Ensure Uvicorn logs propagate into root file handler
+                    "uvicorn": {"level": "INFO", "propagate": True},
+                    "uvicorn.error": {"level": "INFO", "propagate": True},
+                    "uvicorn.access": {"level": "INFO", "propagate": True},
+                },
+            }
+        )
+    except Exception:
+        # Fall back gracefully without crashing the server if logging config fails
+        logging.basicConfig(level=logging.DEBUG)
 
 # 确保日志级别设置为INFO
 logging.basicConfig(level=logging.INFO)
 logger.setLevel(logging.INFO)
 
 
+_setup_logging()
+
+logger = logging.getLogger(__name__)
 # User context switching utilities
 def switch_user_context(agent_wrapper, user_id: str):
     """Switch agent's user context and manage user status"""
@@ -307,6 +352,8 @@ async def startup_event():
     global agent
     
     try:
+        # Re-assert logging config in case a runner (e.g., Uvicorn) overwrote it
+        _setup_logging()
         logger.info("Starting up Mirix FastAPI server...")
 
         # Initialize the agent
