@@ -74,12 +74,15 @@ RUN npm config set registry ${NPM_REGISTRY} \
  && npm config set fetch-retry-mintimeout 10000 \
  && npm config set fetch-retry-maxtimeout 60000 \
  && npm ci --no-audit --no-fund --no-optional --silent --registry=${NPM_REGISTRY} \
+ && npm install -g serve \
  && npm cache clean --force
 
 # 再复制剩余前端源码（以mirix用户身份，自动拥有正确权限）
 COPY frontend/ ./
-# 如果前端需要打包，请在此处开启：
-# RUN npm run build
+
+# 构建前端生产版本
+ENV PUBLIC_URL=/aiop-pams
+RUN npm run build
 
 # ---------------------------
 # 回到应用根目录与运行配置
