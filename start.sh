@@ -2,9 +2,13 @@
 
 # 启动脚本 - 同时运行前端和后端服务
 
+# 设置后端环境变量
+export BACKEND_PORT=${BACKEND_PORT:-47283}
+export BACKEND_HOST=${BACKEND_HOST:-0.0.0.0}
+
 # 启动后端服务
 echo "启动后端服务..."
-python main.py --host 0.0.0.0 --port 47283 &
+python main.py --host ${BACKEND_HOST} --port ${BACKEND_PORT} &
 BACKEND_PID=$!
 
 # 等待后端启动
@@ -13,6 +17,20 @@ sleep 5
 # 启动前端开发服务器
 echo "启动前端服务..."
 cd frontend
+
+# 设置前端专用的环境变量，避免端口冲突
+export PORT=3000  # 前端固定使用3000端口
+export HOST=0.0.0.0
+export REACT_APP_SERVER_URL="http://localhost:${BACKEND_PORT}/pams"
+
+# 清除可能影响前端的环境变量
+unset BACKEND_PORT
+unset BACKEND_HOST
+
+echo "前端将使用端口: ${PORT}"
+echo "后端API地址: ${REACT_APP_SERVER_URL}"
+
+# 启动前端服务
 npm start &
 FRONTEND_PID=$!
 

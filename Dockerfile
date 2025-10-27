@@ -72,8 +72,8 @@ WORKDIR /app
 RUN mkdir -p /app/data /app/logs
 
 # 环境变量
-ENV PORT=47283 \
-    HOST=0.0.0.0 \
+ENV BACKEND_PORT=47283 \
+    BACKEND_HOST=0.0.0.0 \
     MIRIX_CONFIG_PATH=/app/data \
     MIRIX_DATA_PATH=/app/data
 

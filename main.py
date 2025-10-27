@@ -31,7 +31,8 @@ def main():
     # Determine port from command line, environment variable, or default
     port = args.port
     if port is None:
-        port = int(os.environ.get("PORT", 47283))
+        # 优先使用BACKEND_PORT，然后是PORT，最后是默认值
+        port = int(os.environ.get("BACKEND_PORT", os.environ.get("PORT", 47283)))
 
     print(f"Starting Mirix server on {args.host}:{port}")
 
