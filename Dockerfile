@@ -102,11 +102,13 @@ EXPOSE 47283 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:47283/health || exit 1
 
-# 启动脚本（以mirix用户身份复制，自动拥有正确权限）
+# 启动脚本（需要以root身份设置权限）
+USER root
 COPY start.sh ./
-RUN chmod +x start.sh
+RUN chmod +x start.sh && chown mirix:mirix start.sh
 
-# 已经是mirix用户，无需额外权限设置
+# 切换回mirix用户
+USER mirix
 
 # 同时启动前后端（由 start.sh 实现）
 CMD ["./start.sh"]
