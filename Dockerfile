@@ -60,8 +60,7 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 
 # 优化npm配置，加速安装
-ENV NPM_CONFIG_USERCONFIG=/dev/null \
-    NPM_CONFIG_PROGRESS=false \
+ENV NPM_CONFIG_PROGRESS=false \
     NPM_CONFIG_LOGLEVEL=warn \
     NPM_CONFIG_AUDIT=false \
     NPM_CONFIG_FUND=false
