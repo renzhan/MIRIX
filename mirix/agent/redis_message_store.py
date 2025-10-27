@@ -5,9 +5,12 @@ This module encapsulates all Redis operations for storing temporary messages.
 Messages are stored in Redis Lists with user-specific keys to ensure isolation.
 
 Redis data structure:
-- Key: mirix:temp_messages:{user_id}
+- Key: {prefix}:temp_messages:{user_id}  (prefix from settings, default: aiop)
 - Type: List (FIFO queue)
 - Operations: RPUSH (add), LRANGE (get), LTRIM (remove), LLEN (count)
+
+Note: Redis key prefix is configurable via MIRIX_REDIS_KEY_PREFIX environment variable
+to meet K8S operational requirements (default: aiop).
 """
 
 import json
@@ -21,6 +24,16 @@ from mirix.settings import settings
 
 # Global Redis client singleton
 _redis_client = None
+
+
+def _get_temp_messages_key(user_id: str) -> str:
+    """Generate Redis key for temporary messages with configurable prefix"""
+    return f"{settings.redis_key_prefix}:temp_messages:{user_id}"
+
+
+def _get_user_conversations_key(user_id: str) -> str:
+    """Generate Redis key for user conversations with configurable prefix"""
+    return f"{settings.redis_key_prefix}:user_conversations:{user_id}"
 
 
 def _coerce_conversation_content(value: Any) -> str:
@@ -88,7 +101,7 @@ def add_message_to_redis(user_id: str, timestamp: str, message_data: Dict[str, A
         raise ValueError("user_id is required for add_message_to_redis")
     
     client = get_redis_client()
-    key = f"mirix:temp_messages:{user_id}"
+    key = _get_temp_messages_key(user_id)
     
     # Serialize message
     serialized_data = _serialize_message(timestamp, message_data)
@@ -116,7 +129,7 @@ def get_messages_from_redis(user_id: str, limit: Optional[int] = None) -> List[t
         raise ValueError("user_id is required for get_messages_from_redis")
     
     client = get_redis_client()
-    key = f"mirix:temp_messages:{user_id}"
+    key = _get_temp_messages_key(user_id)
     
     # LRANGE to get all or limited messages
     end = limit - 1 if limit else -1
@@ -142,7 +155,7 @@ def remove_messages_from_redis(user_id: str, count: int) -> None:
         raise ValueError("user_id is required for remove_messages_from_redis")
     
     client = get_redis_client()
-    key = f"mirix:temp_messages:{user_id}"
+    key = _get_temp_messages_key(user_id)
     
     # LTRIM to keep only messages after 'count'
     client.ltrim(key, count, -1)
@@ -166,7 +179,7 @@ def get_message_count_from_redis(user_id: str) -> int:
         raise ValueError("user_id is required for get_message_count_from_redis")
     
     client = get_redis_client()
-    key = f"mirix:temp_messages:{user_id}"
+    key = _get_temp_messages_key(user_id)
     return client.llen(key)
 
 
@@ -329,7 +342,7 @@ def add_conversation_to_redis(user_id: str, user_message: str, assistant_respons
         raise ValueError("user_id is required for add_conversation_to_redis")
     
     client = get_redis_client()
-    key = f'mirix:user_conversations:{user_id}'
+    key = _get_user_conversations_key(user_id)
     
     conversation_data = json.dumps(
         [
@@ -359,7 +372,7 @@ def get_conversations_from_redis(user_id: str) -> List[Dict[str, str]]:
         raise ValueError("user_id is required for get_conversations_from_redis")
     
     client = get_redis_client()
-    key = f'mirix:user_conversations:{user_id}'
+    key = _get_user_conversations_key(user_id)
     
     serialized_conversations = client.lrange(key, 0, -1)
     
@@ -382,7 +395,7 @@ def clear_conversations_from_redis(user_id: str):
         raise ValueError("user_id is required for clear_conversations_from_redis")
     
     client = get_redis_client()
-    key = f'mirix:user_conversations:{user_id}'
+    key = _get_user_conversations_key(user_id)
     client.delete(key)
 
 
@@ -400,6 +413,6 @@ def get_conversation_count_from_redis(user_id: str) -> int:
         raise ValueError("user_id is required for get_conversation_count_from_redis")
     
     client = get_redis_client()
-    key = f'mirix:user_conversations:{user_id}'
+    key = _get_user_conversations_key(user_id)
     return client.llen(key)
 

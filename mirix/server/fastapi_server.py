@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -234,6 +234,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Create router for all endpoints with /pams prefix
+router = APIRouter()
 
 
 def register_mcp_tools_for_restored_connections():
@@ -461,6 +464,15 @@ class ScreenshotSettingResponse(BaseModel):
     message: str
 
 
+class WorkflowExtractionRequest(BaseModel):
+    content: str
+    user_id: str
+
+
+class WorkflowExtractionResponse(BaseModel):
+    workflow_result: Any  # 可以是字典或字符串
+
+
 # API Key validation functionality
 def get_required_api_keys_for_model(model_endpoint_type: str) -> List[str]:
     """Get required API keys for a given model endpoint type"""
@@ -617,7 +629,7 @@ async def startup_event():
     print("Agent initialized successfully")
 
 
-@app.get("/health")
+@router.get("/health")
 async def health_check():
     """Health check endpoint for monitoring server status"""
     return {
@@ -627,7 +639,7 @@ async def health_check():
     }
 
 
-@app.post("/send_message")
+@router.post("/send_message")
 async def send_message_endpoint(request: MessageRequest):
     """Send a message to the agent and get the response"""
     if agent is None:
@@ -702,7 +714,62 @@ async def send_message_endpoint(request: MessageRequest):
         )
 
 
-@app.post("/send_streaming_message")
+@router.post("/workflow/extract", response_model=WorkflowExtractionResponse)
+async def extract_workflow(request: WorkflowExtractionRequest):
+    """
+    工作流程提取接口
+    
+    一次性完成：
+    1. 分析邮件/请求内容
+    2. 提取关键问题和信息
+    3. 从 procedural_memory 查询匹配的工作流程
+    4. 返回结构化的完整工作流程
+    """
+    try:
+        # 参数验证
+        if not request.user_id.strip():
+            raise HTTPException(status_code=400, detail="user_id不能为空")
+        if not request.content.strip():
+            raise HTTPException(status_code=400, detail="content不能为空")
+
+        logger.info(f"[WORKFLOW_API] 开始处理工作流程提取 - user_id: {request.user_id}, content_length: {len(request.content)}")
+
+        # 检查 agent 是否已初始化
+        if agent is None:
+            raise HTTPException(status_code=500, detail="Agent未初始化")
+
+        # 在后台线程中调用 workflow_agent
+        loop = asyncio.get_event_loop()
+        workflow_result = await loop.run_in_executor(
+            None,
+            lambda: agent.extract_workflow(
+                content=request.content,
+                user_id=request.user_id
+            )
+        )
+
+        # 处理响应
+        if workflow_result is None or (isinstance(workflow_result, str) and workflow_result.strip() == ""):
+            logger.error("[WORKFLOW_API] 返回空响应")
+            raise HTTPException(status_code=500, detail="工作流程提取失败：返回空内容")
+
+        if isinstance(workflow_result, str) and workflow_result.startswith("ERROR"):
+            logger.error(f"[WORKFLOW_API] 返回错误: {workflow_result}")
+            raise HTTPException(status_code=500, detail=f"工作流程提取失败: {workflow_result}")
+
+        logger.info(f"[WORKFLOW_API] 工作流程提取成功 - 类型: {type(workflow_result).__name__}")
+
+        return WorkflowExtractionResponse(workflow_result=workflow_result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[WORKFLOW_API] 处理失败: {str(e)}")
+        logger.error(f"[WORKFLOW_API] 错误堆栈: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"工作流程提取失败: {str(e)}")
+
+
+@router.post("/send_streaming_message")
 async def send_streaming_message_endpoint(request: MessageRequest):
     """Send a message to the agent and stream intermediate messages and final response"""
     if agent is None:
@@ -975,7 +1042,7 @@ async def send_streaming_message_endpoint(request: MessageRequest):
         raise HTTPException(status_code=500, detail=f"Streaming error: {str(e)}")
 
 
-@app.get("/personas", response_model=PersonaDetailsResponse)
+@router.get("/personas", response_model=PersonaDetailsResponse)
 async def get_personas(user_id: Optional[str] = None):
     """Get all personas with their details (name and text)"""
     if agent is None:
@@ -993,7 +1060,7 @@ async def get_personas(user_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail=f"Error getting personas: {str(e)}")
 
 
-@app.post("/personas/update", response_model=UpdatePersonaResponse)
+@router.post("/personas/update", response_model=UpdatePersonaResponse)
 async def update_persona(request: UpdatePersonaRequest):
     """Update the agent's core memory persona text"""
 
@@ -1016,7 +1083,7 @@ async def update_persona(request: UpdatePersonaRequest):
         )
 
 
-@app.post("/personas/apply_template", response_model=UpdatePersonaResponse)
+@router.post("/personas/apply_template", response_model=UpdatePersonaResponse)
 async def apply_persona_template(request: ApplyPersonaTemplateRequest):
     """Apply a persona template to the agent"""
 
@@ -1040,7 +1107,7 @@ async def apply_persona_template(request: ApplyPersonaTemplateRequest):
         )
 
 
-@app.post("/core_memory/update", response_model=UpdateCoreMemoryResponse)
+@router.post("/core_memory/update", response_model=UpdateCoreMemoryResponse)
 async def update_core_memory(request: UpdateCoreMemoryRequest):
     """Update a specific core memory block with new text"""
 
@@ -1059,7 +1126,7 @@ async def update_core_memory(request: UpdateCoreMemoryRequest):
         )
 
 
-@app.get("/personas/core_memory", response_model=CoreMemoryPersonaResponse)
+@router.get("/personas/core_memory", response_model=CoreMemoryPersonaResponse)
 async def get_core_memory_persona(user_id: Optional[str] = None):
     """Get the core memory persona text"""
     if agent is None:
@@ -1079,7 +1146,7 @@ async def get_core_memory_persona(user_id: Optional[str] = None):
         )
 
 
-@app.get("/models/current", response_model=GetCurrentModelResponse)
+@router.get("/models/current", response_model=GetCurrentModelResponse)
 async def get_current_model():
     """Get the current model being used by the agent"""
     if agent is None:
@@ -1094,7 +1161,7 @@ async def get_current_model():
         )
 
 
-@app.post("/models/set", response_model=SetModelResponse)
+@router.post("/models/set", response_model=SetModelResponse)
 async def set_model(request: SetModelRequest):
     """Set the model for the agent"""
 
@@ -1143,7 +1210,7 @@ async def set_model(request: SetModelRequest):
         )
 
 
-@app.get("/models/memory/current", response_model=GetCurrentModelResponse)
+@router.get("/models/memory/current", response_model=GetCurrentModelResponse)
 async def get_current_memory_model():
     """Get the current model being used by the memory manager"""
     if agent is None:
@@ -1158,7 +1225,7 @@ async def get_current_memory_model():
         )
 
 
-@app.post("/models/memory/set", response_model=SetModelResponse)
+@router.post("/models/memory/set", response_model=SetModelResponse)
 async def set_memory_model(request: SetModelRequest):
     """Set the model for the memory manager"""
 
@@ -1209,7 +1276,7 @@ async def set_memory_model(request: SetModelRequest):
         )
 
 
-@app.post("/models/custom/add", response_model=AddCustomModelResponse)
+@router.post("/models/custom/add", response_model=AddCustomModelResponse)
 async def add_custom_model(request: AddCustomModelRequest):
     """Add a custom model configuration"""
     if agent is None:
@@ -1261,7 +1328,7 @@ async def add_custom_model(request: AddCustomModelRequest):
         )
 
 
-@app.get("/models/custom/list", response_model=ListCustomModelsResponse)
+@router.get("/models/custom/list", response_model=ListCustomModelsResponse)
 async def list_custom_models():
     """List all available custom models"""
     try:
@@ -1286,7 +1353,7 @@ async def list_custom_models():
         return ListCustomModelsResponse(models=[])
 
 
-@app.get("/timezone/current", response_model=GetTimezoneResponse)
+@router.get("/timezone/current", response_model=GetTimezoneResponse)
 async def get_current_timezone():
     """Get the current timezone of the agent"""
 
@@ -1310,7 +1377,7 @@ async def get_current_timezone():
         )
 
 
-@app.post("/timezone/set", response_model=SetTimezoneResponse)
+@router.post("/timezone/set", response_model=SetTimezoneResponse)
 async def set_timezone(request: SetTimezoneRequest):
     """Set the timezone for the agent"""
 
@@ -1341,7 +1408,7 @@ async def set_timezone(request: SetTimezoneRequest):
         )
 
 
-@app.get("/screenshot_setting", response_model=ScreenshotSettingResponse)
+@router.get("/screenshot_setting", response_model=ScreenshotSettingResponse)
 async def get_screenshot_setting():
     """Get the current screenshot setting"""
     if agent is None:
@@ -1354,7 +1421,7 @@ async def get_screenshot_setting():
     )
 
 
-@app.post("/screenshot_setting/set", response_model=ScreenshotSettingResponse)
+@router.post("/screenshot_setting/set", response_model=ScreenshotSettingResponse)
 async def set_screenshot_setting(request: ScreenshotSettingRequest):
     """Set whether to include recent screenshots in messages"""
 
@@ -1376,7 +1443,7 @@ async def set_screenshot_setting(request: ScreenshotSettingRequest):
         )
 
 
-@app.get("/api_keys/check", response_model=ApiKeyCheckResponse)
+@router.get("/api_keys/check", response_model=ApiKeyCheckResponse)
 async def check_api_keys():
     """Check for missing API keys based on current agent configuration"""
     if agent is None:
@@ -1399,7 +1466,7 @@ async def check_api_keys():
         )
 
 
-@app.post("/api_keys/update", response_model=ApiKeyUpdateResponse)
+@router.post("/api_keys/update", response_model=ApiKeyUpdateResponse)
 async def update_api_key(request: ApiKeyRequest):
     """Update an API key value"""
     if agent is None:
@@ -1489,7 +1556,7 @@ def _save_api_key_to_env_file(key_name: str, api_key: str):
 
 
 # Memory endpoints
-@app.get("/memory/episodic")
+@router.get("/memory/episodic")
 async def get_episodic_memory(user_id: Optional[str] = None):
     """Get episodic memory (past events)"""
     if agent is None:
@@ -1534,7 +1601,7 @@ async def get_episodic_memory(user_id: Optional[str] = None):
         return []
 
 
-@app.get("/memory/semantic")
+@router.get("/memory/semantic")
 async def get_semantic_memory(user_id: Optional[str] = None):
     """Get semantic memory (knowledge)"""
     if agent is None:
@@ -1579,7 +1646,7 @@ async def get_semantic_memory(user_id: Optional[str] = None):
         return []
 
 
-@app.get("/memory/procedural")
+@router.get("/memory/procedural")
 async def get_procedural_memory(user_id: Optional[str] = None):
     """Get procedural memory (skills and procedures)"""
     if agent is None:
@@ -1650,7 +1717,7 @@ async def get_procedural_memory(user_id: Optional[str] = None):
         return []
 
 
-@app.get("/memory/resources")
+@router.get("/memory/resources")
 async def get_resource_memory(user_id: Optional[str] = None):
     """Get resource memory (docs and files)"""
     if agent is None:
@@ -1703,7 +1770,7 @@ async def get_resource_memory(user_id: Optional[str] = None):
         return []
 
 
-@app.get("/memory/core")
+@router.get("/memory/core")
 async def get_core_memory(user_id: Optional[str] = None):
     """Get core memory (understanding of user)"""
     if agent is None:
@@ -1760,7 +1827,7 @@ async def get_core_memory(user_id: Optional[str] = None):
         return []
 
 
-@app.get("/memory/credentials")
+@router.get("/memory/credentials")
 async def get_credentials_memory(user_id: Optional[str] = None):
     """Get credentials memory (knowledge vault with masked content)"""
     if agent is None:
@@ -1803,7 +1870,7 @@ async def get_credentials_memory(user_id: Optional[str] = None):
         return []
 
 
-@app.post("/conversation/clear", response_model=ClearConversationResponse)
+@router.post("/conversation/clear", response_model=ClearConversationResponse)
 async def clear_conversation_history():
     """Permanently clear all conversation history for the current agent (memories are preserved)"""
     try:
@@ -1849,7 +1916,7 @@ async def clear_conversation_history():
         )
 
 
-@app.post("/export/memories", response_model=ExportMemoriesResponse)
+@router.post("/export/memories", response_model=ExportMemoriesResponse)
 async def export_memories(request: ExportMemoriesRequest):
     """Export memories to Excel file with separate sheets for each memory type"""
     if agent is None:
@@ -1886,7 +1953,7 @@ async def export_memories(request: ExportMemoriesRequest):
         )
 
 
-@app.post("/reflexion", response_model=ReflexionResponse)
+@router.post("/reflexion", response_model=ReflexionResponse)
 async def trigger_reflexion(request: ReflexionRequest):
     """Trigger reflexion agent to reorganize memory - runs in separate thread to not block other requests"""
     if agent is None:
@@ -1924,7 +1991,7 @@ async def trigger_reflexion(request: ReflexionRequest):
 
 
 # MCP Marketplace endpoints
-@app.get("/mcp/marketplace")
+@router.get("/mcp/marketplace")
 async def get_marketplace():
     """Get available MCP servers from marketplace"""
     marketplace = get_mcp_marketplace()
@@ -1949,7 +2016,7 @@ async def get_marketplace():
     return {"servers": server_data, "categories": categories}
 
 
-@app.get("/mcp/status")
+@router.get("/mcp/status")
 async def get_mcp_status():
     """Get current MCP connection status"""
     try:
@@ -1990,7 +2057,7 @@ async def get_mcp_status():
         }
 
 
-@app.get("/mcp/marketplace/search")
+@router.get("/mcp/marketplace/search")
 async def search_mcp_marketplace(query: str = ""):
     """Search MCP marketplace"""
     try:
@@ -2020,7 +2087,7 @@ async def search_mcp_marketplace(query: str = ""):
         )
 
 
-@app.post("/mcp/marketplace/connect")
+@router.post("/mcp/marketplace/connect")
 async def connect_mcp_server(request: dict):
     """Connect to an MCP server"""
     try:
@@ -2123,7 +2190,7 @@ async def connect_mcp_server(request: dict):
         return {"success": False, "error": f"Connection failed: {str(e)}"}
 
 
-@app.post("/mcp/marketplace/disconnect")
+@router.post("/mcp/marketplace/disconnect")
 async def disconnect_mcp_server(request: dict):
     """Disconnect from an MCP server"""
 
@@ -2208,7 +2275,7 @@ def _run_reflexion_process(agent):
         return {"success": False, "message": f"Reflexion process failed: {str(e)}"}
 
 
-@app.post("/confirmation/respond")
+@router.post("/confirmation/respond")
 async def respond_to_confirmation(request: ConfirmationRequest):
     """Handle user confirmation response"""
     confirmation_id = request.confirmation_id
@@ -2225,7 +2292,7 @@ async def respond_to_confirmation(request: ConfirmationRequest):
         return {"success": False, "message": "Confirmation ID not found or expired"}
 
 
-@app.get("/users")
+@router.get("/users")
 async def get_all_users():
     """Get all users in the system"""
     if agent is None:
@@ -2248,7 +2315,7 @@ class SwitchUserResponse(BaseModel):
     user: Optional[Dict[str, Any]] = None
 
 
-@app.post("/users/switch", response_model=SwitchUserResponse)
+@router.post("/users/switch", response_model=SwitchUserResponse)
 async def switch_user(request: SwitchUserRequest):
     """Switch the active user"""
     if agent is None:
@@ -2288,7 +2355,7 @@ class CreateUserResponse(BaseModel):
     user: Optional[Dict[str, Any]] = None
 
 
-@app.post("/users/create", response_model=CreateUserResponse)
+@router.post("/users/create", response_model=CreateUserResponse)
 async def create_user(request: CreateUserRequest):
     """Create a new user in the system"""
     if agent is None:
@@ -2312,7 +2379,7 @@ async def create_user(request: CreateUserRequest):
         )
 
 
-@app.post("/email/reply", response_model=EmailReplyResponse)
+@router.post("/email/reply", response_model=EmailReplyResponse)
 async def reply_to_email(request: EmailReplyRequest):
     """
     智能邮件回复接口
@@ -2407,7 +2474,7 @@ async def reply_to_email(request: EmailReplyRequest):
         raise HTTPException(status_code=500, detail=f"邮件回复生成失败: {str(e)}")
 
 
-@app.post("/api/process_mysql_email", response_model=ProcessMysqlEmailResponse)
+@router.post("/api/process_mysql_email", response_model=ProcessMysqlEmailResponse)
 async def process_mysql_email(request: ProcessMysqlEmailRequest):
     """
     处理MySQL阿里云数据库的邮件数据
@@ -2585,6 +2652,10 @@ async def process_mysql_email(request: ProcessMysqlEmailRequest):
             status_code=500,
             detail=f"MySQL邮件处理失败: {str(e)}"
         )
+
+
+# Include router with /pams prefix
+app.include_router(router, prefix="/pams")
 
 
 if __name__ == "__main__":

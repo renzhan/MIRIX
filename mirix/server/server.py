@@ -618,6 +618,10 @@ class SyncServer(Server):
                 agent = EmailReplyAgent(
                     agent_state=agent_state, interface=interface, user=actor
                 )
+            elif agent_state.agent_type == AgentType.workflow_agent:
+                agent = Agent(
+                    agent_state=agent_state, interface=interface, user=actor
+                )
             else:
                 raise ValueError(f"Invalid agent type {agent_state.agent_type}")
 

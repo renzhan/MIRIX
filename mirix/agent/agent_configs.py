@@ -67,5 +67,11 @@ AGENT_CONFIGS = [
         'agent_type': AgentType.email_reply_agent,
         'attr_name': 'email_reply_agent_state',
         'include_base_tools': True
+    },
+    {
+        'name': 'workflow_agent',
+        'agent_type': AgentType.workflow_agent,
+        'attr_name': 'workflow_agent_state',
+        'include_base_tools': True
     }
 ]
