@@ -3,7 +3,7 @@
   "version": "0.1.5",
   "description": "MIRIX Desktop Application",
   "main": "public/electron.js",
-  "homepage": "./",
+  "homepage": "/aiop-pams",
   "private": true,
   "dependencies": {
     "@electric-sql/pglite": "^0.3.4",

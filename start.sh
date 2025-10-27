@@ -21,6 +21,7 @@ cd frontend
 # 设置前端专用的环境变量，避免端口冲突
 export PORT=3000  # 前端固定使用3000端口
 export HOST=0.0.0.0
+export PUBLIC_URL=${PUBLIC_URL:-/aiop-pams}
 export REACT_APP_SERVER_URL="http://localhost:${BACKEND_PORT}/pams"
 
 # 清除可能影响前端的环境变量

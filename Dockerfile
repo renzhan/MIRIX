@@ -93,7 +93,8 @@ RUN mkdir -p /app/data /app/logs
 ENV BACKEND_PORT=47283 \
     BACKEND_HOST=0.0.0.0 \
     MIRIX_CONFIG_PATH=/app/data \
-    MIRIX_DATA_PATH=/app/data
+    MIRIX_DATA_PATH=/app/data \
+    PUBLIC_URL=/aiop-pams
 
 # 暴露端口（后端 47283；前端 dev/build 可使用 3000）
 EXPOSE 47283 3000
