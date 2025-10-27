@@ -1,14 +1,23 @@
 import asyncio
 import json
 import logging
+import logging.config
 import os
 import queue
 import traceback
+import uuid
+import threading
+import time
+import hashlib
+import multiprocessing
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
+import redis
+import requests
+from fastapi import FastAPI, HTTPException
 from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -23,9 +32,96 @@ from ..services.mcp_tool_registry import get_mcp_tool_registry
 from ..utils import parse_json
 from ..schemas.mirix_message import MessageType
 
+def _setup_logging():
+    """Configure logging with flexible output options (console/file/both)."""
+    try:
+        import os
+
+        # 日志配置环境变量
+        log_output = os.getenv('LOG_OUTPUT', 'both').lower()  # console, file, both
+        log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+        log_dir = os.getenv('LOG_DIR', './')
+
+        # 创建日志目录（如果需要文件输出）
+        if log_output in ['file', 'both']:
+            os.makedirs(log_dir, exist_ok=True)
+
+        log_file = os.path.join(log_dir, 'api_backend.log')
+
+        # 基础配置
+        config = {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "standard": {
+                    "format": "%(asctime)s - %(levelname)s - %(name)s - %(filename)s:%(lineno)d - %(message)s",
+                },
+                "simple": {
+                    "format": "%(asctime)s - %(levelname)s - %(message)s",
+                },
+            },
+            "handlers": {},
+            "root": {
+                "level": log_level,
+                "handlers": [],
+            },
+            "loggers": {
+                "uvicorn": {"level": "INFO", "propagate": True},
+                "uvicorn.error": {"level": "INFO", "propagate": True},
+                "uvicorn.access": {"level": "INFO", "propagate": True},
+            },
+        }
+
+        # 根据配置添加处理器
+        if log_output in ['console', 'both']:
+            config["handlers"]["console"] = {
+                "class": "logging.StreamHandler",
+                "level": log_level,
+                "formatter": "simple",
+                "stream": "ext://sys.stdout",
+            }
+            config["root"]["handlers"].append("console")
+
+        if log_output in ['file', 'both']:
+            config["handlers"]["rotating_file"] = {
+                "class": "logging.handlers.RotatingFileHandler",
+                "level": log_level,
+                "formatter": "standard",
+                "filename": log_file,
+                "maxBytes": 52428800,  # 50MB
+                "backupCount": 10,
+                "encoding": "utf-8",
+            }
+            config["root"]["handlers"].append("rotating_file")
+
+        # 应用配置
+        logging.config.dictConfig(config)
+
+        # 记录日志配置信息
+        logger = logging.getLogger(__name__)
+        logger.info("=== 邮件回复服务日志配置完成 ===")
+        logger.info(f"日志输出模式: {log_output}")
+        logger.info(f"日志级别: {log_level}")
+
+        if log_output in ['file', 'both']:
+            logger.info(f"日志文件路径: {log_file}")
+            logger.info(f"日志文件最大大小: 50MB，保留备份数: 10")
+
+        if log_output == 'console':
+            logger.info("仅输出到控制台")
+        elif log_output == 'file':
+            logger.info("仅输出到文件")
+        else:
+            logger.info("同时输出到控制台和文件")
+
+    except Exception as e:
+        # Fall back gracefully without crashing the server if logging config fails
+        logging.basicConfig(level=logging.INFO)
+        print(f"日志配置失败，使用基础配置: {e}")
+
+_setup_logging()
+
 logger = logging.getLogger(__name__)
-
-
 # User context switching utilities
 def switch_user_context(agent_wrapper, user_id: str):
     """Switch agent's user context and manage user status"""
@@ -224,7 +320,7 @@ To fix it, install FFmpeg:
 The warning doesn't affect functionality as pydub falls back gracefully.
 """
 
-app = FastAPI(title="Mirix Agent API", version="0.1.5")
+app = FastAPI(title="Mirix Agent API", version="0.1.5", root_path="/pams")
 
 # Add CORS middleware
 app.add_middleware(
@@ -234,10 +330,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Create router for all endpoints with /pams prefix
-router = APIRouter()
-
 
 def register_mcp_tools_for_restored_connections():
     """Register tools for MCP connections that were restored on startup"""
@@ -296,8 +388,27 @@ def register_mcp_tools_for_restored_connections():
 @app.on_event("startup")
 async def startup_event():
     """Initialize and restore MCP connections on startup"""
+    global agent
+
     try:
+        # Re-assert logging config in case a runner (e.g., Uvicorn) overwrote it
+        _setup_logging()
         logger.info("Starting up Mirix FastAPI server...")
+
+        # Initialize the agent
+        import sys
+        from pathlib import Path
+
+        if getattr(sys, "frozen", False):
+            # Running in PyInstaller bundle
+            bundle_dir = Path(sys._MEIPASS)
+            config_path = bundle_dir / "mirix" / "configs" / "mirix_gpt4o.yaml"
+        else:
+            # Running in development
+            config_path = Path("mirix/configs/mirix_gpt4o.yaml")
+
+        agent = AgentWrapper(str(config_path))
+        print("Agent initialized successfully")
 
         # Initialize the MCP client manager (this will auto-restore connections)
         print("🚀 Initializing MCP client manager...")
@@ -311,13 +422,9 @@ async def startup_event():
         )
 
         # Debug: Check if the configuration file exists
-        import os
-
         config_file = os.path.expanduser("~/.mirix/mcp_connections.json")
         if os.path.exists(config_file):
             with open(config_file, "r") as f:
-                import json
-
                 configs = json.load(f)
                 print(
                     f"📋 Found MCP config file with {len(configs)} entries: {list(configs.keys())}"
@@ -325,10 +432,33 @@ async def startup_event():
         else:
             print(f"📋 No MCP config file found at {config_file}")
 
+        # 启动邮件回复工作线程池
+        start_email_reply_workers()
+
+        # 恢复邮件回复队列中的任务
+        recover_email_reply_tasks()
+
+        # 清理过期的邮件回复任务
+        cleanup_expired_email_tasks()
+
         # Tool registration will happen later when agent is available
 
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on server shutdown"""
+    try:
+        logger.info("Shutting down Mirix FastAPI server...")
+
+        # 停止邮件回复工作线程池
+        stop_email_reply_workers()
+
+        logger.info("Server shutdown completed")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {str(e)}")
 
 
 # Global agent instance
@@ -337,6 +467,224 @@ agent = None
 confirmation_queues = {}
 # Flag to track if MCP tools have been registered for restored connections
 _mcp_tools_registered = False
+
+def process_email_reply_task(task_id: str, email_content: str, category_list: str, user_id: str, email_basic_id: str, callback_url: str):
+    """后台处理邮件回复任务"""
+    processing_start_time = time.time()
+
+    try:
+        logger.info(f"开始处理邮件回复任务: {task_id}")
+
+        # 从Redis获取任务状态
+        task_key = f"email_reply_task:{task_id}"
+        task_data = redis_client.hgetall(task_key)
+
+        if not task_data:
+            logger.error(f"任务不存在: {task_id}")
+            return
+
+        # 计算等待时间
+        created_at = datetime.fromisoformat(task_data.get("created_at"))
+        wait_time = processing_start_time - created_at.timestamp()
+
+        logger.info(f"任务 {task_id} 等待处理时间: {wait_time:.2f}秒")
+
+        # 更新任务状态为处理中
+        redis_client.hset(task_key, "status", "processing")
+        redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
+        redis_client.hset(task_key, "processing_start_time", datetime.now().isoformat())
+
+        # 执行邮件回复生成
+        response, _ = agent.message_queue.send_message_in_queue(
+            agent.client,
+            agent.agent_states.email_reply_agent_state.id,
+            {
+                "user_id": user_id,
+                "message": email_content,
+                "force_response": True
+            },
+            agent_type="email_reply",
+        )
+
+        # 处理响应
+        if response == "ERROR":
+            actual_processing_time = time.time() - processing_start_time
+            total_time = time.time() - created_at.timestamp()
+            logger.info(f"任务 {task_id} 处理失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+
+            result = {
+                "status": "error",
+                "error": "邮件回复生成失败",
+                "task_id": task_id,
+                "email_basic_id": email_basic_id,
+                "category_list": category_list,
+                "timing": {
+                    "wait_time": round(wait_time, 2),
+                    "processing_time": round(actual_processing_time, 2),
+                    "total_time": round(total_time, 2)
+                }
+            }
+        elif not hasattr(response, "messages") or len(response.messages) < 2:
+            actual_processing_time = time.time() - processing_start_time
+            total_time = time.time() - created_at.timestamp()
+            logger.info(f"任务 {task_id} 响应结构无效 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+
+            result = {
+                "status": "error",
+                "error": "响应结构无效",
+                "task_id": task_id,
+                "email_basic_id": email_basic_id,
+                "category_list": category_list,
+                "timing": {
+                    "wait_time": round(wait_time, 2),
+                    "processing_time": round(actual_processing_time, 2),
+                    "total_time": round(total_time, 2)
+                }
+            }
+        else:
+            try:
+                # 解析响应
+                num_tools_called = 0
+                for message in response.messages[::-1]:
+                    if message.message_type == MessageType.tool_return_message:
+                        num_tools_called += 1
+                    else:
+                        break
+
+                if not hasattr(response.messages[-(num_tools_called * 2 + 1)], "tool_call"):
+                    actual_processing_time = time.time() - processing_start_time
+                    total_time = time.time() - created_at.timestamp()
+                    logger.info(f"任务 {task_id} 缺少工具调用 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+
+                    result = {
+                        "status": "error",
+                        "error": "缺少工具调用",
+                        "task_id": task_id,
+                        "email_basic_id": email_basic_id,
+                        "category_list": category_list,
+                        "timing": {
+                            "wait_time": round(wait_time, 2),
+                            "processing_time": round(actual_processing_time, 2),
+                            "total_time": round(total_time, 2)
+                        }
+                    }
+                else:
+                    tool_call = response.messages[-(num_tools_called * 2 + 1)].tool_call
+                    parsed_args = parse_json(tool_call.arguments)
+
+                    if "message" not in parsed_args:
+                        actual_processing_time = time.time() - processing_start_time
+                        total_time = time.time() - created_at.timestamp()
+                        logger.info(f"任务 {task_id} 缺少消息内容 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+
+                        result = {
+                            "status": "error",
+                            "error": "缺少消息内容",
+                            "task_id": task_id,
+                            "email_basic_id": email_basic_id,
+                            "category_list": category_list,
+                            "timing": {
+                                "wait_time": round(wait_time, 2),
+                                "processing_time": round(actual_processing_time, 2),
+                                "total_time": round(total_time, 2)
+                            }
+                        }
+                    else:
+                        # 计算处理时间
+                        actual_processing_time = time.time() - processing_start_time
+                        total_time = time.time() - created_at.timestamp()
+
+                        logger.info(f"任务 {task_id} 实际处理时间: {actual_processing_time:.2f}秒")
+                        logger.info(f"任务 {task_id} 总处理时间: {total_time:.2f}秒")
+
+                        result = {
+                            "status": "completed",
+                            "reply_content": parsed_args["message"],
+                            "task_id": task_id,
+                            "email_basic_id": email_basic_id,
+                            "category_list": category_list,
+                            "timing": {
+                                "wait_time": round(wait_time, 2),
+                                "processing_time": round(actual_processing_time, 2),
+                                "total_time": round(total_time, 2)
+                            }
+                        }
+            except Exception as e:
+                actual_processing_time = time.time() - processing_start_time
+                total_time = time.time() - created_at.timestamp()
+                logger.info(f"任务 {task_id} 解析响应失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+
+                result = {
+                    "status": "error",
+                    "error": f"解析响应失败: {str(e)}",
+                    "task_id": task_id,
+                    "email_basic_id": email_basic_id,
+                    "category_list": category_list,
+                    "timing": {
+                        "wait_time": round(wait_time, 2),
+                        "processing_time": round(actual_processing_time, 2),
+                        "total_time": round(total_time, 2)
+                    }
+                }
+
+        # 发送回调
+        try:
+            callback_response = requests.post(
+                callback_url,
+                json=result,
+                timeout=30,
+                headers={"Content-Type": "application/json"}
+            )
+            logger.info(f"回调发送成功: {task_id}, 状态码: {callback_response.status_code}")
+        except Exception as e:
+            logger.error(f"回调发送失败: {task_id}, 错误: {str(e)}")
+            # 即使回调失败，也要更新Redis状态
+            redis_client.hset(task_key, "callback_error", str(e))
+        logger.info(f"Url:{callback_url} \n  Body: {json.dumps(result, ensure_ascii=False, indent=2)}")
+
+        # 清除Redis记录
+        redis_client.delete(task_key)
+        final_time = time.time() - processing_start_time
+        logger.info(f"任务处理完成并清除: {task_id}, 最终处理时间: {final_time:.2f}秒")
+
+    except Exception as e:
+        actual_processing_time = time.time() - processing_start_time
+        # 如果created_at未定义，使用当前时间作为fallback
+        try:
+            total_time = time.time() - created_at.timestamp()
+        except:
+            total_time = actual_processing_time
+
+        logger.error(f"处理邮件回复任务失败: {task_id}, 错误: {str(e)}")
+        logger.info(f"任务 {task_id} 异常失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+
+        # 更新任务状态为失败
+        task_key = f"email_reply_task:{task_id}"
+        redis_client.hset(task_key, "status", "failed")
+        redis_client.hset(task_key, "error", str(e))
+        redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
+
+        # 尝试发送失败回调
+        try:
+            callback_data = {
+                "status": "error",
+                "error": str(e),
+                "task_id": task_id,
+                "email_basic_id": email_basic_id,
+                "category_list": category_list,
+                "timing": {
+                    "processing_time": round(actual_processing_time, 2),
+                    "total_time": round(total_time, 2)
+                }
+            }
+            requests.post(
+                callback_url,
+                json=callback_data,
+                timeout=30,
+                headers={"Content-Type": "application/json"}
+            )
+        except:
+            pass
 
 
 class MessageRequest(BaseModel):
@@ -462,15 +810,6 @@ class ScreenshotSettingResponse(BaseModel):
     success: bool
     include_recent_screenshots: bool
     message: str
-
-
-class WorkflowExtractionRequest(BaseModel):
-    content: str
-    user_id: str
-
-
-class WorkflowExtractionResponse(BaseModel):
-    workflow_result: Any  # 可以是字典或字符串
 
 
 # API Key validation functionality
@@ -605,41 +944,308 @@ class ReflexionResponse(BaseModel):
 
 class EmailReplyRequest(BaseModel):
     email_content: str
+    category_list: str
     user_id: str
+    email_basic_id: str
+    callback_url: str  # 回调地址
+
+class EmailReplyResponse(BaseModel):
+    task_id: str
+    status: str
+    message: str
+
+# Redis连接
+redis_port_str = os.getenv('REDIS_PORT', '6379')
+
+if ':' in redis_port_str and not redis_port_str.isdigit():
+    redis_port_str = redis_port_str.split(':')[-1]  # 'tcp://172.30.1.193:6379' → '6379'
+
+redis_client = redis.Redis(
+    host=os.getenv('REDIS_HOST', 'localhost'),
+    port=int(redis_port_str),
+    password=os.getenv('REDIS_PASSWORD', 'aiop123456'),
+    db=int(os.getenv('REDIS_DB', 0)),
+    decode_responses=True
+)
+
+# Redis队列名称
+EMAIL_REPLY_QUEUE = "email_reply_queue"
+
+# 工作线程池
+worker_threads = []
+worker_shutdown_event = threading.Event()
+
+def generate_task_id(user_id: str, email_basic_id: str, email_content: str) -> str:
+    """根据用户ID和邮件内容生成MD5任务ID"""
+    content = f"{user_id}:{email_basic_id}:{email_content}"
+    return hashlib.md5(content.encode('utf-8')).hexdigest()
+
+def email_reply_worker():
+    """邮件回复工作线程"""
+    logger.info(f"邮件回复工作线程启动: {threading.current_thread().name}")
+
+    while not worker_shutdown_event.is_set():
+        try:
+            # 阻塞式从Redis队列获取任务，超时5秒
+            task_data = redis_client.blpop(EMAIL_REPLY_QUEUE, timeout=5)
+
+            if task_data is None:
+                # 超时，继续循环
+                continue
+
+            # 解析任务数据
+            _, task_json = task_data
+            task_info = json.loads(task_json)
+
+            task_id = task_info['task_id']
+            email_content = task_info['email_content']
+            category_list = task_info['category_list']
+            user_id = task_info['user_id']
+            email_basic_id = task_info['email_basic_id']
+            callback_url = task_info['callback_url']
+
+            logger.info(f"工作线程 {threading.current_thread().name} 开始处理任务: {task_id}")
+
+            # 验证任务是否仍然有效（防止处理已删除的任务）
+            task_key = f"email_reply_task:{task_id}"
+            current_task = redis_client.hgetall(task_key)
+
+            if not current_task:
+                logger.warning(f"任务 {task_id} 已不存在，跳过处理")
+                continue
+
+            current_status = current_task.get("status", "unknown")
+            if current_status not in ["queued", "processing"]:
+                logger.warning(f"任务 {task_id} 状态为 {current_status}，跳过处理")
+                continue
+
+            # 处理任务
+            process_email_reply_task(task_id, email_content, category_list, user_id, email_basic_id, callback_url)
+
+        except json.JSONDecodeError as e:
+            logger.error(f"解析任务数据失败: {str(e)}")
+        except Exception as e:
+            logger.error(f"工作线程异常: {str(e)}")
+            logger.error(f"错误堆栈: {traceback.format_exc()}")
+
+    logger.info(f"邮件回复工作线程退出: {threading.current_thread().name}")
+
+def start_email_reply_workers():
+    """启动邮件回复工作线程池"""
+    global worker_threads
+
+    # 计算线程数：CPU核数的2倍，最少2个
+    cpu_count = multiprocessing.cpu_count()
+    thread_count = max(2, cpu_count * 2)
+
+    logger.info(f"启动 {thread_count} 个邮件回复工作线程")
+
+    for i in range(thread_count):
+        thread = threading.Thread(
+            target=email_reply_worker,
+            name=f"EmailReplyWorker-{i+1}",
+            daemon=True
+        )
+        thread.start()
+        worker_threads.append(thread)
+
+    logger.info(f"邮件回复工作线程池启动完成，共 {len(worker_threads)} 个线程")
+
+def stop_email_reply_workers():
+    """停止邮件回复工作线程池"""
+    global worker_threads
+
+    logger.info("正在停止邮件回复工作线程池...")
+    worker_shutdown_event.set()
+
+    # 等待所有线程结束
+    for thread in worker_threads:
+        thread.join(timeout=10)
+
+    worker_threads.clear()
+    logger.info("邮件回复工作线程池已停止")
+
+def recover_email_reply_tasks():
+    """恢复邮件回复队列中的任务"""
+    try:
+        logger.info("🔄 开始恢复邮件回复队列中的任务...")
+
+        # 获取所有邮件回复任务的键
+        task_keys = redis_client.keys("email_reply_task:*")
+
+        if not task_keys:
+            logger.info("✅ 没有需要恢复的邮件回复任务")
+            return
+
+        recovered_count = 0
+        requeued_count = 0
+
+        for task_key in task_keys:
+            try:
+                task_data = redis_client.hgetall(task_key)
+
+                if not task_data:
+                    continue
+
+                task_id = task_data.get("task_id")
+                status = task_data.get("status", "unknown")
+
+                logger.info(f"发现任务: {task_id}, 状态: {status}")
+
+                # 处理不同状态的任务
+                if status in ["queued", "processing"]:
+                    # 重新排队执行
+                    queue_data = {
+                        "task_id": task_data.get("task_id"),
+                        "email_content": task_data.get("email_content"),
+                        "category_list": task_data.get("category_list"),
+                        "user_id": task_data.get("user_id"),
+                        "email_basic_id": task_data.get("email_basic_id"),
+                        "callback_url": task_data.get("callback_url")
+                    }
+
+                    # 检查必要字段是否存在
+                    if all(queue_data.values()):
+                        # 更新任务状态为重新排队
+                        redis_client.hset(task_key, "status", "queued")
+                        redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
+                        redis_client.hset(task_key, "recovered_at", datetime.now().isoformat())
+
+                        # 重新放入队列
+                        redis_client.rpush(EMAIL_REPLY_QUEUE, json.dumps(queue_data))
+
+                        requeued_count += 1
+                        logger.info(f"✅ 任务 {task_id} 已重新排队 (原状态: {status})")
+                    else:
+                        logger.warning(f"⚠️ 任务 {task_id} 数据不完整，跳过恢复")
+                        # 标记为失败
+                        redis_client.hset(task_key, "status", "failed")
+                        redis_client.hset(task_key, "error", "任务数据不完整，无法恢复")
+                        redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
+
+                elif status in ["completed", "failed"]:
+                    # 已完成或失败的任务，不需要恢复
+                    logger.info(f"ℹ️ 任务 {task_id} 已完成 (状态: {status})，无需恢复")
+
+                else:
+                    logger.warning(f"⚠️ 任务 {task_id} 状态未知: {status}")
+
+                recovered_count += 1
+
+            except Exception as e:
+                logger.error(f"恢复任务失败 {task_key}: {str(e)}")
+                continue
+
+        logger.info(f"✅ 邮件回复队列恢复完成: 检查了 {recovered_count} 个任务，重新排队 {requeued_count} 个任务")
+
+        # 显示当前队列长度
+        queue_length = redis_client.llen(EMAIL_REPLY_QUEUE)
+        logger.info(f"📊 当前邮件回复队列长度: {queue_length}")
+
+    except Exception as e:
+        logger.error(f"恢复邮件回复队列失败: {str(e)}")
+        logger.error(f"错误堆栈: {traceback.format_exc()}")
+
+def cleanup_expired_email_tasks():
+    """清理过期的邮件回复任务"""
+    try:
+        logger.info("🧹 开始清理过期的邮件回复任务...")
+
+        # 获取所有邮件回复任务的键
+        task_keys = redis_client.keys("email_reply_task:*")
+
+        if not task_keys:
+            logger.info("✅ 没有需要清理的任务")
+            return
+
+        current_time = datetime.now()
+        expired_count = 0
+
+        # 设置过期时间阈值（24小时）
+        expiry_hours = 24
+
+        for task_key in task_keys:
+            try:
+                task_data = redis_client.hgetall(task_key)
+
+                if not task_data:
+                    continue
+
+                created_at_str = task_data.get("created_at")
+                status = task_data.get("status", "unknown")
+                task_id = task_data.get("task_id")
+
+                if not created_at_str:
+                    continue
+
+                # 解析创建时间
+                created_at = datetime.fromisoformat(created_at_str)
+                age_hours = (current_time - created_at).total_seconds() / 3600
+
+                # 清理超过24小时的已完成或失败任务
+                if age_hours > expiry_hours and status in ["completed", "failed"]:
+                    redis_client.delete(task_key)
+                    expired_count += 1
+                    logger.info(f"🗑️ 清理过期任务: {task_id} (状态: {status}, 年龄: {age_hours:.1f}小时)")
+
+                # 清理超过1小时的处理中任务（可能是僵尸任务）
+                elif age_hours > 1 and status == "processing":
+                    logger.warning(f"⚠️ 发现可能的僵尸任务: {task_id} (处理中超过1小时)")
+                    # 将其标记为失败而不是删除，以便调试
+                    redis_client.hset(task_key, "status", "failed")
+                    redis_client.hset(task_key, "error", "任务处理超时，可能是僵尸任务")
+                    redis_client.hset(task_key, "updated_at", current_time.isoformat())
+
+            except Exception as e:
+                logger.error(f"清理任务失败 {task_key}: {str(e)}")
+                continue
+
+        logger.info(f"✅ 过期任务清理完成: 清理了 {expired_count} 个过期任务")
+
+    except Exception as e:
+        logger.error(f"清理过期任务失败: {str(e)}")
+        logger.error(f"错误堆栈: {traceback.format_exc()}")
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize the agent when the server starts"""
-    global agent
-
-    # Handle PyInstaller bundled resources
-    import sys
-    from pathlib import Path
-
-    if getattr(sys, "frozen", False):
-        # Running in PyInstaller bundle
-        bundle_dir = Path(sys._MEIPASS)
-        config_path = bundle_dir / "mirix" / "configs" / "mirix_gpt4o.yaml"
-    else:
-        # Running in development
-        config_path = Path("mirix/configs/mirix_gpt4o.yaml")
-
-    agent = AgentWrapper(str(config_path))
-    print("Agent initialized successfully")
-
-
-@router.get("/health")
+@app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring server status"""
-    return {
-        "status": "healthy",
-        "agent_initialized": agent is not None,
-        "timestamp": datetime.now().isoformat(),
-    }
+    try:
+        # 检查邮件回复队列状态
+        queue_length = redis_client.llen(EMAIL_REPLY_QUEUE)
+        worker_count = len(worker_threads)
+
+        # 统计任务状态
+        task_keys = redis_client.keys("email_reply_task:*")
+        task_stats = {"queued": 0, "processing": 0, "completed": 0, "failed": 0, "unknown": 0}
+
+        for task_key in task_keys:
+            task_data = redis_client.hgetall(task_key)
+            status = task_data.get("status", "unknown")
+            task_stats[status] = task_stats.get(status, 0) + 1
+
+        return {
+            "status": "healthy",
+            "agent_initialized": agent is not None,
+            "timestamp": datetime.now().isoformat(),
+            "email_reply_queue": {
+                "queue_length": queue_length,
+                "worker_threads": worker_count,
+                "task_statistics": task_stats
+            }
+        }
+    except Exception as e:
+        return {
+            "status": "healthy",
+            "agent_initialized": agent is not None,
+            "timestamp": datetime.now().isoformat(),
+            "email_reply_queue": {
+                "error": f"无法获取队列状态: {str(e)}"
+            }
+        }
 
 
-@router.post("/send_message")
+@app.post("/send_message")
 async def send_message_endpoint(request: MessageRequest):
     """Send a message to the agent and get the response"""
     if agent is None:
@@ -713,12 +1319,11 @@ async def send_message_endpoint(request: MessageRequest):
             status_code=500, detail=f"Error processing message: {str(e)}"
         )
 
-
-@router.post("/workflow/extract", response_model=WorkflowExtractionResponse)
+@app.post("/workflow/extract", response_model=WorkflowExtractionResponse)
 async def extract_workflow(request: WorkflowExtractionRequest):
     """
     工作流程提取接口
-    
+
     一次性完成：
     1. 分析邮件/请求内容
     2. 提取关键问题和信息
@@ -769,7 +1374,7 @@ async def extract_workflow(request: WorkflowExtractionRequest):
         raise HTTPException(status_code=500, detail=f"工作流程提取失败: {str(e)}")
 
 
-@router.post("/send_streaming_message")
+@app.post("/send_streaming_message")
 async def send_streaming_message_endpoint(request: MessageRequest):
     """Send a message to the agent and stream intermediate messages and final response"""
     if agent is None:
@@ -1042,7 +1647,7 @@ async def send_streaming_message_endpoint(request: MessageRequest):
         raise HTTPException(status_code=500, detail=f"Streaming error: {str(e)}")
 
 
-@router.get("/personas", response_model=PersonaDetailsResponse)
+@app.get("/personas", response_model=PersonaDetailsResponse)
 async def get_personas(user_id: Optional[str] = None):
     """Get all personas with their details (name and text)"""
     if agent is None:
@@ -1060,7 +1665,7 @@ async def get_personas(user_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail=f"Error getting personas: {str(e)}")
 
 
-@router.post("/personas/update", response_model=UpdatePersonaResponse)
+@app.post("/personas/update", response_model=UpdatePersonaResponse)
 async def update_persona(request: UpdatePersonaRequest):
     """Update the agent's core memory persona text"""
 
@@ -1083,7 +1688,7 @@ async def update_persona(request: UpdatePersonaRequest):
         )
 
 
-@router.post("/personas/apply_template", response_model=UpdatePersonaResponse)
+@app.post("/personas/apply_template", response_model=UpdatePersonaResponse)
 async def apply_persona_template(request: ApplyPersonaTemplateRequest):
     """Apply a persona template to the agent"""
 
@@ -1107,7 +1712,7 @@ async def apply_persona_template(request: ApplyPersonaTemplateRequest):
         )
 
 
-@router.post("/core_memory/update", response_model=UpdateCoreMemoryResponse)
+@app.post("/core_memory/update", response_model=UpdateCoreMemoryResponse)
 async def update_core_memory(request: UpdateCoreMemoryRequest):
     """Update a specific core memory block with new text"""
 
@@ -1126,7 +1731,7 @@ async def update_core_memory(request: UpdateCoreMemoryRequest):
         )
 
 
-@router.get("/personas/core_memory", response_model=CoreMemoryPersonaResponse)
+@app.get("/personas/core_memory", response_model=CoreMemoryPersonaResponse)
 async def get_core_memory_persona(user_id: Optional[str] = None):
     """Get the core memory persona text"""
     if agent is None:
@@ -1146,7 +1751,7 @@ async def get_core_memory_persona(user_id: Optional[str] = None):
         )
 
 
-@router.get("/models/current", response_model=GetCurrentModelResponse)
+@app.get("/models/current", response_model=GetCurrentModelResponse)
 async def get_current_model():
     """Get the current model being used by the agent"""
     if agent is None:
@@ -1161,7 +1766,7 @@ async def get_current_model():
         )
 
 
-@router.post("/models/set", response_model=SetModelResponse)
+@app.post("/models/set", response_model=SetModelResponse)
 async def set_model(request: SetModelRequest):
     """Set the model for the agent"""
 
@@ -1210,7 +1815,7 @@ async def set_model(request: SetModelRequest):
         )
 
 
-@router.get("/models/memory/current", response_model=GetCurrentModelResponse)
+@app.get("/models/memory/current", response_model=GetCurrentModelResponse)
 async def get_current_memory_model():
     """Get the current model being used by the memory manager"""
     if agent is None:
@@ -1225,7 +1830,7 @@ async def get_current_memory_model():
         )
 
 
-@router.post("/models/memory/set", response_model=SetModelResponse)
+@app.post("/models/memory/set", response_model=SetModelResponse)
 async def set_memory_model(request: SetModelRequest):
     """Set the model for the memory manager"""
 
@@ -1276,7 +1881,7 @@ async def set_memory_model(request: SetModelRequest):
         )
 
 
-@router.post("/models/custom/add", response_model=AddCustomModelResponse)
+@app.post("/models/custom/add", response_model=AddCustomModelResponse)
 async def add_custom_model(request: AddCustomModelRequest):
     """Add a custom model configuration"""
     if agent is None:
@@ -1328,7 +1933,7 @@ async def add_custom_model(request: AddCustomModelRequest):
         )
 
 
-@router.get("/models/custom/list", response_model=ListCustomModelsResponse)
+@app.get("/models/custom/list", response_model=ListCustomModelsResponse)
 async def list_custom_models():
     """List all available custom models"""
     try:
@@ -1353,7 +1958,7 @@ async def list_custom_models():
         return ListCustomModelsResponse(models=[])
 
 
-@router.get("/timezone/current", response_model=GetTimezoneResponse)
+@app.get("/timezone/current", response_model=GetTimezoneResponse)
 async def get_current_timezone():
     """Get the current timezone of the agent"""
 
@@ -1377,7 +1982,7 @@ async def get_current_timezone():
         )
 
 
-@router.post("/timezone/set", response_model=SetTimezoneResponse)
+@app.post("/timezone/set", response_model=SetTimezoneResponse)
 async def set_timezone(request: SetTimezoneRequest):
     """Set the timezone for the agent"""
 
@@ -1408,7 +2013,7 @@ async def set_timezone(request: SetTimezoneRequest):
         )
 
 
-@router.get("/screenshot_setting", response_model=ScreenshotSettingResponse)
+@app.get("/screenshot_setting", response_model=ScreenshotSettingResponse)
 async def get_screenshot_setting():
     """Get the current screenshot setting"""
     if agent is None:
@@ -1421,7 +2026,7 @@ async def get_screenshot_setting():
     )
 
 
-@router.post("/screenshot_setting/set", response_model=ScreenshotSettingResponse)
+@app.post("/screenshot_setting/set", response_model=ScreenshotSettingResponse)
 async def set_screenshot_setting(request: ScreenshotSettingRequest):
     """Set whether to include recent screenshots in messages"""
 
@@ -1443,7 +2048,7 @@ async def set_screenshot_setting(request: ScreenshotSettingRequest):
         )
 
 
-@router.get("/api_keys/check", response_model=ApiKeyCheckResponse)
+@app.get("/api_keys/check", response_model=ApiKeyCheckResponse)
 async def check_api_keys():
     """Check for missing API keys based on current agent configuration"""
     if agent is None:
@@ -1466,7 +2071,7 @@ async def check_api_keys():
         )
 
 
-@router.post("/api_keys/update", response_model=ApiKeyUpdateResponse)
+@app.post("/api_keys/update", response_model=ApiKeyUpdateResponse)
 async def update_api_key(request: ApiKeyRequest):
     """Update an API key value"""
     if agent is None:
@@ -1556,7 +2161,7 @@ def _save_api_key_to_env_file(key_name: str, api_key: str):
 
 
 # Memory endpoints
-@router.get("/memory/episodic")
+@app.get("/memory/episodic")
 async def get_episodic_memory(user_id: Optional[str] = None):
     """Get episodic memory (past events)"""
     if agent is None:
@@ -1601,7 +2206,7 @@ async def get_episodic_memory(user_id: Optional[str] = None):
         return []
 
 
-@router.get("/memory/semantic")
+@app.get("/memory/semantic")
 async def get_semantic_memory(user_id: Optional[str] = None):
     """Get semantic memory (knowledge)"""
     if agent is None:
@@ -1646,7 +2251,7 @@ async def get_semantic_memory(user_id: Optional[str] = None):
         return []
 
 
-@router.get("/memory/procedural")
+@app.get("/memory/procedural")
 async def get_procedural_memory(user_id: Optional[str] = None):
     """Get procedural memory (skills and procedures)"""
     if agent is None:
@@ -1717,7 +2322,7 @@ async def get_procedural_memory(user_id: Optional[str] = None):
         return []
 
 
-@router.get("/memory/resources")
+@app.get("/memory/resources")
 async def get_resource_memory(user_id: Optional[str] = None):
     """Get resource memory (docs and files)"""
     if agent is None:
@@ -1770,7 +2375,7 @@ async def get_resource_memory(user_id: Optional[str] = None):
         return []
 
 
-@router.get("/memory/core")
+@app.get("/memory/core")
 async def get_core_memory(user_id: Optional[str] = None):
     """Get core memory (understanding of user)"""
     if agent is None:
@@ -1827,7 +2432,7 @@ async def get_core_memory(user_id: Optional[str] = None):
         return []
 
 
-@router.get("/memory/credentials")
+@app.get("/memory/credentials")
 async def get_credentials_memory(user_id: Optional[str] = None):
     """Get credentials memory (knowledge vault with masked content)"""
     if agent is None:
@@ -1870,7 +2475,7 @@ async def get_credentials_memory(user_id: Optional[str] = None):
         return []
 
 
-@router.post("/conversation/clear", response_model=ClearConversationResponse)
+@app.post("/conversation/clear", response_model=ClearConversationResponse)
 async def clear_conversation_history():
     """Permanently clear all conversation history for the current agent (memories are preserved)"""
     try:
@@ -1916,7 +2521,7 @@ async def clear_conversation_history():
         )
 
 
-@router.post("/export/memories", response_model=ExportMemoriesResponse)
+@app.post("/export/memories", response_model=ExportMemoriesResponse)
 async def export_memories(request: ExportMemoriesRequest):
     """Export memories to Excel file with separate sheets for each memory type"""
     if agent is None:
@@ -1953,7 +2558,7 @@ async def export_memories(request: ExportMemoriesRequest):
         )
 
 
-@router.post("/reflexion", response_model=ReflexionResponse)
+@app.post("/reflexion", response_model=ReflexionResponse)
 async def trigger_reflexion(request: ReflexionRequest):
     """Trigger reflexion agent to reorganize memory - runs in separate thread to not block other requests"""
     if agent is None:
@@ -1991,7 +2596,7 @@ async def trigger_reflexion(request: ReflexionRequest):
 
 
 # MCP Marketplace endpoints
-@router.get("/mcp/marketplace")
+@app.get("/mcp/marketplace")
 async def get_marketplace():
     """Get available MCP servers from marketplace"""
     marketplace = get_mcp_marketplace()
@@ -2016,7 +2621,7 @@ async def get_marketplace():
     return {"servers": server_data, "categories": categories}
 
 
-@router.get("/mcp/status")
+@app.get("/mcp/status")
 async def get_mcp_status():
     """Get current MCP connection status"""
     try:
@@ -2057,7 +2662,7 @@ async def get_mcp_status():
         }
 
 
-@router.get("/mcp/marketplace/search")
+@app.get("/mcp/marketplace/search")
 async def search_mcp_marketplace(query: str = ""):
     """Search MCP marketplace"""
     try:
@@ -2087,7 +2692,7 @@ async def search_mcp_marketplace(query: str = ""):
         )
 
 
-@router.post("/mcp/marketplace/connect")
+@app.post("/mcp/marketplace/connect")
 async def connect_mcp_server(request: dict):
     """Connect to an MCP server"""
     try:
@@ -2190,7 +2795,7 @@ async def connect_mcp_server(request: dict):
         return {"success": False, "error": f"Connection failed: {str(e)}"}
 
 
-@router.post("/mcp/marketplace/disconnect")
+@app.post("/mcp/marketplace/disconnect")
 async def disconnect_mcp_server(request: dict):
     """Disconnect from an MCP server"""
 
@@ -2275,7 +2880,7 @@ def _run_reflexion_process(agent):
         return {"success": False, "message": f"Reflexion process failed: {str(e)}"}
 
 
-@router.post("/confirmation/respond")
+@app.post("/confirmation/respond")
 async def respond_to_confirmation(request: ConfirmationRequest):
     """Handle user confirmation response"""
     confirmation_id = request.confirmation_id
@@ -2292,7 +2897,7 @@ async def respond_to_confirmation(request: ConfirmationRequest):
         return {"success": False, "message": "Confirmation ID not found or expired"}
 
 
-@router.get("/users")
+@app.get("/users")
 async def get_all_users():
     """Get all users in the system"""
     if agent is None:
@@ -2315,7 +2920,7 @@ class SwitchUserResponse(BaseModel):
     user: Optional[Dict[str, Any]] = None
 
 
-@router.post("/users/switch", response_model=SwitchUserResponse)
+@app.post("/users/switch", response_model=SwitchUserResponse)
 async def switch_user(request: SwitchUserRequest):
     """Switch the active user"""
     if agent is None:
@@ -2355,7 +2960,7 @@ class CreateUserResponse(BaseModel):
     user: Optional[Dict[str, Any]] = None
 
 
-@router.post("/users/create", response_model=CreateUserResponse)
+@app.post("/users/create", response_model=CreateUserResponse)
 async def create_user(request: CreateUserRequest):
     """Create a new user in the system"""
     if agent is None:
@@ -2379,36 +2984,25 @@ async def create_user(request: CreateUserRequest):
         )
 
 
-@router.post("/email/reply", response_model=EmailReplyResponse)
+@app.post("/email/reply", response_model=EmailReplyResponse)
 async def reply_to_email(request: EmailReplyRequest):
     """
-    智能邮件回复接口
+    智能邮件回复接口 - 异步处理模式
 
     参数:
     - email_content: 需要回复的邮件内容（必需）
-    - reply_instruction: 回复指令/要求（可选，默认："请生成专业的邮件回复"）
+    - category_list: 邮件分类（必需）
     - user_id: 用户标识（必需）
+    - email_basic_id: email标识（必需）
+    - callback_url: 回调地址（必需）
 
     返回:
-    - reply_content: 生成的邮件回复内容
+    - task_id: 任务ID
+    - status: 任务状态
+    - message: 状态描述
     """
     if agent is None:
         raise HTTPException(status_code=500, detail="Agent not initialized")
-
-    # Register tools for restored MCP connections (one-time only)
-    global _mcp_tools_registered
-    if not _mcp_tools_registered:
-        register_mcp_tools_for_restored_connections()
-        _mcp_tools_registered = True
-
-    # Check for missing API keys
-    api_key_check = check_missing_api_keys(agent)
-    if "error" in api_key_check:
-        raise HTTPException(status_code=500, detail=api_key_check["error"][0])
-
-    if api_key_check["missing_keys"]:
-        # Return a special response indicating missing API keys
-        raise HTTPException(status_code=500, detail=f"Missing API keys for {api_key_check['model_type']} model: {', '.join(api_key_check['missing_keys'])}. Please provide the required API keys.")
 
     try:
         # 参数验证
@@ -2418,63 +3012,181 @@ async def reply_to_email(request: EmailReplyRequest):
         if not request.email_content.strip():
             raise HTTPException(status_code=400, detail="email_content不能为空")
 
-        response, _ = agent.message_queue.send_message_in_queue(
-            agent.client,
-            agent.agent_states.email_reply_agent_state.id,
-            {
-                "user_id": request.user_id,
-                "message": request.email_content,
-                "force_response": True
-            },
-            agent_type="email_reply",
+        if not request.category_list.strip():
+            raise HTTPException(status_code=400, detail="category_list不能为空")
+
+        if not request.email_basic_id.strip():
+            raise HTTPException(status_code=400, detail="email_basic_id不能为空")
+
+        if not request.callback_url.strip():
+            raise HTTPException(status_code=400, detail="callback_url不能为空")
+
+        # 生成任务ID（使用MD5）
+        task_id = generate_task_id(request.user_id, request.email_basic_id, request.email_content)
+
+        # 检查任务是否已存在
+        task_key = f"email_reply_task:{task_id}"
+        existing_task = redis_client.hgetall(task_key)
+
+        if existing_task:
+            existing_status = existing_task.get("status", "unknown")
+
+            # 如果任务状态是成功或执行中，返回现有任务信息
+            if existing_status in ["completed", "processing"]:
+                logger.info(f"任务 {task_id} 已存在且状态为 {existing_status}，返回现有任务信息")
+                return EmailReplyResponse(
+                    task_id=task_id,
+                    status=existing_status,
+                    message=f"任务已存在，状态: {existing_status}"
+                )
+
+            # 如果任务状态不是成功也不是执行中，删除现有任务并重新创建
+            else:
+                logger.info(f"任务 {task_id} 已存在但状态为 {existing_status}，删除并重新创建")
+                redis_client.delete(task_key)
+
+                # 如果任务在队列中，也需要尝试移除（虽然可能不在队列中）
+                # 注意：Redis列表的移除操作比较复杂，这里我们让工作线程处理重复任务
+                logger.info(f"已删除状态为 {existing_status} 的任务 {task_id}，将创建新任务")
+
+        # 将任务信息存储到Redis
+        task_data = {
+            "task_id": task_id,
+            "email_content": request.email_content,
+            "category_list": request.category_list,
+            "user_id": request.user_id,
+            "email_basic_id": request.email_basic_id,
+            "callback_url": request.callback_url,
+            "status": "queued",
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+
+        redis_client.hset(task_key, mapping=task_data)
+        # 设置过期时间为1小时
+        redis_client.expire(task_key, 3600)
+
+        # 将任务放入Redis队列
+        queue_data = {
+            "task_id": task_id,
+            "email_content": request.email_content,
+            "category_list": request.category_list,
+            "user_id": request.user_id,
+            "email_basic_id": request.email_basic_id,
+            "callback_url": request.callback_url
+        }
+        redis_client.rpush(EMAIL_REPLY_QUEUE, json.dumps(queue_data))
+
+        logger.info(f"邮件回复任务已排队: {task_id}")
+
+        return EmailReplyResponse(
+            task_id=task_id,
+            status="queued",
+            message="任务已排队，将通过回调地址返回结果"
         )
-
-        # Check if response is an error string
-        if response == "ERROR":
-            return "ERROR_RESPONSE_FAILED"
-
-        # Check if response has the expected structure
-        if not hasattr(response, "messages") or len(response.messages) < 2:
-            return "ERROR_INVALID_RESPONSE_STRUCTURE"
-
-        try:
-            # find how many tools are called
-            num_tools_called = 0
-            for message in response.messages[::-1]:
-                if message.message_type == MessageType.tool_return_message:
-                    num_tools_called += 1
-                else:
-                    break
-
-            # Check if the message has tool_call attribute
-            # 1->3; 2->5
-            if not hasattr(
-                    response.messages[-(num_tools_called * 2 + 1)], "tool_call"
-            ):
-                return "ERROR_NO_TOOL_CALL"
-
-            tool_call = response.messages[-(num_tools_called * 2 + 1)].tool_call
-
-            parsed_args = parse_json(tool_call.arguments)
-
-            if "message" not in parsed_args:
-                return "ERROR_NO_MESSAGE_IN_ARGS"
-
-            response_text = parsed_args["message"]
-
-            return response_text
-        except (AttributeError, KeyError, IndexError, json.JSONDecodeError):
-            raise HTTPException(status_code=500, detail="Error parsing response")
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"[EMAIL_REPLY_API] 处理失败: {str(e)}")
         logger.error(f"[EMAIL_REPLY_API] 错误堆栈: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"邮件回复生成失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"邮件回复任务创建失败: {str(e)}")
+
+        raise HTTPException(status_code=500, detail=f"邮件回复任务创建失败: {str(e)}")
 
 
-@router.post("/api/process_mysql_email", response_model=ProcessMysqlEmailResponse)
+@app.get("/email/reply/status/{task_id}")
+async def get_email_reply_status(task_id: str):
+    """
+    查询邮件回复任务状态
+
+    参数:
+    - task_id: 任务ID
+
+    返回:
+    - 任务状态信息
+    """
+    try:
+        task_key = f"email_reply_task:{task_id}"
+        task_data = redis_client.hgetall(task_key)
+
+        if not task_data:
+            raise HTTPException(status_code=404, detail="任务不存在或已完成")
+
+        return {
+            "task_id": task_id,
+            "status": task_data.get("status", "unknown"),
+            "created_at": task_data.get("created_at"),
+            "updated_at": task_data.get("updated_at"),
+            "error": task_data.get("error"),
+            "callback_error": task_data.get("callback_error")
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"查询任务状态失败: {task_id}, 错误: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"查询任务状态失败: {str(e)}")
+
+
+@app.post("/email/reply/queue/recover")
+async def recover_email_queue():
+    """手动触发邮件回复队列恢复"""
+    try:
+        recover_email_reply_tasks()
+        return {"status": "success", "message": "队列恢复完成"}
+    except Exception as e:
+        logger.error(f"手动队列恢复失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"队列恢复失败: {str(e)}")
+
+
+@app.post("/email/reply/queue/cleanup")
+async def cleanup_email_queue():
+    """手动触发过期任务清理"""
+    try:
+        cleanup_expired_email_tasks()
+        return {"status": "success", "message": "过期任务清理完成"}
+    except Exception as e:
+        logger.error(f"手动任务清理失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"任务清理失败: {str(e)}")
+
+
+@app.get("/email/reply/queue/status")
+async def get_email_queue_status():
+    """获取邮件回复队列详细状态"""
+    try:
+        queue_length = redis_client.llen(EMAIL_REPLY_QUEUE)
+        worker_count = len(worker_threads)
+
+        # 获取所有任务详情
+        task_keys = redis_client.keys("email_reply_task:*")
+        tasks = []
+
+        for task_key in task_keys[:50]:  # 限制返回最多50个任务
+            task_data = redis_client.hgetall(task_key)
+            if task_data:
+                tasks.append({
+                    "task_id": task_data.get("task_id"),
+                    "status": task_data.get("status"),
+                    "created_at": task_data.get("created_at"),
+                    "updated_at": task_data.get("updated_at"),
+                    "user_id": task_data.get("user_id"),
+                    "email_basic_id": task_data.get("email_basic_id")
+                })
+
+        return {
+            "queue_length": queue_length,
+            "worker_threads": worker_count,
+            "total_tasks": len(task_keys),
+            "tasks": tasks
+        }
+
+    except Exception as e:
+        logger.error(f"获取队列状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取队列状态失败: {str(e)}")
+
+
+@app.post("/api/process_mysql_email", response_model=ProcessMysqlEmailResponse)
 async def process_mysql_email(request: ProcessMysqlEmailRequest):
     """
     处理MySQL阿里云数据库的邮件数据
@@ -2652,10 +3364,6 @@ async def process_mysql_email(request: ProcessMysqlEmailRequest):
             status_code=500,
             detail=f"MySQL邮件处理失败: {str(e)}"
         )
-
-
-# Include router with /pams prefix
-app.include_router(router, prefix="/pams")
 
 
 if __name__ == "__main__":

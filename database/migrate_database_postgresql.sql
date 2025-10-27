@@ -338,3 +338,26 @@ BEGIN
     RAISE NOTICE 'All schema changes have been applied and verified.';
 END;
 $$;
+-- Additional Migration: Add email_tag column to procedural_memory table if it doesn't exist
+DO $
+BEGIN
+    IF NOT column_exists('procedural_memory', 'email_tag') THEN
+        ALTER TABLE procedural_memory ADD COLUMN email_tag VARCHAR;
+        RAISE NOTICE '✓ Added email_tag column to procedural_memory table';
+    ELSE
+        RAISE NOTICE '✓ Skipped: email_tag column already exists in procedural_memory table';
+    END IF;
+END;
+$;
+
+-- Additional Migration: Add flow_tag column to procedural_memory table if it doesn't exist
+DO $
+BEGIN
+    IF NOT column_exists('procedural_memory', 'flow_tag') THEN
+        ALTER TABLE procedural_memory ADD COLUMN flow_tag VARCHAR;
+        RAISE NOTICE '✓ Added flow_tag column to procedural_memory table';
+    ELSE
+        RAISE NOTICE '✓ Skipped: flow_tag column already exists in procedural_memory table';
+    END IF;
+END;
+$;
