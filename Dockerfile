@@ -24,41 +24,60 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
  && node -v && npm -v
 
 # ---------------------------
+# 创建用户和工作目录
+# ---------------------------
+RUN useradd --create-home --shell /bin/bash mirix
+WORKDIR /app
+RUN chown mirix:mirix /app
+
+# 切换到mirix用户进行后续操作
+USER mirix
+
+# ---------------------------
 # Python 环境
 # ---------------------------
-WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app
 
-# 复制并安装 Python 依赖
+# 复制并安装 Python 依赖（以mirix用户身份）
 COPY requirements.txt pyproject.toml setup.py MANIFEST.in ./
-RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip --user \
+ && pip install --no-cache-dir -r requirements.txt --user
 
-# 复制项目源码
+# 复制项目源码（以mirix用户身份，自动拥有正确权限）
 COPY mirix/ ./mirix/
 COPY main.py chat.py email_learning.py ./
 COPY database/ ./database/
 COPY assets/ ./assets/
 
 # ---------------------------
-# 前端依赖安装（固定 registry，稳定构建）
+# 前端依赖安装（以mirix用户身份）
 # ---------------------------
 WORKDIR /app/frontend
 
 # 仅复制 lockfile 与 package.json 以充分利用缓存
 COPY frontend/package.json frontend/package-lock.json ./
 
-# 忽略外部用户级 .npmrc，固定 registry（可通过 --build-arg 覆盖）
-ENV NPM_CONFIG_USERCONFIG=/dev/null
+# 优化npm配置，加速安装
+ENV NPM_CONFIG_USERCONFIG=/dev/null \
+    NPM_CONFIG_PROGRESS=false \
+    NPM_CONFIG_LOGLEVEL=warn \
+    NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_FUND=false
+
 ARG NPM_REGISTRY=https://registry.npmjs.org/
 
+# 使用更快的安装方式，跳过可选依赖和审计（以mirix用户身份）
 RUN npm config set registry ${NPM_REGISTRY} \
- && npm ping \
- && npm ci --no-audit --no-fund --registry=${NPM_REGISTRY}
+ && npm config set fetch-retries 3 \
+ && npm config set fetch-retry-factor 2 \
+ && npm config set fetch-retry-mintimeout 10000 \
+ && npm config set fetch-retry-maxtimeout 60000 \
+ && npm ci --no-audit --no-fund --no-optional --silent --registry=${NPM_REGISTRY} \
+ && npm cache clean --force
 
-# 再复制剩余前端源码
+# 再复制剩余前端源码（以mirix用户身份，自动拥有正确权限）
 COPY frontend/ ./
 # 如果前端需要打包，请在此处开启：
 # RUN npm run build
@@ -68,7 +87,7 @@ COPY frontend/ ./
 # ---------------------------
 WORKDIR /app
 
-# 必要目录
+# 必要目录（以mirix用户身份创建，自动拥有正确权限）
 RUN mkdir -p /app/data /app/logs
 
 # 环境变量
@@ -84,13 +103,11 @@ EXPOSE 47283 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:47283/health || exit 1
 
-# 启动脚本
+# 启动脚本（以mirix用户身份复制，自动拥有正确权限）
 COPY start.sh ./
 RUN chmod +x start.sh
 
-# 非 root 用户
-RUN useradd --create-home --shell /bin/bash mirix && chown -R mirix:mirix /app
-USER mirix
+# 已经是mirix用户，无需额外权限设置
 
 # 同时启动前后端（由 start.sh 实现）
 CMD ["./start.sh"]
