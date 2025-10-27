@@ -74,7 +74,6 @@ RUN npm config set registry ${NPM_REGISTRY} \
  && npm config set fetch-retry-mintimeout 10000 \
  && npm config set fetch-retry-maxtimeout 60000 \
  && npm ci --no-audit --no-fund --no-optional --silent --registry=${NPM_REGISTRY} \
- && npm install -g serve \
  && npm cache clean --force
 
 # 再复制剩余前端源码（以mirix用户身份，自动拥有正确权限）
