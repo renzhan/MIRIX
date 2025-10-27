@@ -18,7 +18,6 @@ import yaml
 import redis
 import requests
 from fastapi import FastAPI, HTTPException
-from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -811,6 +810,13 @@ class ScreenshotSettingResponse(BaseModel):
     include_recent_screenshots: bool
     message: str
 
+class WorkflowExtractionRequest(BaseModel):
+    content: str
+    user_id: str
+
+
+class WorkflowExtractionResponse(BaseModel):
+    workflow_result: Any  # 可以是字典或字符串
 
 # API Key validation functionality
 def get_required_api_keys_for_model(model_endpoint_type: str) -> List[str]:
