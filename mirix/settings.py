@@ -150,6 +150,7 @@ class Settings(BaseSettings):
     redis_db: int = 0
     redis_socket_timeout: float = 5.0
     redis_max_connections: int = 50
+    redis_key_prefix: str = "aiop"  # Redis key prefix (required by k8s ops)
 
     # multi agent settings
     multi_agent_send_message_max_retries: int = 3
