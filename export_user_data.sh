@@ -2,6 +2,10 @@
 ##############################################################################
 # 修复 PostgreSQL 字段查询语法，兼容所有版本（无需 GROUP BY）
 # 100% 纯 Bash，无外部工具，免密导出指定用户数据
+# 
+# 修复内容：
+# 1. PostgreSQL 关键字字段（如 limit）用双引号包围
+# 2. VALUES 子句使用逗号分隔，而非管道符
 ##############################################################################
 
 # -------------------------- 基础配置（无需修改）--------------------------
@@ -70,20 +74,28 @@ for table in "${TABLES[@]}"; do
     IFS=',' read -r -a column_array <<< "${columns}"
 
     # 4.3 构建 INSERT 语句的字段和值处理部分
-    insert_columns="${columns}"
+    insert_columns=""
     insert_values=""
     for col in "${column_array[@]}"; do
         # 处理关键字字段（如 limit，加双引号）
-        if [[ "${col}" =~ ^(limit|order|where|select|from)$ ]]; then
+        if [[ "${col}" =~ ^(limit|order|where|select|from|group|having|union|join|inner|outer|left|right|full|cross|natural|on|using|case|when|then|else|end|distinct|all|any|some|exists|in|not|and|or|between|like|ilike|similar|is|null|true|false|unknown|cast|extract|interval|current_date|current_time|current_timestamp)$ ]]; then
             col_safe="\"${col}\""
         else
             col_safe="${col}"
         fi
+        
+        # 构建字段列表（用于INSERT语句）
+        if [ -z "${insert_columns}" ]; then
+            insert_columns="${col_safe}"
+        else
+            insert_columns="${insert_columns}, ${col_safe}"
+        fi
+        
         # 拼接值处理逻辑（COALESCE 处理 NULL 和转义）
         if [ -z "${insert_values}" ]; then
             insert_values="COALESCE(quote_literal(${col_safe}), 'NULL')"
         else
-            insert_values="${insert_values}, COALESCE(quote_literal(${col_safe}), 'NULL')"
+            insert_values="${insert_values} || ',' || COALESCE(quote_literal(${col_safe}), 'NULL')"
         fi
     done
 
@@ -93,7 +105,7 @@ for table in "${TABLES[@]}"; do
     psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" \
         -t -A -c "
             SELECT 'INSERT INTO public.${table} (${insert_columns}) VALUES (' || 
-                   ${insert_values} || ';' 
+                   ${insert_values} || ');' 
             FROM public.${table} 
             WHERE user_id = '${TARGET_USER_ID}';
         " > "${data_file}"
