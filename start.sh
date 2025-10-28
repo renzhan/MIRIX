@@ -34,8 +34,17 @@ echo "后端API地址: ${REACT_APP_SERVER_URL}"
 # 检查是否存在构建后的文件
 if [ -d "build" ]; then
     echo "检测到构建文件，启动生产模式前端服务..."
-    # 使用全局安装的 serve 提供静态文件
-    serve -s build -l 3000 --single &
+
+    # 检查是否存在嵌套的 aiop-pams 目录
+    if [ -d "build/aiop-pams" ]; then
+        echo "使用嵌套构建目录: build/aiop-pams"
+        # 使用嵌套目录作为根目录
+        serve -s build/aiop-pams -l 3000 &
+    else
+        echo "使用标准构建目录: build"
+        # 使用标准构建目录
+        serve -s build -l 3000 &
+    fi
     FRONTEND_PID=$!
 else
     echo "未找到构建文件，启动开发模式前端服务..."
