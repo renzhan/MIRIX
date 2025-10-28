@@ -10,7 +10,7 @@ import UpdateChecker from './components/UpdateChecker';
 import queuedFetch from './utils/requestQueue';
 import './App.css';
 import { useTranslation } from 'react-i18next';
-
+console.log('process.env', process.env)
 function App() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('chat');
