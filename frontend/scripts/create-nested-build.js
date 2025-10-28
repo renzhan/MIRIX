@@ -8,7 +8,7 @@ const path = require('path');
  * 将 build/ 目录下的内容移动到 build/aiop-pams/ 下
  */
 
-const buildDir = path.join(__dirname, '..', 'build');
+const buildDir = path.join(__dirname, 'build');
 const nestedDir = path.join(buildDir, 'aiop-pams');
 
 console.log('🔄 创建嵌套构建目录结构...');
