@@ -35,7 +35,7 @@ echo "后端API地址: ${REACT_APP_SERVER_URL}"
 if [ -d "build" ]; then
     echo "检测到构建文件，启动生产模式前端服务..."
     # 使用本地安装的serve提供静态文件
-    ./node_modules/.bin/serve -s build -l 3000 &
+    npx serve -s build -l 3000 --single &
     FRONTEND_PID=$!
 else
     echo "未找到构建文件，启动开发模式前端服务..."
