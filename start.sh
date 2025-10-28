@@ -21,6 +21,7 @@ cd frontend
 # 设置前端专用的环境变量，避免端口冲突
 export PORT=3000  # 前端固定使用3000端口
 export HOST=0.0.0.0
+export PUBLIC_URL=${PUBLIC_URL:-/aiop-pams}
 export REACT_APP_SERVER_URL="http://localhost:${BACKEND_PORT}/pams"
 
 # 清除可能影响前端的环境变量
@@ -30,9 +31,18 @@ unset BACKEND_HOST
 echo "前端将使用端口: ${PORT}"
 echo "后端API地址: ${REACT_APP_SERVER_URL}"
 
-# 启动前端服务
-npm start &
-FRONTEND_PID=$!
+# 检查是否存在构建后的文件
+if [ -d "build" ]; then
+    echo "检测到构建文件，启动生产模式前端服务..."
+    # 使用本地安装的serve提供静态文件
+    ./node_modules/.bin/serve -s build -l 3000 &
+    FRONTEND_PID=$!
+else
+    echo "未找到构建文件，启动开发模式前端服务..."
+    # 启动前端开发服务
+    npm start &
+    FRONTEND_PID=$!
+fi
 
 # 回到根目录
 cd ..

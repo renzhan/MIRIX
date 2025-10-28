@@ -35,18 +35,18 @@ def _setup_logging():
     """Configure logging with flexible output options (console/file/both)."""
     try:
         import os
-        
+
         # 日志配置环境变量
         log_output = os.getenv('LOG_OUTPUT', 'both').lower()  # console, file, both
         log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
         log_dir = os.getenv('LOG_DIR', './')
-        
+
         # 创建日志目录（如果需要文件输出）
         if log_output in ['file', 'both']:
             os.makedirs(log_dir, exist_ok=True)
-        
+
         log_file = os.path.join(log_dir, 'api_backend.log')
-        
+
         # 基础配置
         config = {
             "version": 1,
@@ -70,7 +70,7 @@ def _setup_logging():
                 "uvicorn.access": {"level": "INFO", "propagate": True},
             },
         }
-        
+
         # 根据配置添加处理器
         if log_output in ['console', 'both']:
             config["handlers"]["console"] = {
@@ -80,7 +80,7 @@ def _setup_logging():
                 "stream": "ext://sys.stdout",
             }
             config["root"]["handlers"].append("console")
-        
+
         if log_output in ['file', 'both']:
             config["handlers"]["rotating_file"] = {
                 "class": "logging.handlers.RotatingFileHandler",
@@ -92,27 +92,27 @@ def _setup_logging():
                 "encoding": "utf-8",
             }
             config["root"]["handlers"].append("rotating_file")
-        
+
         # 应用配置
         logging.config.dictConfig(config)
-        
+
         # 记录日志配置信息
         logger = logging.getLogger(__name__)
         logger.info("=== 邮件回复服务日志配置完成 ===")
         logger.info(f"日志输出模式: {log_output}")
         logger.info(f"日志级别: {log_level}")
-        
+
         if log_output in ['file', 'both']:
             logger.info(f"日志文件路径: {log_file}")
             logger.info(f"日志文件最大大小: 50MB，保留备份数: 10")
-        
+
         if log_output == 'console':
             logger.info("仅输出到控制台")
         elif log_output == 'file':
             logger.info("仅输出到文件")
         else:
             logger.info("同时输出到控制台和文件")
-        
+
     except Exception as e:
         # Fall back gracefully without crashing the server if logging config fails
         logging.basicConfig(level=logging.INFO)
@@ -330,7 +330,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 def register_mcp_tools_for_restored_connections():
     """Register tools for MCP connections that were restored on startup"""
     try:
@@ -389,7 +388,7 @@ def register_mcp_tools_for_restored_connections():
 async def startup_event():
     """Initialize and restore MCP connections on startup"""
     global agent
-    
+
     try:
         # Re-assert logging config in case a runner (e.g., Uvicorn) overwrote it
         _setup_logging()
@@ -434,10 +433,10 @@ async def startup_event():
 
         # 启动邮件回复工作线程池
         start_email_reply_workers()
-        
+
         # 恢复邮件回复队列中的任务
         recover_email_reply_tasks()
-        
+
         # 清理过期的邮件回复任务
         cleanup_expired_email_tasks()
 
@@ -452,10 +451,10 @@ async def shutdown_event():
     """Cleanup on server shutdown"""
     try:
         logger.info("Shutting down Mirix FastAPI server...")
-        
+
         # 停止邮件回复工作线程池
         stop_email_reply_workers()
-        
+
         logger.info("Server shutdown completed")
     except Exception as e:
         logger.error(f"Error during shutdown: {str(e)}")
@@ -471,24 +470,24 @@ _mcp_tools_registered = False
 def process_email_reply_task(task_id: str, email_content: str, category_list: str, user_id: str, email_basic_id: str, callback_url: str):
     """后台处理邮件回复任务"""
     processing_start_time = time.time()
-    
+
     try:
         logger.info(f"开始处理邮件回复任务: {task_id}")
-        
+
         # 从Redis获取任务状态
         task_key = f"email_reply_task:{task_id}"
         task_data = redis_client.hgetall(task_key)
-        
+
         if not task_data:
             logger.error(f"任务不存在: {task_id}")
             return
-        
+
         # 计算等待时间
         created_at = datetime.fromisoformat(task_data.get("created_at"))
         wait_time = processing_start_time - created_at.timestamp()
-        
+
         logger.info(f"任务 {task_id} 等待处理时间: {wait_time:.2f}秒")
-            
+
         # 更新任务状态为处理中
         redis_client.hset(task_key, "status", "processing")
         redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
@@ -511,11 +510,11 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             actual_processing_time = time.time() - processing_start_time
             total_time = time.time() - created_at.timestamp()
             logger.info(f"任务 {task_id} 处理失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
-            
+
             result = {
-                "status": "error", 
-                "error": "邮件回复生成失败", 
-                "task_id": task_id, 
+                "status": "error",
+                "error": "邮件回复生成失败",
+                "task_id": task_id,
                 "email_basic_id": email_basic_id,
                 "category_list": category_list,
                 "timing": {
@@ -528,11 +527,11 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             actual_processing_time = time.time() - processing_start_time
             total_time = time.time() - created_at.timestamp()
             logger.info(f"任务 {task_id} 响应结构无效 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
-            
+
             result = {
-                "status": "error", 
-                "error": "响应结构无效", 
-                "task_id": task_id, 
+                "status": "error",
+                "error": "响应结构无效",
+                "task_id": task_id,
                 "email_basic_id": email_basic_id,
                 "category_list": category_list,
                 "timing": {
@@ -555,11 +554,11 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                     actual_processing_time = time.time() - processing_start_time
                     total_time = time.time() - created_at.timestamp()
                     logger.info(f"任务 {task_id} 缺少工具调用 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
-                    
+
                     result = {
-                        "status": "error", 
-                        "error": "缺少工具调用", 
-                        "task_id": task_id, 
+                        "status": "error",
+                        "error": "缺少工具调用",
+                        "task_id": task_id,
                         "email_basic_id": email_basic_id,
                         "category_list": category_list,
                         "timing": {
@@ -571,16 +570,16 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                 else:
                     tool_call = response.messages[-(num_tools_called * 2 + 1)].tool_call
                     parsed_args = parse_json(tool_call.arguments)
-                    
+
                     if "message" not in parsed_args:
                         actual_processing_time = time.time() - processing_start_time
                         total_time = time.time() - created_at.timestamp()
                         logger.info(f"任务 {task_id} 缺少消息内容 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
-                        
+
                         result = {
-                            "status": "error", 
-                            "error": "缺少消息内容", 
-                            "task_id": task_id, 
+                            "status": "error",
+                            "error": "缺少消息内容",
+                            "task_id": task_id,
                             "email_basic_id": email_basic_id,
                             "category_list": category_list,
                             "timing": {
@@ -593,10 +592,10 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                         # 计算处理时间
                         actual_processing_time = time.time() - processing_start_time
                         total_time = time.time() - created_at.timestamp()
-                        
+
                         logger.info(f"任务 {task_id} 实际处理时间: {actual_processing_time:.2f}秒")
                         logger.info(f"任务 {task_id} 总处理时间: {total_time:.2f}秒")
-                        
+
                         result = {
                             "status": "completed",
                             "reply_content": parsed_args["message"],
@@ -613,11 +612,11 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                 actual_processing_time = time.time() - processing_start_time
                 total_time = time.time() - created_at.timestamp()
                 logger.info(f"任务 {task_id} 解析响应失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
-                
+
                 result = {
-                    "status": "error", 
-                    "error": f"解析响应失败: {str(e)}", 
-                    "task_id": task_id, 
+                    "status": "error",
+                    "error": f"解析响应失败: {str(e)}",
+                    "task_id": task_id,
                     "email_basic_id": email_basic_id,
                     "category_list": category_list,
                     "timing": {
@@ -626,7 +625,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                         "total_time": round(total_time, 2)
                     }
                 }
-        
+
         # 发送回调
         try:
             callback_response = requests.post(
@@ -641,12 +640,12 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             # 即使回调失败，也要更新Redis状态
             redis_client.hset(task_key, "callback_error", str(e))
         logger.info(f"Url:{callback_url} \n  Body: {json.dumps(result, ensure_ascii=False, indent=2)}")
-        
+
         # 清除Redis记录
         redis_client.delete(task_key)
         final_time = time.time() - processing_start_time
         logger.info(f"任务处理完成并清除: {task_id}, 最终处理时间: {final_time:.2f}秒")
-        
+
     except Exception as e:
         actual_processing_time = time.time() - processing_start_time
         # 如果created_at未定义，使用当前时间作为fallback
@@ -654,22 +653,22 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             total_time = time.time() - created_at.timestamp()
         except:
             total_time = actual_processing_time
-            
+
         logger.error(f"处理邮件回复任务失败: {task_id}, 错误: {str(e)}")
         logger.info(f"任务 {task_id} 异常失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
-        
+
         # 更新任务状态为失败
         task_key = f"email_reply_task:{task_id}"
         redis_client.hset(task_key, "status", "failed")
         redis_client.hset(task_key, "error", str(e))
         redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
-        
+
         # 尝试发送失败回调
         try:
             callback_data = {
-                "status": "error", 
-                "error": str(e), 
-                "task_id": task_id, 
+                "status": "error",
+                "error": str(e),
+                "task_id": task_id,
                 "email_basic_id": email_basic_id,
                 "category_list": category_list,
                 "timing": {
@@ -811,6 +810,13 @@ class ScreenshotSettingResponse(BaseModel):
     include_recent_screenshots: bool
     message: str
 
+class WorkflowExtractionRequest(BaseModel):
+    content: str
+    user_id: str
+
+
+class WorkflowExtractionResponse(BaseModel):
+    workflow_result: Any  # 可以是字典或字符串
 
 # API Key validation functionality
 def get_required_api_keys_for_model(model_endpoint_type: str) -> List[str]:
@@ -962,7 +968,7 @@ if ':' in redis_port_str and not redis_port_str.isdigit():
 
 redis_client = redis.Redis(
     host=os.getenv('REDIS_HOST', 'localhost'),
-    port=int(redis_port_str), 
+    port=int(redis_port_str),
     password=os.getenv('REDIS_PASSWORD', 'aiop123456'),
     db=int(os.getenv('REDIS_DB', 0)),
     decode_responses=True
@@ -983,63 +989,63 @@ def generate_task_id(user_id: str, email_basic_id: str, email_content: str) -> s
 def email_reply_worker():
     """邮件回复工作线程"""
     logger.info(f"邮件回复工作线程启动: {threading.current_thread().name}")
-    
+
     while not worker_shutdown_event.is_set():
         try:
             # 阻塞式从Redis队列获取任务，超时5秒
             task_data = redis_client.blpop(EMAIL_REPLY_QUEUE, timeout=5)
-            
+
             if task_data is None:
                 # 超时，继续循环
                 continue
-                
+
             # 解析任务数据
             _, task_json = task_data
             task_info = json.loads(task_json)
-            
+
             task_id = task_info['task_id']
             email_content = task_info['email_content']
             category_list = task_info['category_list']
             user_id = task_info['user_id']
             email_basic_id = task_info['email_basic_id']
             callback_url = task_info['callback_url']
-            
+
             logger.info(f"工作线程 {threading.current_thread().name} 开始处理任务: {task_id}")
-            
+
             # 验证任务是否仍然有效（防止处理已删除的任务）
             task_key = f"email_reply_task:{task_id}"
             current_task = redis_client.hgetall(task_key)
-            
+
             if not current_task:
                 logger.warning(f"任务 {task_id} 已不存在，跳过处理")
                 continue
-            
+
             current_status = current_task.get("status", "unknown")
             if current_status not in ["queued", "processing"]:
                 logger.warning(f"任务 {task_id} 状态为 {current_status}，跳过处理")
                 continue
-            
+
             # 处理任务
             process_email_reply_task(task_id, email_content, category_list, user_id, email_basic_id, callback_url)
-            
+
         except json.JSONDecodeError as e:
             logger.error(f"解析任务数据失败: {str(e)}")
         except Exception as e:
             logger.error(f"工作线程异常: {str(e)}")
             logger.error(f"错误堆栈: {traceback.format_exc()}")
-    
+
     logger.info(f"邮件回复工作线程退出: {threading.current_thread().name}")
 
 def start_email_reply_workers():
     """启动邮件回复工作线程池"""
     global worker_threads
-    
+
     # 计算线程数：CPU核数的2倍，最少2个
     cpu_count = multiprocessing.cpu_count()
     thread_count = max(2, cpu_count * 2)
-    
+
     logger.info(f"启动 {thread_count} 个邮件回复工作线程")
-    
+
     for i in range(thread_count):
         thread = threading.Thread(
             target=email_reply_worker,
@@ -1048,20 +1054,20 @@ def start_email_reply_workers():
         )
         thread.start()
         worker_threads.append(thread)
-    
+
     logger.info(f"邮件回复工作线程池启动完成，共 {len(worker_threads)} 个线程")
 
 def stop_email_reply_workers():
     """停止邮件回复工作线程池"""
     global worker_threads
-    
+
     logger.info("正在停止邮件回复工作线程池...")
     worker_shutdown_event.set()
-    
+
     # 等待所有线程结束
     for thread in worker_threads:
         thread.join(timeout=10)
-    
+
     worker_threads.clear()
     logger.info("邮件回复工作线程池已停止")
 
@@ -1069,29 +1075,29 @@ def recover_email_reply_tasks():
     """恢复邮件回复队列中的任务"""
     try:
         logger.info("🔄 开始恢复邮件回复队列中的任务...")
-        
+
         # 获取所有邮件回复任务的键
         task_keys = redis_client.keys("email_reply_task:*")
-        
+
         if not task_keys:
             logger.info("✅ 没有需要恢复的邮件回复任务")
             return
-        
+
         recovered_count = 0
         requeued_count = 0
-        
+
         for task_key in task_keys:
             try:
                 task_data = redis_client.hgetall(task_key)
-                
+
                 if not task_data:
                     continue
-                
+
                 task_id = task_data.get("task_id")
                 status = task_data.get("status", "unknown")
-                
+
                 logger.info(f"发现任务: {task_id}, 状态: {status}")
-                
+
                 # 处理不同状态的任务
                 if status in ["queued", "processing"]:
                     # 重新排队执行
@@ -1103,17 +1109,17 @@ def recover_email_reply_tasks():
                         "email_basic_id": task_data.get("email_basic_id"),
                         "callback_url": task_data.get("callback_url")
                     }
-                    
+
                     # 检查必要字段是否存在
                     if all(queue_data.values()):
                         # 更新任务状态为重新排队
                         redis_client.hset(task_key, "status", "queued")
                         redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
                         redis_client.hset(task_key, "recovered_at", datetime.now().isoformat())
-                        
+
                         # 重新放入队列
                         redis_client.rpush(EMAIL_REPLY_QUEUE, json.dumps(queue_data))
-                        
+
                         requeued_count += 1
                         logger.info(f"✅ 任务 {task_id} 已重新排队 (原状态: {status})")
                     else:
@@ -1122,26 +1128,26 @@ def recover_email_reply_tasks():
                         redis_client.hset(task_key, "status", "failed")
                         redis_client.hset(task_key, "error", "任务数据不完整，无法恢复")
                         redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
-                
+
                 elif status in ["completed", "failed"]:
                     # 已完成或失败的任务，不需要恢复
                     logger.info(f"ℹ️ 任务 {task_id} 已完成 (状态: {status})，无需恢复")
-                
+
                 else:
                     logger.warning(f"⚠️ 任务 {task_id} 状态未知: {status}")
-                
+
                 recovered_count += 1
-                
+
             except Exception as e:
                 logger.error(f"恢复任务失败 {task_key}: {str(e)}")
                 continue
-        
+
         logger.info(f"✅ 邮件回复队列恢复完成: 检查了 {recovered_count} 个任务，重新排队 {requeued_count} 个任务")
-        
+
         # 显示当前队列长度
         queue_length = redis_client.llen(EMAIL_REPLY_QUEUE)
         logger.info(f"📊 当前邮件回复队列长度: {queue_length}")
-        
+
     except Exception as e:
         logger.error(f"恢复邮件回复队列失败: {str(e)}")
         logger.error(f"错误堆栈: {traceback.format_exc()}")
@@ -1150,44 +1156,44 @@ def cleanup_expired_email_tasks():
     """清理过期的邮件回复任务"""
     try:
         logger.info("🧹 开始清理过期的邮件回复任务...")
-        
+
         # 获取所有邮件回复任务的键
         task_keys = redis_client.keys("email_reply_task:*")
-        
+
         if not task_keys:
             logger.info("✅ 没有需要清理的任务")
             return
-        
+
         current_time = datetime.now()
         expired_count = 0
-        
+
         # 设置过期时间阈值（24小时）
         expiry_hours = 24
-        
+
         for task_key in task_keys:
             try:
                 task_data = redis_client.hgetall(task_key)
-                
+
                 if not task_data:
                     continue
-                
+
                 created_at_str = task_data.get("created_at")
                 status = task_data.get("status", "unknown")
                 task_id = task_data.get("task_id")
-                
+
                 if not created_at_str:
                     continue
-                
+
                 # 解析创建时间
                 created_at = datetime.fromisoformat(created_at_str)
                 age_hours = (current_time - created_at).total_seconds() / 3600
-                
+
                 # 清理超过24小时的已完成或失败任务
                 if age_hours > expiry_hours and status in ["completed", "failed"]:
                     redis_client.delete(task_key)
                     expired_count += 1
                     logger.info(f"🗑️ 清理过期任务: {task_id} (状态: {status}, 年龄: {age_hours:.1f}小时)")
-                
+
                 # 清理超过1小时的处理中任务（可能是僵尸任务）
                 elif age_hours > 1 and status == "processing":
                     logger.warning(f"⚠️ 发现可能的僵尸任务: {task_id} (处理中超过1小时)")
@@ -1195,19 +1201,16 @@ def cleanup_expired_email_tasks():
                     redis_client.hset(task_key, "status", "failed")
                     redis_client.hset(task_key, "error", "任务处理超时，可能是僵尸任务")
                     redis_client.hset(task_key, "updated_at", current_time.isoformat())
-                
+
             except Exception as e:
                 logger.error(f"清理任务失败 {task_key}: {str(e)}")
                 continue
-        
+
         logger.info(f"✅ 过期任务清理完成: 清理了 {expired_count} 个过期任务")
-        
+
     except Exception as e:
         logger.error(f"清理过期任务失败: {str(e)}")
         logger.error(f"错误堆栈: {traceback.format_exc()}")
-
-
-
 
 
 @app.get("/health")
@@ -1217,16 +1220,16 @@ async def health_check():
         # 检查邮件回复队列状态
         queue_length = redis_client.llen(EMAIL_REPLY_QUEUE)
         worker_count = len(worker_threads)
-        
+
         # 统计任务状态
         task_keys = redis_client.keys("email_reply_task:*")
         task_stats = {"queued": 0, "processing": 0, "completed": 0, "failed": 0, "unknown": 0}
-        
+
         for task_key in task_keys:
             task_data = redis_client.hgetall(task_key)
             status = task_data.get("status", "unknown")
             task_stats[status] = task_stats.get(status, 0) + 1
-        
+
         return {
             "status": "healthy",
             "agent_initialized": agent is not None,
@@ -1321,6 +1324,60 @@ async def send_message_endpoint(request: MessageRequest):
         raise HTTPException(
             status_code=500, detail=f"Error processing message: {str(e)}"
         )
+
+@app.post("/workflow/extract", response_model=WorkflowExtractionResponse)
+async def extract_workflow(request: WorkflowExtractionRequest):
+    """
+    工作流程提取接口
+
+    一次性完成：
+    1. 分析邮件/请求内容
+    2. 提取关键问题和信息
+    3. 从 procedural_memory 查询匹配的工作流程
+    4. 返回结构化的完整工作流程
+    """
+    try:
+        # 参数验证
+        if not request.user_id.strip():
+            raise HTTPException(status_code=400, detail="user_id不能为空")
+        if not request.content.strip():
+            raise HTTPException(status_code=400, detail="content不能为空")
+
+        logger.info(f"[WORKFLOW_API] 开始处理工作流程提取 - user_id: {request.user_id}, content_length: {len(request.content)}")
+
+        # 检查 agent 是否已初始化
+        if agent is None:
+            raise HTTPException(status_code=500, detail="Agent未初始化")
+
+        # 在后台线程中调用 workflow_agent
+        loop = asyncio.get_event_loop()
+        workflow_result = await loop.run_in_executor(
+            None,
+            lambda: agent.extract_workflow(
+                content=request.content,
+                user_id=request.user_id
+            )
+        )
+
+        # 处理响应
+        if workflow_result is None or (isinstance(workflow_result, str) and workflow_result.strip() == ""):
+            logger.error("[WORKFLOW_API] 返回空响应")
+            raise HTTPException(status_code=500, detail="工作流程提取失败：返回空内容")
+
+        if isinstance(workflow_result, str) and workflow_result.startswith("ERROR"):
+            logger.error(f"[WORKFLOW_API] 返回错误: {workflow_result}")
+            raise HTTPException(status_code=500, detail=f"工作流程提取失败: {workflow_result}")
+
+        logger.info(f"[WORKFLOW_API] 工作流程提取成功 - 类型: {type(workflow_result).__name__}")
+
+        return WorkflowExtractionResponse(workflow_result=workflow_result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[WORKFLOW_API] 处理失败: {str(e)}")
+        logger.error(f"[WORKFLOW_API] 错误堆栈: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"工作流程提取失败: {str(e)}")
 
 
 @app.post("/send_streaming_message")
@@ -2960,26 +3017,26 @@ async def reply_to_email(request: EmailReplyRequest):
 
         if not request.email_content.strip():
             raise HTTPException(status_code=400, detail="email_content不能为空")
-            
+
         if not request.category_list.strip():
             raise HTTPException(status_code=400, detail="category_list不能为空")
-            
+
         if not request.email_basic_id.strip():
             raise HTTPException(status_code=400, detail="email_basic_id不能为空")
-            
+
         if not request.callback_url.strip():
             raise HTTPException(status_code=400, detail="callback_url不能为空")
 
         # 生成任务ID（使用MD5）
         task_id = generate_task_id(request.user_id, request.email_basic_id, request.email_content)
-        
+
         # 检查任务是否已存在
         task_key = f"email_reply_task:{task_id}"
         existing_task = redis_client.hgetall(task_key)
-        
+
         if existing_task:
             existing_status = existing_task.get("status", "unknown")
-            
+
             # 如果任务状态是成功或执行中，返回现有任务信息
             if existing_status in ["completed", "processing"]:
                 logger.info(f"任务 {task_id} 已存在且状态为 {existing_status}，返回现有任务信息")
@@ -2988,16 +3045,16 @@ async def reply_to_email(request: EmailReplyRequest):
                     status=existing_status,
                     message=f"任务已存在，状态: {existing_status}"
                 )
-            
+
             # 如果任务状态不是成功也不是执行中，删除现有任务并重新创建
             else:
                 logger.info(f"任务 {task_id} 已存在但状态为 {existing_status}，删除并重新创建")
                 redis_client.delete(task_key)
-                
+
                 # 如果任务在队列中，也需要尝试移除（虽然可能不在队列中）
                 # 注意：Redis列表的移除操作比较复杂，这里我们让工作线程处理重复任务
                 logger.info(f"已删除状态为 {existing_status} 的任务 {task_id}，将创建新任务")
-        
+
         # 将任务信息存储到Redis
         task_data = {
             "task_id": task_id,
@@ -3010,11 +3067,11 @@ async def reply_to_email(request: EmailReplyRequest):
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
-        
+
         redis_client.hset(task_key, mapping=task_data)
         # 设置过期时间为1小时
         redis_client.expire(task_key, 3600)
-        
+
         # 将任务放入Redis队列
         queue_data = {
             "task_id": task_id,
@@ -3025,9 +3082,9 @@ async def reply_to_email(request: EmailReplyRequest):
             "callback_url": request.callback_url
         }
         redis_client.rpush(EMAIL_REPLY_QUEUE, json.dumps(queue_data))
-        
+
         logger.info(f"邮件回复任务已排队: {task_id}")
-        
+
         return EmailReplyResponse(
             task_id=task_id,
             status="queued",
@@ -3041,25 +3098,27 @@ async def reply_to_email(request: EmailReplyRequest):
         logger.error(f"[EMAIL_REPLY_API] 错误堆栈: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"邮件回复任务创建失败: {str(e)}")
 
+        raise HTTPException(status_code=500, detail=f"邮件回复任务创建失败: {str(e)}")
+
 
 @app.get("/email/reply/status/{task_id}")
 async def get_email_reply_status(task_id: str):
     """
     查询邮件回复任务状态
-    
+
     参数:
     - task_id: 任务ID
-    
+
     返回:
     - 任务状态信息
     """
     try:
         task_key = f"email_reply_task:{task_id}"
         task_data = redis_client.hgetall(task_key)
-        
+
         if not task_data:
             raise HTTPException(status_code=404, detail="任务不存在或已完成")
-        
+
         return {
             "task_id": task_id,
             "status": task_data.get("status", "unknown"),
@@ -3068,7 +3127,7 @@ async def get_email_reply_status(task_id: str):
             "error": task_data.get("error"),
             "callback_error": task_data.get("callback_error")
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -3104,11 +3163,11 @@ async def get_email_queue_status():
     try:
         queue_length = redis_client.llen(EMAIL_REPLY_QUEUE)
         worker_count = len(worker_threads)
-        
+
         # 获取所有任务详情
         task_keys = redis_client.keys("email_reply_task:*")
         tasks = []
-        
+
         for task_key in task_keys[:50]:  # 限制返回最多50个任务
             task_data = redis_client.hgetall(task_key)
             if task_data:
@@ -3120,14 +3179,14 @@ async def get_email_queue_status():
                     "user_id": task_data.get("user_id"),
                     "email_basic_id": task_data.get("email_basic_id")
                 })
-        
+
         return {
             "queue_length": queue_length,
             "worker_threads": worker_count,
             "total_tasks": len(task_keys),
             "tasks": tasks
         }
-        
+
     except Exception as e:
         logger.error(f"获取队列状态失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"获取队列状态失败: {str(e)}")

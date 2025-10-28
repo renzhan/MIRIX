@@ -205,6 +205,7 @@ def search_in_memory(
                 "entry_type": x.entry_type,
                 "summary": x.summary,
                 "steps": x.steps,
+                "email_tag": x.email_tag if hasattr(x, 'email_tag') else [],
             }
             for x in procedural_memories
         ]

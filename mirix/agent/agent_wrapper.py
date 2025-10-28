@@ -6,6 +6,7 @@ import threading
 import time
 import uuid
 from datetime import datetime
+from typing import Optional
 
 import pytz
 import yaml
@@ -150,6 +151,8 @@ class AgentWrapper:
 
                 elif agent_state.name == 'email_reply_agent':
                     self.agent_states.email_reply_agent_state = agent_state
+                elif agent_state.name == "workflow_agent":
+                    self.agent_states.workflow_agent_state = agent_state
 
                 if self.system_prompt_folder is not None and os.path.exists(os.path.join(self.system_prompt_folder, agent_state.name + ".txt")):
                     system_prompt = gpt_system.get_system_text(os.path.join(self.system_prompt_folder, agent_state.name))
@@ -219,7 +222,25 @@ class AgentWrapper:
                 )
                 setattr(
                     self.agent_states, "email_reply_agent_state", email_reply_agent_state
-                )   
+                )
+
+            if self.agent_states.workflow_agent_state is None:
+                if self.system_prompt_folder is not None and os.path.exists(os.path.join(self.system_prompt_folder, "workflow_agent.txt")):
+                    workflow_system_prompt = gpt_system.get_system_text(
+                        os.path.join(self.system_prompt_folder, "workflow_agent")
+                    )
+                else:
+                    workflow_system_prompt = gpt_system.get_system_text("base/workflow_agent")
+                workflow_agent_state = self.client.create_agent(
+                    name="workflow_agent",
+                    agent_type=AgentType.workflow_agent,
+                    memory=self.agent_states.agent_state.memory,
+                    system=workflow_system_prompt,
+                    include_base_tools=True,
+                )
+                setattr(
+                    self.agent_states, "workflow_agent_state", workflow_agent_state
+                )
 
 
         else:
@@ -1109,6 +1130,8 @@ class AgentWrapper:
             "resource_memory_agent",
             "reflexion_agent",
             "background_agent",
+            "email_reply_agent",
+            "workflow_agent",
         ]
 
         for agent_state in self.client.list_agents():
@@ -2205,6 +2228,73 @@ Please perform this analysis and create new memories as appropriate. Provide a d
                 )
 
             return response_text
+
+    def extract_workflow(self, content: str, user_id: Optional[str] = None):
+        """
+        使用 workflow_agent 提取工作流程
+        
+        Args:
+            content: 需要分析的邮件内容或问题描述
+            user_id: 用户ID
+            
+        Returns:
+            str: 结构化的工作流程响应
+        """
+        # 使用 message_queue 发送消息给 workflow_agent
+        response, _ = self.message_queue.send_message_in_queue(
+            self.client,
+            self.agent_states.workflow_agent_state.id,
+            {
+                "user_id": user_id,
+                "message": content,
+                "display_intermediate_message": None,
+                "request_user_confirmation": None,
+                "force_response": True,
+                "existing_file_uris": set(),
+                "extra_messages": None,
+            },
+            agent_type="workflow",
+        )
+        
+        # 检查响应错误
+        if response == "ERROR":
+            return "ERROR_RESPONSE_FAILED"
+        
+        # 检查响应结构
+        if not hasattr(response, "messages") or len(response.messages) < 2:
+            return "ERROR_INVALID_RESPONSE_STRUCTURE"
+        
+        try:
+            # 提取工具调用的数量
+            num_tools_called = 0
+            for message in response.messages[::-1]:
+                if message.message_type == MessageType.tool_return_message:
+                    num_tools_called += 1
+                else:
+                    break
+            
+            # 获取 tool_call
+            if not hasattr(response.messages[-(num_tools_called * 2 + 1)], "tool_call"):
+                return "ERROR_NO_TOOL_CALL"
+            
+            tool_call = response.messages[-(num_tools_called * 2 + 1)].tool_call
+            parsed_args = parse_json(tool_call.arguments)
+            
+            if "message" not in parsed_args:
+                return "ERROR_NO_MESSAGE_IN_ARGS"
+            
+            response_text = parsed_args["message"]
+            
+            # 尝试解析 JSON 字符串为对象
+            try:
+                workflow_result = json.loads(response_text)
+                return workflow_result
+            except json.JSONDecodeError:
+                # 如果不是 JSON，返回原始文本
+                return response_text
+            
+        except (AttributeError, KeyError, IndexError, json.JSONDecodeError) as e:
+            return f"ERROR_PARSING_EXCEPTION: {str(e)}"
 
     def cleanup_upload_workers(self):
         """Delegate to UploadManager for cleanup."""
