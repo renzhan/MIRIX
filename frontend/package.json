@@ -30,7 +30,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build && npm run create-nested-structure",
+    "build": "NODE_ENV=development react-scripts build && npm run create-nested-structure",
     "create-nested-structure": "node scripts/create-nested-build.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
