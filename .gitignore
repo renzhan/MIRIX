@@ -33,3 +33,4 @@ mirix.egg-info
 .local
 .venv/
 .idea/
+.env
