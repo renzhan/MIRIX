@@ -30,6 +30,9 @@ class User(UserBase):
     name: str = Field(..., description="The name of the user.")
     status: str = Field("active", description="Whether the user is active or not.")
     timezone: str = Field(..., description="The timezone of the user.")
+    email_account: Optional[str] = Field(
+        default=None, description="The email account (address) of the user."
+    )
     created_at: Optional[datetime] = Field(
         default_factory=datetime.utcnow, description="The creation date of the user."
     )
@@ -44,6 +47,9 @@ class UserCreate(UserBase):
     status: str = Field("active", description="Whether the user is active or not.")
     timezone: str = Field(..., description="The timezone of the user.")
     organization_id: str = Field(..., description="The organization id of the user.")
+    email_account: Optional[str] = Field(
+        default=None, description="The email account (address) of the user."
+    )
 
 
 class UserUpdate(UserBase):
@@ -53,4 +59,7 @@ class UserUpdate(UserBase):
     timezone: Optional[str] = Field(None, description="The new timezone of the user.")
     organization_id: Optional[str] = Field(
         None, description="The new organization id of the user."
+    )
+    email_account: Optional[str] = Field(
+        None, description="The email account (address) of the user."
     )
