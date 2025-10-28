@@ -47,6 +47,7 @@ try {
     }
   });
 
+  console.log('process.env.REACT_APP_API_URLprocess.env.REACT_APP_API_URL', process.env)
   // 更新 index.html 中的路径引用，指向 aiop-pams 目录
   const indexPath = path.join(buildDir, 'index.html');
   if (fs.existsSync(indexPath)) {
