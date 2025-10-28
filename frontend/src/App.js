@@ -18,7 +18,8 @@ function App() {
     model: 'gpt-4o-mini',
     persona: 'helpful_assistant',
     timezone: 'America/New_York',
-    serverUrl: process.env.REACT_APP_API_URL || 'http://localhost:47283/pams'
+    serverUrl: 'https://aiop-dev.item.pub/pams'
+    // || 'http://localhost:47283/pams'
   });
 
   // Lift chat messages state to App level to persist across tab switches
