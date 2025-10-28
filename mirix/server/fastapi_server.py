@@ -1,3 +1,4 @@
+﻿# -*- coding: utf-8 -*-
 import asyncio
 import json
 import logging
@@ -30,6 +31,7 @@ from ..services.mcp_marketplace import get_mcp_marketplace
 from ..services.mcp_tool_registry import get_mcp_tool_registry
 from ..utils import parse_json
 from ..schemas.mirix_message import MessageType
+
 
 def _setup_logging():
     """Configure logging with flexible output options (console/file/both)."""
@@ -118,9 +120,12 @@ def _setup_logging():
         logging.basicConfig(level=logging.INFO)
         print(f"日志配置失败，使用基础配置: {e}")
 
+
 _setup_logging()
 
 logger = logging.getLogger(__name__)
+
+
 # User context switching utilities
 def switch_user_context(agent_wrapper, user_id: str):
     """Switch agent's user context and manage user status"""
@@ -152,7 +157,7 @@ def get_user_or_default(agent_wrapper, user_id: Optional[str] = None):
 
 
 async def handle_gmail_connection(
-    client_id: str, client_secret: str, server_name: str
+        client_id: str, client_secret: str, server_name: str
 ) -> bool:
     """
     Handle Gmail OAuth2 authentication and MCP connection
@@ -330,6 +335,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 def register_mcp_tools_for_restored_connections():
     """Register tools for MCP connections that were restored on startup"""
     try:
@@ -467,7 +473,9 @@ confirmation_queues = {}
 # Flag to track if MCP tools have been registered for restored connections
 _mcp_tools_registered = False
 
-def process_email_reply_task(task_id: str, email_content: str, category_list: str, user_id: str, email_basic_id: str, callback_url: str):
+
+def process_email_reply_task(task_id: str, email_content: str, category_list: str, user_id: str, email_basic_id: str,
+                             callback_url: str):
     """后台处理邮件回复任务"""
     processing_start_time = time.time()
 
@@ -509,7 +517,8 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         if response == "ERROR":
             actual_processing_time = time.time() - processing_start_time
             total_time = time.time() - created_at.timestamp()
-            logger.info(f"任务 {task_id} 处理失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+            logger.info(
+                f"任务 {task_id} 处理失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
 
             result = {
                 "status": "error",
@@ -526,7 +535,8 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         elif not hasattr(response, "messages") or len(response.messages) < 2:
             actual_processing_time = time.time() - processing_start_time
             total_time = time.time() - created_at.timestamp()
-            logger.info(f"任务 {task_id} 响应结构无效 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+            logger.info(
+                f"任务 {task_id} 响应结构无效 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
 
             result = {
                 "status": "error",
@@ -553,7 +563,8 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                 if not hasattr(response.messages[-(num_tools_called * 2 + 1)], "tool_call"):
                     actual_processing_time = time.time() - processing_start_time
                     total_time = time.time() - created_at.timestamp()
-                    logger.info(f"任务 {task_id} 缺少工具调用 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+                    logger.info(
+                        f"任务 {task_id} 缺少工具调用 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
 
                     result = {
                         "status": "error",
@@ -574,7 +585,8 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                     if "message" not in parsed_args:
                         actual_processing_time = time.time() - processing_start_time
                         total_time = time.time() - created_at.timestamp()
-                        logger.info(f"任务 {task_id} 缺少消息内容 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+                        logger.info(
+                            f"任务 {task_id} 缺少消息内容 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
 
                         result = {
                             "status": "error",
@@ -611,7 +623,8 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             except Exception as e:
                 actual_processing_time = time.time() - processing_start_time
                 total_time = time.time() - created_at.timestamp()
-                logger.info(f"任务 {task_id} 解析响应失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+                logger.info(
+                    f"任务 {task_id} 解析响应失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
 
                 result = {
                     "status": "error",
@@ -655,7 +668,8 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             total_time = actual_processing_time
 
         logger.error(f"处理邮件回复任务失败: {task_id}, 错误: {str(e)}")
-        logger.info(f"任务 {task_id} 异常失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+        logger.info(
+            f"任务 {task_id} 异常失败 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
 
         # 更新任务状态为失败
         task_key = f"email_reply_task:{task_id}"
@@ -810,13 +824,15 @@ class ScreenshotSettingResponse(BaseModel):
     include_recent_screenshots: bool
     message: str
 
+
 class WorkflowExtractionRequest(BaseModel):
     content: str
-    user_id: str
+    email_account: str
 
 
 class WorkflowExtractionResponse(BaseModel):
     workflow_result: Any  # 可以是字典或字符串
+
 
 # API Key validation functionality
 def get_required_api_keys_for_model(model_endpoint_type: str) -> List[str]:
@@ -951,14 +967,16 @@ class ReflexionResponse(BaseModel):
 class EmailReplyRequest(BaseModel):
     email_content: str
     category_list: str
-    user_id: str
+    email_account: str
     email_basic_id: str
     callback_url: str  # 回调地址
+
 
 class EmailReplyResponse(BaseModel):
     task_id: str
     status: str
     message: str
+
 
 # Redis连接
 redis_port_str = os.getenv('REDIS_PORT', '6379')
@@ -981,10 +999,12 @@ EMAIL_REPLY_QUEUE = "email_reply_queue"
 worker_threads = []
 worker_shutdown_event = threading.Event()
 
+
 def generate_task_id(user_id: str, email_basic_id: str, email_content: str) -> str:
     """根据用户ID和邮件内容生成MD5任务ID"""
     content = f"{user_id}:{email_basic_id}:{email_content}"
     return hashlib.md5(content.encode('utf-8')).hexdigest()
+
 
 def email_reply_worker():
     """邮件回复工作线程"""
@@ -1036,6 +1056,7 @@ def email_reply_worker():
 
     logger.info(f"邮件回复工作线程退出: {threading.current_thread().name}")
 
+
 def start_email_reply_workers():
     """启动邮件回复工作线程池"""
     global worker_threads
@@ -1049,13 +1070,14 @@ def start_email_reply_workers():
     for i in range(thread_count):
         thread = threading.Thread(
             target=email_reply_worker,
-            name=f"EmailReplyWorker-{i+1}",
+            name=f"EmailReplyWorker-{i + 1}",
             daemon=True
         )
         thread.start()
         worker_threads.append(thread)
 
     logger.info(f"邮件回复工作线程池启动完成，共 {len(worker_threads)} 个线程")
+
 
 def stop_email_reply_workers():
     """停止邮件回复工作线程池"""
@@ -1070,6 +1092,7 @@ def stop_email_reply_workers():
 
     worker_threads.clear()
     logger.info("邮件回复工作线程池已停止")
+
 
 def recover_email_reply_tasks():
     """恢复邮件回复队列中的任务"""
@@ -1151,6 +1174,7 @@ def recover_email_reply_tasks():
     except Exception as e:
         logger.error(f"恢复邮件回复队列失败: {str(e)}")
         logger.error(f"错误堆栈: {traceback.format_exc()}")
+
 
 def cleanup_expired_email_tasks():
     """清理过期的邮件回复任务"""
@@ -1325,6 +1349,7 @@ async def send_message_endpoint(request: MessageRequest):
             status_code=500, detail=f"Error processing message: {str(e)}"
         )
 
+
 @app.post("/workflow/extract", response_model=WorkflowExtractionResponse)
 async def extract_workflow(request: WorkflowExtractionRequest):
     """
@@ -1338,24 +1363,28 @@ async def extract_workflow(request: WorkflowExtractionRequest):
     """
     try:
         # 参数验证
-        if not request.user_id.strip():
-            raise HTTPException(status_code=400, detail="user_id不能为空")
+        if not request.email_account.strip():
+            raise HTTPException(status_code=400, detail="email_account不能为空")
         if not request.content.strip():
             raise HTTPException(status_code=400, detail="content不能为空")
 
-        logger.info(f"[WORKFLOW_API] 开始处理工作流程提取 - user_id: {request.user_id}, content_length: {len(request.content)}")
+        logger.info(
+            f"[WORKFLOW_API] 开始处理工作流程提取 - email_account: {request.email_account}, content_length: {len(request.content)}")
 
         # 检查 agent 是否已初始化
         if agent is None:
             raise HTTPException(status_code=500, detail="Agent未初始化")
 
-        # 在后台线程中调用 workflow_agent
+        # 解析/创建用户并在后台线程中调用 workflow_agent
+        user = agent.client.server.user_manager.get_or_create_user_by_email(request.email_account)
+        resolved_user_id = user.id
+
         loop = asyncio.get_event_loop()
         workflow_result = await loop.run_in_executor(
             None,
             lambda: agent.extract_workflow(
                 content=request.content,
-                user_id=request.user_id
+                user_id=resolved_user_id
             )
         )
 
@@ -1557,7 +1586,7 @@ async def send_streaming_message_endpoint(request: MessageRequest):
                             {"type": "error", "error": "Agent processing failed"}
                         )
                     elif not response or (
-                        isinstance(response, str) and response.strip() == ""
+                            isinstance(response, str) and response.strip() == ""
                     ):
                         if request.memorizing:
                             print(
@@ -2288,9 +2317,9 @@ async def get_procedural_memory(user_id: Optional[str] = None):
                         steps = json.loads(steps)
                         # Extract just the instruction text for simpler frontend display
                         if (
-                            isinstance(steps, list)
-                            and steps
-                            and isinstance(steps[0], dict)
+                                isinstance(steps, list)
+                                and steps
+                                and isinstance(steps[0], dict)
                         ):
                             steps = [
                                 step.get("instruction", str(step)) for step in steps
@@ -2357,11 +2386,11 @@ async def get_resource_memory(user_id: Optional[str] = None):
                     "filename": resource.title,
                     "type": resource.resource_type,
                     "summary": resource.summary
-                    or (
-                        resource.content[:200] + "..."
-                        if len(resource.content) > 200
-                        else resource.content
-                    ),
+                               or (
+                                   resource.content[:200] + "..."
+                                   if len(resource.content) > 200
+                                   else resource.content
+                               ),
                     "last_accessed": resource.updated_at.isoformat()
                     if resource.updated_at
                     else None,
@@ -2390,18 +2419,18 @@ async def get_core_memory(user_id: Optional[str] = None):
     try:
         # Get target user based on user_id parameter
         target_user = get_user_or_default(agent, user_id)
-        
+
         # Directly query blocks table by user_id
         from mirix.orm import Block
         from mirix.server.server import db_context
         from sqlalchemy import select
-        
+
         print(f"🔍 查询核心记忆 - user_id: {target_user.id}, user_name: {target_user.name}")
-        
+
         with db_context() as session:
             stmt = select(Block).where(Block.user_id == target_user.id)
             blocks = session.execute(stmt).scalars().all()
-            
+
             print(f"🔍 查询到 {len(blocks)} 个 blocks:")
             for b in blocks:
                 value_preview = b.value[:100] if b.value else 'None'
@@ -2447,7 +2476,7 @@ async def get_credentials_memory(user_id: Optional[str] = None):
     try:
         # Get target user based on user_id parameter
         target_user = get_user_or_default(agent, user_id)
-        
+
         client = agent.client
         knowledge_vault_manager = client.server.knowledge_vault_manager
 
@@ -2998,8 +3027,8 @@ async def reply_to_email(request: EmailReplyRequest):
     参数:
     - email_content: 需要回复的邮件内容（必需）
     - category_list: 邮件分类（必需）
-    - user_id: 用户标识（必需）
-    - email_basic_id: email标识（必需）
+    - email_account: 用户邮箱账户（必需）
+    - email_basic_id: 邮件标识（必需）
     - callback_url: 回调地址（必需）
 
     返回:
@@ -3012,8 +3041,8 @@ async def reply_to_email(request: EmailReplyRequest):
 
     try:
         # 参数验证
-        if not request.user_id.strip():
-            raise HTTPException(status_code=400, detail="user_id不能为空")
+        if not request.email_account.strip():
+            raise HTTPException(status_code=400, detail="email_account不能为空")
 
         if not request.email_content.strip():
             raise HTTPException(status_code=400, detail="email_content不能为空")
@@ -3027,8 +3056,15 @@ async def reply_to_email(request: EmailReplyRequest):
         if not request.callback_url.strip():
             raise HTTPException(status_code=400, detail="callback_url不能为空")
 
+        # 解析邮箱账户为用户ID（若不存在则创建）
+        try:
+            user_id = agent.client.server.user_manager.get_id_by_email(request.email_account)
+        except Exception:
+            user = agent.client.server.user_manager.get_or_create_user_by_email(request.email_account)
+            user_id = user.id
+
         # 生成任务ID（使用MD5）
-        task_id = generate_task_id(request.user_id, request.email_basic_id, request.email_content)
+        task_id = generate_task_id(user_id, request.email_basic_id, request.email_content)
 
         # 检查任务是否已存在
         task_key = f"email_reply_task:{task_id}"
@@ -3060,7 +3096,7 @@ async def reply_to_email(request: EmailReplyRequest):
             "task_id": task_id,
             "email_content": request.email_content,
             "category_list": request.category_list,
-            "user_id": request.user_id,
+            "user_id": user_id,
             "email_basic_id": request.email_basic_id,
             "callback_url": request.callback_url,
             "status": "queued",
@@ -3077,7 +3113,7 @@ async def reply_to_email(request: EmailReplyRequest):
             "task_id": task_id,
             "email_content": request.email_content,
             "category_list": request.category_list,
-            "user_id": request.user_id,
+            "user_id": user_id,
             "email_basic_id": request.email_basic_id,
             "callback_url": request.callback_url
         }
@@ -3196,7 +3232,7 @@ async def get_email_queue_status():
 async def process_mysql_email(request: ProcessMysqlEmailRequest):
     """
     处理MySQL阿里云数据库的邮件数据
-    
+
     该接口接收结构化的邮件数据，调用 Meta Memory Agent 进行分析，
     并返回触发的 memory agents 和处理时间。
     """
@@ -3204,14 +3240,14 @@ async def process_mysql_email(request: ProcessMysqlEmailRequest):
         # 检查agent是否已初始化
         if agent is None or not hasattr(agent, 'agent_states'):
             raise HTTPException(status_code=500, detail="Agent未初始化")
-        
+
         # 验证参数
         if not request.email_data:
             raise HTTPException(status_code=400, detail="缺少required参数: email_data")
-        
+
         email_data = request.email_data
         user_id = request.user_id
-        
+
         # 验证邮件数据字段
         required_fields = ['id', 'subject', 'content_text', 'sent_date_time']
         for field in required_fields:
@@ -3220,15 +3256,15 @@ async def process_mysql_email(request: ProcessMysqlEmailRequest):
                     status_code=400,
                     detail=f"邮件数据缺少必需字段: {field}"
                 )
-        
+
         # 构建统一的数据格式
         email_id = str(email_data['id'])
         conversation_id = str(email_data.get('conversation_id', ''))
         user_email_account = email_data.get('user_email_account', '未知邮箱账户')
-        
+
         # 加载提示词并构造消息
         email_analysis_prompt = gpt_system.get_system_text("base/meta_memory_agent")
-        
+
         # 构建参与者信息
         participants_info = []
         if email_data.get('senders'):
@@ -3243,13 +3279,13 @@ async def process_mysql_email(request: ProcessMysqlEmailRequest):
             participants_info.append(f"密送: {email_data['bcc_recipients']}")
         if email_data.get('reply_to'):
             participants_info.append(f"回复地址: {email_data['reply_to']}")
-        
+
         participants_text = '\n'.join(participants_info) if participants_info else '参与者信息不完整'
-        
+
         # 获取邮件分类信息
         category_name = email_data.get('category_name', '未分类')
         source_category_text = f"\n- 📂 邮件分类: {category_name}" if category_name and category_name != '未分类' else ""
-        
+
         email_content_message = f"""
 邮件内容分析请求：
 
@@ -3269,10 +3305,10 @@ async def process_mysql_email(request: ProcessMysqlEmailRequest):
 🎯 请根据上述邮件内容，作为Meta Memory Manager进行分析并协调相应的记忆管理器。
 {f'📌 注意：此邮件属于"{category_name}"分类，请在相关记忆中使用此分类作为 source_category 标签。' if category_name and category_name != '未分类' else ''}
 """
-        
+
         # 构造完整的分析消息（提示词 + 邮件数据）
         full_analysis_message = f"{email_analysis_prompt}\n\n{email_content_message}"
-        
+
         # 调用Meta Memory Agent处理
         agent_states = agent.agent_states
         if agent_states.meta_memory_agent_state is None:
@@ -3280,14 +3316,14 @@ async def process_mysql_email(request: ProcessMysqlEmailRequest):
                 status_code=500,
                 detail="Meta Memory Agent not initialized"
             )
-        
+
         meta_agent_id = agent_states.meta_memory_agent_state.id
         start_time = datetime.now()
         meta_response = None
-        
+
         try:
             loop = asyncio.get_event_loop()
-            
+
             # 🎯 确定用于记忆存储的用户ID
             active_user_id = None
             if user_id:
@@ -3306,11 +3342,11 @@ async def process_mysql_email(request: ProcessMysqlEmailRequest):
                         logger.warning("⚠️ 未找到活跃用户，使用系统默认用户")
                 except Exception as e:
                     logger.error(f"❌ 查询活跃用户失败，使用系统默认用户: {e}")
-            
+
             # 创建消息队列以启用Memory Agent并发处理
             message_queue = MessageQueue()
             agent_client = agent.client
-            
+
             meta_response = await loop.run_in_executor(
                 None,
                 lambda: agent_client.send_message(
@@ -3322,15 +3358,15 @@ async def process_mysql_email(request: ProcessMysqlEmailRequest):
                     user_id=active_user_id  # 🎯 传递活跃用户ID
                 )
             )
-            
+
         except Exception as e:
             logger.error(f"❌ Meta Memory Agent调用失败: {e}")
             meta_response = None
-        
+
         # 从Meta Memory Agent响应中提取信息
         triggered_count = 0
         triggered_memory_types = []
-        
+
         if meta_response and hasattr(meta_response, 'messages') and meta_response.messages:
             # 从tool_call中提取memory_types
             for msg in meta_response.messages:
@@ -3340,13 +3376,14 @@ async def process_mysql_email(request: ProcessMysqlEmailRequest):
                         if 'memory_types' in args:
                             triggered_memory_types = args['memory_types']
                             triggered_count = len(triggered_memory_types)
-                            logger.info(f"✅ 从tool_call提取成功: {triggered_count} agents, types: {triggered_memory_types}")
+                            logger.info(
+                                f"✅ 从tool_call提取成功: {triggered_count} agents, types: {triggered_memory_types}")
                             break
                     except Exception as e:
                         logger.error(f"❌ 解析tool_call失败: {e}")
-        
+
         processing_time = (datetime.now() - start_time).total_seconds()
-        
+
         return ProcessMysqlEmailResponse(
             status="success",
             message=f"MySQL邮件处理完成：{user_email_account}",
@@ -3357,15 +3394,15 @@ async def process_mysql_email(request: ProcessMysqlEmailRequest):
             triggered_memory_types=triggered_memory_types,
             processing_time=f"{processing_time:.2f}s"
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         processing_time = (datetime.now() - start_time).total_seconds() if 'start_time' in locals() else 0
         email_id_display = email_data.get('id', 'unknown') if 'email_data' in locals() else "unknown"
-        
+
         logger.error(f"❌ MySQL邮件处理失败: {email_id_display} | {str(e)}")
-        
+
         raise HTTPException(
             status_code=500,
             detail=f"MySQL邮件处理失败: {str(e)}"
@@ -3376,3 +3413,4 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=47283)
+

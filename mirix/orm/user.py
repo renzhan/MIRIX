@@ -25,6 +25,9 @@ class User(SqlalchemyBase, OrganizationMixin):
     timezone: Mapped[str] = mapped_column(
         nullable=False, doc="The timezone of the user."
     )
+    email_account: Mapped[str] = mapped_column(
+        nullable=True, doc="The email account (address) of the user."
+    )
 
     # relationships
     organization: Mapped["Organization"] = relationship(

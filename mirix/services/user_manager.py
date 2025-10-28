@@ -136,10 +136,45 @@ class UserManager:
         if not user_id:
             return self.get_default_user()
 
-        try:
-            return self.get_user_by_id(user_id=user_id)
-        except NoResultFound:
-            return self.get_default_user()
+    @enforce_types
+    def get_id_by_email(self, email_account: str) -> str:
+        """Get user id by email_account.
+
+        Raises:
+            NoResultFound: if no user exists with the given email_account
+        """
+        with self.session_maker() as session:
+            user = UserModel.read(db_session=session, email_account=email_account)
+            return user.id
+
+    @enforce_types
+    def get_or_create_user_by_email(self, email_account: str, name: Optional[str] = None) -> PydanticUser:
+        """Get a user by email_account or create one if not found.
+
+        - Name defaults to the part before '@' in email_account.
+        - Uses default timezone and organization_id.
+        """
+        local_name = name
+        if not local_name:
+            local_name = email_account.split("@")[0] if "@" in email_account else email_account
+
+        with self.session_maker() as session:
+            try:
+                user = UserModel.read(db_session=session, email_account=email_account)
+                return user.to_pydantic()
+            except NoResultFound:
+                # Create new user
+                new_user = UserModel(
+                    id=PydanticUser._generate_id(PydanticUser.__id_prefix__),
+                    name=local_name,
+                    status="active",
+                    timezone=self.DEFAULT_TIME_ZONE,
+                    organization_id=OrganizationManager.DEFAULT_ORG_ID,
+                    email_account=email_account,
+                )
+                new_user.create(session)
+                return new_user.to_pydantic()
+
 
     @enforce_types
     def list_users(
