@@ -520,6 +520,12 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         ).start()
 
         # 执行邮件回复生成
+        absorb_content = f"""
+        {email_content}
+             
+        {f'  📌 注意：此邮件类别列表category_list为："{category_list}"。' if category_list and category_list != '未分类' else ''}
+        """
+
         response, _ = agent.message_queue.send_message_in_queue(
             agent.client,
             agent.agent_states.email_reply_agent_state.id,
