@@ -523,7 +523,8 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         absorb_content = f"""
         {email_content}
              
-        {f'  📌 注意：此邮件类别列表category_list为："{category_list}"。' if category_list and category_list != '未分类' else ''}
+        {f'  📌 注意：此邮件类别列表category_list为："{category_list}"， email_intent_category字段优先按照给出的类别列表选择其一。' if category_list and category_list != '未分类' else ''}
+
         """
 
         response, _ = agent.message_queue.send_message_in_queue(
