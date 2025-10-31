@@ -35,3 +35,4 @@ mirix.egg-info
 .idea/
 .env
 api_backend.log
+user_data_export/
