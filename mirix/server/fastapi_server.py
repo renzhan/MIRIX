@@ -3061,6 +3061,8 @@ async def reply_to_email(request: EmailReplyRequest):
     - status: 任务状态
     - message: 状态描述
     """
+    request_start_time = time.time()
+    
     if agent is None:
         raise HTTPException(status_code=500, detail="Agent not initialized")
 
@@ -3145,6 +3147,9 @@ async def reply_to_email(request: EmailReplyRequest):
         redis_client.rpush(EMAIL_REPLY_QUEUE, json.dumps(queue_data))
 
         logger.info(f"邮件回复任务已排队: {task_id}")
+
+        request_total_time = time.time() - request_start_time
+        logger.info(f"[EMAIL_REPLY_API] 任务 {task_id} 接口处理完成，总耗时: {request_total_time:.3f}秒")
 
         return EmailReplyResponse(
             task_id=task_id,
