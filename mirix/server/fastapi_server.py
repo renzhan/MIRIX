@@ -1452,6 +1452,31 @@ async def extract_workflow(request: WorkflowExtractionRequest):
 
         logger.info(f"[WORKFLOW_API] 工作流程提取成功 - 类型: {type(workflow_result).__name__}")
 
+        # 清理 workflow_agent 的历史消息，只保留 system prompt
+        try:
+            if agent.agent_states.workflow_agent_state:
+                workflow_agent_id = agent.agent_states.workflow_agent_state.id
+                workflow_agent = agent.client.server.agent_manager.get_agent_by_id(
+                    agent_id=workflow_agent_id,
+                    actor=user
+                )
+                
+                # 只保留 message_ids 的第一个元素（system prompt）
+                if len(workflow_agent.message_ids) > 1:
+                    original_count = len(workflow_agent.message_ids)
+                    new_message_ids = [workflow_agent.message_ids[0]]
+                    
+                    agent.client.server.agent_manager.set_in_context_messages(
+                        agent_id=workflow_agent_id,
+                        message_ids=new_message_ids,
+                        actor=user
+                    )
+                    
+                    logger.info(f"[WORKFLOW_API] 已清理 workflow_agent 历史消息: {original_count} -> 1")
+        except Exception as cleanup_error:
+            # 清理失败不影响主流程，只记录日志
+            logger.warning(f"[WORKFLOW_API] 清理 workflow_agent 历史失败: {cleanup_error}")
+
         return WorkflowExtractionResponse(workflow_result=workflow_result)
 
     except HTTPException:
