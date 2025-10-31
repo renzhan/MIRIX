@@ -324,7 +324,25 @@ To fix it, install FFmpeg:
 The warning doesn't affect functionality as pydub falls back gracefully.
 """
 
-app = FastAPI(title="Mirix Agent API", version="0.1.5", root_path="/pams")
+from fastapi.responses import JSONResponse
+
+class PrettyJSONResponse(JSONResponse):
+    """自定义 JSON 响应，使用格式化输出（2 个空格缩进）"""
+    def render(self, content) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=2,
+            separators=(",", ": "),
+        ).encode("utf-8")
+
+app = FastAPI(
+    title="Mirix Agent API", 
+    version="0.1.5", 
+    root_path="/pams",
+    default_response_class=PrettyJSONResponse  # 使用格式化 JSON
+)
 
 # Add CORS middleware
 app.add_middleware(
@@ -412,8 +430,13 @@ async def startup_event():
             # Running in development
             config_path = Path("mirix/configs/mirix_gpt4o.yaml")
 
+        logger.info(f"🔄 开始初始化 AgentWrapper，配置文件：{config_path}")
+        print(f"🔄 开始初始化 AgentWrapper，配置文件：{config_path}")
+        
         agent = AgentWrapper(str(config_path))
-        print("Agent initialized successfully")
+        
+        logger.info("✅ Agent initialized successfully")
+        print("✅ Agent initialized successfully")
 
         # Initialize the MCP client manager (this will auto-restore connections)
         print("🚀 Initializing MCP client manager...")
@@ -449,7 +472,12 @@ async def startup_event():
         # Tool registration will happen later when agent is available
 
     except Exception as e:
-        logger.error(f"Error during startup: {str(e)}")
+        import traceback
+        error_msg = f"Error during startup: {str(e)}\n{traceback.format_exc()}"
+        logger.error(error_msg)
+        print(f"❌ 启动失败：{error_msg}")
+        # Re-raise to make the error more visible
+        raise
 
 
 @app.on_event("shutdown")
@@ -1423,6 +1451,31 @@ async def extract_workflow(request: WorkflowExtractionRequest):
             raise HTTPException(status_code=500, detail=f"工作流程提取失败: {workflow_result}")
 
         logger.info(f"[WORKFLOW_API] 工作流程提取成功 - 类型: {type(workflow_result).__name__}")
+
+        # 清理 workflow_agent 的历史消息，只保留 system prompt
+        try:
+            if agent.agent_states.workflow_agent_state:
+                workflow_agent_id = agent.agent_states.workflow_agent_state.id
+                workflow_agent = agent.client.server.agent_manager.get_agent_by_id(
+                    agent_id=workflow_agent_id,
+                    actor=user
+                )
+                
+                # 只保留 message_ids 的第一个元素（system prompt）
+                if len(workflow_agent.message_ids) > 1:
+                    original_count = len(workflow_agent.message_ids)
+                    new_message_ids = [workflow_agent.message_ids[0]]
+                    
+                    agent.client.server.agent_manager.set_in_context_messages(
+                        agent_id=workflow_agent_id,
+                        message_ids=new_message_ids,
+                        actor=user
+                    )
+                    
+                    logger.info(f"[WORKFLOW_API] 已清理 workflow_agent 历史消息: {original_count} -> 1")
+        except Exception as cleanup_error:
+            # 清理失败不影响主流程，只记录日志
+            logger.warning(f"[WORKFLOW_API] 清理 workflow_agent 历史失败: {cleanup_error}")
 
         return WorkflowExtractionResponse(workflow_result=workflow_result)
 

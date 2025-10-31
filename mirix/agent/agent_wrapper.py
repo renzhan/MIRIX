@@ -2288,6 +2288,8 @@ Please perform this analysis and create new memories as appropriate. Provide a d
             # 尝试解析 JSON 字符串为对象
             try:
                 workflow_result = json.loads(response_text)
+                # 直接返回解析后的 dict，让 FastAPI 自动序列化
+                # FastAPI 会使用默认的 JSON encoder，保持 LLM 返回的格式
                 return workflow_result
             except json.JSONDecodeError:
                 # 如果不是 JSON，返回原始文本
