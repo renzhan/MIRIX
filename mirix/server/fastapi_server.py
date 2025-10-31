@@ -523,7 +523,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         absorb_content = f"""
         {email_content}
              
-        {f'  📌 注意：此邮件类别列表category_list为："{category_list}"， email_intent_category字段优先按照给出的类别列表选择其一。' if category_list and category_list != '未分类' else ''}
+        {f'  📌 注意：此邮件类别为："{category_list}"， 若有必要Procedural记忆则优先按照在{category_list}类别查找相关处理流程。' if category_list and category_list != '未分类' else ''}
 
         """
 
