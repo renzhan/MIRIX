@@ -26,11 +26,11 @@ class ProceduralMemoryItemBase(MirixBase):
         ...,
         description="Hierarchical categorization path as an array of strings (e.g., ['workflows', 'development', 'testing'])",
     )
-    email_tag: List[str] = Field(
+    email_tag: Optional[List[str]] = Field(
         default_factory=list,
         description="Array of email-related tags for categorization",
     )
-    flow_tag: List[str] = Field(
+    flow_tag: Optional[List[str]] = Field(
         default_factory=list,
         description="Array of workflow/flow-related tags for categorization",
     )

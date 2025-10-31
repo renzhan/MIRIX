@@ -13,7 +13,7 @@ class UserManager:
     """Manager class to handle business logic related to Users."""
 
     DEFAULT_USER_NAME = "default_user"
-    DEFAULT_USER_ID = "user-00000000-0000-4000-8000-000000000000"
+    DEFAULT_USER_ID = "user-43a92772-e76b-4e5d-a1bd-3d32992580f9"  # Shelia Sun
     DEFAULT_TIME_ZONE = "UTC (UTC+00:00)"
 
     def __init__(self):
