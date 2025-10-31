@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Optional
-
-from pydantic import Field
+from pydantic import Field, model_validator, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -117,7 +116,7 @@ if "--use-file-pg-uri" in sys.argv:
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="mirix_", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="mirix_", env_file=".env", extra="ignore")
 
     mirix_dir: Optional[Path] = Field(Path.home() / ".mirix", env="MIRIX_DIR")
     # Directory where uploaded/processed images are stored
@@ -144,9 +143,9 @@ class Settings(BaseSettings):
     pg_echo: bool = False  # Logging
 
     # ✅ TASK 1: Redis configuration for temporary message storage (multi-pod user isolation)
-    redis_host: str = "localhost"
-    redis_port: int = 6379
-    redis_password: Optional[str] = None
+    redis_host: str = Field(default='localhost', validation_alias=AliasChoices('REDIS_HOST', 'mirix_redis_host'))
+    redis_port: int = Field(default=6379, validation_alias=AliasChoices('REDIS_PORT', 'mirix_redis_port'))
+    redis_password: Optional[str] = Field(default='aiop123456', validation_alias=AliasChoices('REDIS_PASSWORD', 'mirix_redis_password'))
     redis_db: int = 0
     redis_socket_timeout: float = 5.0
     redis_max_connections: int = 50
@@ -188,6 +187,15 @@ class Settings(BaseSettings):
     # cron job parameters
     enable_batch_job_polling: bool = False
     poll_running_llm_batches_interval_seconds: int = 5 * 60
+
+    @model_validator(mode='after')
+    def parse_redis_port(self):
+        # 处理像 'tcp://host:6379' 这样的输入
+        port_str = self.redis_port
+        if isinstance(port_str, str) and ':' in port_str:
+            port_str = port_str.split(':')[-1]
+        self.redis_port = int(port_str)
+        return self
 
     @property
     def mirix_pg_uri(self) -> str:
