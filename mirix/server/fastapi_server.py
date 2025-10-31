@@ -501,7 +501,32 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
         redis_client.hset(task_key, "processing_start_time", datetime.now().isoformat())
 
+        # 带标签
+        absorb_content = f"""
+        {email_content}
+        
+        请根据上述邮件内容，作为Meta Memory Manager进行分析并协调相应的记忆管理器。
+        {f'📌 注意：此邮件属于"{category_list}"分类，请在相关记忆中使用此分类作为 source_category 标签。' if category_list and category_list != '未分类' else ''}
+        """
+        # 异步执行absorb，不等待结果
+        threading.Thread(
+            target=lambda: agent.send_message(
+                message=absorb_content,
+                memorizing=True,
+                force_absorb_content=True,
+                user_id=user_id
+            ),
+            daemon=True
+        ).start()
+
         # 执行邮件回复生成
+        absorb_content = f"""
+        {email_content}
+             
+        {f'  📌 注意：此邮件类别列表category_list为："{category_list}"， email_intent_category字段优先按照给出的类别列表选择其一。' if category_list and category_list != '未分类' else ''}
+
+        """
+
         response, _ = agent.message_queue.send_message_in_queue(
             agent.client,
             agent.agent_states.email_reply_agent_state.id,
