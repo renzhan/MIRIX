@@ -34,3 +34,4 @@ mirix.egg-info
 .venv/
 .idea/
 .env
+api_backend.log
