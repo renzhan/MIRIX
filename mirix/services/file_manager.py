@@ -90,7 +90,7 @@ class FileManager:
 
     @enforce_types
     def create_file_metadata_from_path(
-        self, file_path: str, organization_id: str, source_id: Optional[str] = None
+        self, file_path: str, organization_id: str, user_id: Optional[str] = None, source_id: Optional[str] = None
     ) -> PydanticFileMetadata:
         """Create file metadata from a file path by extracting file information."""
         if not os.path.exists(file_path):
@@ -129,6 +129,7 @@ class FileManager:
         # Create file metadata
         file_metadata = PydanticFileMetadata(
             organization_id=organization_id,
+            user_id=user_id,
             source_id=source_id,
             file_name=file_name,
             file_path=file_path,

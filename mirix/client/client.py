@@ -513,7 +513,7 @@ class LocalClient(AbstractClient):
 
             # Create FileMetadata
             file_metadata = self.file_manager.create_file_metadata_from_path(
-                file_path=str(file_path), organization_id=self.org_id
+                file_path=str(file_path), organization_id=self.org_id, user_id=self.user_id
             )
 
             return file_metadata
@@ -550,7 +550,7 @@ class LocalClient(AbstractClient):
 
             # Create FileMetadata
             file_metadata = self.file_manager.create_file_metadata_from_path(
-                file_path=str(file_path), organization_id=self.org_id
+                file_path=str(file_path), organization_id=self.org_id, user_id=self.user_id
             )
 
             return file_metadata
@@ -591,7 +591,7 @@ class LocalClient(AbstractClient):
 
             # Create FileMetadata
             file_metadata = self.file_manager.create_file_metadata_from_path(
-                file_path=str(file_path), organization_id=self.org_id
+                file_path=str(file_path), organization_id=self.org_id, user_id=self.user_id
             )
 
             return file_metadata
@@ -635,6 +635,7 @@ class LocalClient(AbstractClient):
         file_metadata = self.file_manager.create_file_metadata(
             PydanticFileMetadata(
                 organization_id=self.org_id,
+                user_id=self.user_id,
                 file_name=file_name,
                 file_path=None,  # No local path for Google Cloud URIs
                 source_url=None,  # No regular source URL for Google Cloud files
@@ -658,7 +659,7 @@ class LocalClient(AbstractClient):
 
             # Create FileMetadata using the file manager
             file_metadata = self.file_manager.create_file_metadata_from_path(
-                file_path=str(file_path), organization_id=self.org_id
+                file_path=str(file_path), organization_id=self.org_id, user_id=self.user_id
             )
 
             return file_metadata
@@ -736,6 +737,7 @@ class LocalClient(AbstractClient):
             file_metadata = self.file_manager.create_file_metadata(
                 PydanticFileMetadata(
                     organization_id=self.org_id,
+                    user_id=self.user_id,
                     file_name=file_name,
                     file_path=None,  # No local path for remote URLs
                     source_url=url,  # Store URL in the dedicated field
@@ -2208,7 +2210,7 @@ class LocalClient(AbstractClient):
             FileMetadata: The created file metadata
         """
         return self.file_manager.create_file_metadata_from_path(
-            file_path=file_path, organization_id=self.org_id, source_id=source_id
+            file_path=file_path, organization_id=self.org_id, user_id=self.user_id, source_id=source_id
         )
 
     def list_files(

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Optional
 from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from mirix.orm.mixins import OrganizationMixin
+from mirix.orm.mixins import OrganizationMixin, UserMixin
 from mirix.orm.sqlalchemy_base import SqlalchemyBase
 from mirix.schemas.file import FileMetadata as PydanticFileMetadata
 
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from mirix.orm.organization import Organization
 
 
-class FileMetadata(SqlalchemyBase, OrganizationMixin):
+class FileMetadata(SqlalchemyBase, OrganizationMixin, UserMixin):
     """Represents metadata for an uploaded file."""
 
     __tablename__ = "files"
