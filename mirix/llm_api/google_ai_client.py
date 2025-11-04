@@ -261,6 +261,22 @@ class GoogleAIClient(LLMClientBase):
                                 }
                             }
                         )
+                elif "file_id" in part:
+                    file = self.file_manager.get_file_metadata_by_id(part["file_id"])
+                    if file.file_path is not None:
+                        import base64
+                        with open(file.file_path, "rb") as f:
+                            base64_data = base64.b64encode(f.read()).decode("utf-8")
+                        message_parts.append(
+                            {
+                                "inline_data": {
+                                    "mime_type": file.file_type,
+                                    "data": base64_data,
+                                }
+                            }
+                        )
+                    else:
+                        raise ValueError(f"File with id {part['file_id']} has no file_path")
                 else:
                     raise ValueError(f"Unknown part type in message: {part}")
             message["parts"] = message_parts
