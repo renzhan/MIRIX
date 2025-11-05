@@ -3,10 +3,8 @@ from ace import LiteLLMClient, Generator, Playbook
 import os
 from dotenv import load_dotenv
 
-# 加载根目录下的 .env 文件
 load_dotenv('.env')
 
-# 调试：打印是否加载成功
 api_key = os.getenv("OPENAI_API_KEY")
 print(f"[DEBUG] API Key loaded: {api_key[:20] + '...' if api_key else 'None'}")
 
