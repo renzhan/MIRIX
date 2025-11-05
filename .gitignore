@@ -35,3 +35,5 @@ mirix.egg-info
 .idea/
 agentic-context-engine-main/
 user_data_export/
+.env
+api_backend.log
