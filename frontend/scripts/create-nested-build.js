@@ -3,44 +3,6 @@
 const fs = require('fs');
 const path = require('path');
 
-// 读取环境变量文件
-function loadEnvFile(envPath) {
-  if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    const envVars = {};
-
-    envContent.split('\n').forEach(line => {
-      const trimmedLine = line.trim();
-      if (trimmedLine && !trimmedLine.startsWith('#')) {
-        const [key, ...valueParts] = trimmedLine.split('=');
-        if (key && valueParts.length > 0) {
-          envVars[key.trim()] = valueParts.join('=').trim();
-        }
-      }
-    });
-
-    return envVars;
-  }
-  return {};
-}
-
-// 根据 NODE_ENV 加载对应的环境变量文件
-const nodeEnv = process.env.NODE_ENV || 'development';
-const envFiles = [
-  path.join(__dirname, '..', '.env.local'),
-  path.join(__dirname, '..', `.env.${nodeEnv}`),
-  path.join(__dirname, '..', '.env')
-];
-
-let envVars = {};
-envFiles.forEach(envFile => {
-  const fileVars = loadEnvFile(envFile);
-  envVars = { ...envVars, ...fileVars };
-});
-
-// 将环境变量设置到 process.env
-Object.assign(process.env, envVars);
-
 /**
  * 创建嵌套的构建目录结构
  * 将 build/ 目录下的内容移动到 build/aiop-pams/ 下
@@ -85,6 +47,7 @@ try {
     }
   });
 
+  console.log('process.env.REACT_APP_API_URLprocess.env.REACT_APP_API_URL', process.env)
   // 更新 index.html 中的路径引用，指向 aiop-pams 目录
   const indexPath = path.join(buildDir, 'index.html');
   if (fs.existsSync(indexPath)) {

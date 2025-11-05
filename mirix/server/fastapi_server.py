@@ -324,7 +324,25 @@ To fix it, install FFmpeg:
 The warning doesn't affect functionality as pydub falls back gracefully.
 """
 
-app = FastAPI(title="Mirix Agent API", version="0.1.5", root_path="/pams")
+from fastapi.responses import JSONResponse
+
+class PrettyJSONResponse(JSONResponse):
+    """自定义 JSON 响应，使用格式化输出（2 个空格缩进）"""
+    def render(self, content) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=2,
+            separators=(",", ": "),
+        ).encode("utf-8")
+
+app = FastAPI(
+    title="Mirix Agent API", 
+    version="0.1.5", 
+    root_path="/pams",
+    default_response_class=PrettyJSONResponse  # 使用格式化 JSON
+)
 
 # Add CORS middleware
 app.add_middleware(
@@ -412,8 +430,13 @@ async def startup_event():
             # Running in development
             config_path = Path("mirix/configs/mirix_gpt4o.yaml")
 
+        logger.info(f"🔄 开始初始化 AgentWrapper，配置文件：{config_path}")
+        print(f"🔄 开始初始化 AgentWrapper，配置文件：{config_path}")
+        
         agent = AgentWrapper(str(config_path))
-        print("Agent initialized successfully")
+        
+        logger.info("✅ Agent initialized successfully")
+        print("✅ Agent initialized successfully")
 
         # Initialize the MCP client manager (this will auto-restore connections)
         print("🚀 Initializing MCP client manager...")
@@ -449,7 +472,12 @@ async def startup_event():
         # Tool registration will happen later when agent is available
 
     except Exception as e:
-        logger.error(f"Error during startup: {str(e)}")
+        import traceback
+        error_msg = f"Error during startup: {str(e)}\n{traceback.format_exc()}"
+        logger.error(error_msg)
+        print(f"❌ 启动失败：{error_msg}")
+        # Re-raise to make the error more visible
+        raise
 
 
 @app.on_event("shutdown")
@@ -501,7 +529,32 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
         redis_client.hset(task_key, "processing_start_time", datetime.now().isoformat())
 
+        # 带标签
+        absorb_content = f"""
+        {email_content}
+        
+        请根据上述邮件内容，作为Meta Memory Manager进行分析并协调相应的记忆管理器。
+        {f'📌 注意：此邮件属于"{category_list}"分类，请在相关记忆中使用此分类作为 source_category 标签。' if category_list and category_list != '未分类' else ''}
+        """
+        # 异步执行absorb，不等待结果
+        threading.Thread(
+            target=lambda: agent.send_message(
+                message=absorb_content,
+                memorizing=True,
+                force_absorb_content=True,
+                user_id=user_id
+            ),
+            daemon=True
+        ).start()
+
         # 执行邮件回复生成
+        absorb_content = f"""
+        {email_content}
+             
+        {f'  📌 注意：此邮件类别为："{category_list}"， 若有必要Procedural记忆则优先按照在{category_list}类别查找相关处理流程。' if category_list and category_list != '未分类' else ''}
+
+        """
+
         response, _ = agent.message_queue.send_message_in_queue(
             agent.client,
             agent.agent_states.email_reply_agent_state.id,
@@ -1398,6 +1451,31 @@ async def extract_workflow(request: WorkflowExtractionRequest):
             raise HTTPException(status_code=500, detail=f"工作流程提取失败: {workflow_result}")
 
         logger.info(f"[WORKFLOW_API] 工作流程提取成功 - 类型: {type(workflow_result).__name__}")
+
+        # 清理 workflow_agent 的历史消息，只保留 system prompt
+        try:
+            if agent.agent_states.workflow_agent_state:
+                workflow_agent_id = agent.agent_states.workflow_agent_state.id
+                workflow_agent = agent.client.server.agent_manager.get_agent_by_id(
+                    agent_id=workflow_agent_id,
+                    actor=user
+                )
+                
+                # 只保留 message_ids 的第一个元素（system prompt）
+                if len(workflow_agent.message_ids) > 1:
+                    original_count = len(workflow_agent.message_ids)
+                    new_message_ids = [workflow_agent.message_ids[0]]
+                    
+                    agent.client.server.agent_manager.set_in_context_messages(
+                        agent_id=workflow_agent_id,
+                        message_ids=new_message_ids,
+                        actor=user
+                    )
+                    
+                    logger.info(f"[WORKFLOW_API] 已清理 workflow_agent 历史消息: {original_count} -> 1")
+        except Exception as cleanup_error:
+            # 清理失败不影响主流程，只记录日志
+            logger.warning(f"[WORKFLOW_API] 清理 workflow_agent 历史失败: {cleanup_error}")
 
         return WorkflowExtractionResponse(workflow_result=workflow_result)
 
@@ -3036,6 +3114,8 @@ async def reply_to_email(request: EmailReplyRequest):
     - status: 任务状态
     - message: 状态描述
     """
+    request_start_time = time.time()
+    
     if agent is None:
         raise HTTPException(status_code=500, detail="Agent not initialized")
 
@@ -3120,6 +3200,9 @@ async def reply_to_email(request: EmailReplyRequest):
         redis_client.rpush(EMAIL_REPLY_QUEUE, json.dumps(queue_data))
 
         logger.info(f"邮件回复任务已排队: {task_id}")
+
+        request_total_time = time.time() - request_start_time
+        logger.info(f"[EMAIL_REPLY_API] 任务 {task_id} 接口处理完成，总耗时: {request_total_time:.3f}秒")
 
         return EmailReplyResponse(
             task_id=task_id,
