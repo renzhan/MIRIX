@@ -1,7 +1,6 @@
 import logging
 import re
-from collections.abc import AsyncGenerator
-from typing import IO
+from typing import IO, Generator
 from bs4 import BeautifulSoup
 from .page import Page
 from .parser import Parser
@@ -20,7 +19,7 @@ def cleanup_data(data: str) -> str:
 class LocalHTMLParser(Parser):
     """Parses HTML text into Page objects."""
 
-    async def parse(self, content: IO) -> AsyncGenerator[Page, None]:
+    def parse(self, content: IO) -> Generator[Page, None, None]:
         logger.info("Extracting text from '%s' using BeautifulSoup", content.name)
 
         data = content.read()

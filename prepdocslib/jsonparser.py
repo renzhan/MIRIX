@@ -1,6 +1,5 @@
 import json
-from collections.abc import AsyncGenerator
-from typing import IO
+from typing import IO, Generator
 
 from .page import Page
 from .parser import Parser
@@ -11,7 +10,7 @@ class JsonParser(Parser):
     Concrete parser that can parse JSON into Page objects. A top-level object becomes a single Page, while a top-level array becomes multiple Page objects.
     """
 
-    async def parse(self, content: IO) -> AsyncGenerator[Page, None]:
+    def parse(self, content: IO) -> Generator[Page, None, None]:
         offset = 0
         data = json.loads(content.read())
         if isinstance(data, list):

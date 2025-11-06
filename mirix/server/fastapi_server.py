@@ -648,7 +648,6 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         # 计算等待时间
         created_at = datetime.fromisoformat(task_data.get("created_at"))
         wait_time = processing_start_time - created_at.timestamp()
-
         logger.info(f"任务 {task_id} 等待处理时间: {wait_time:.2f}秒")
 
         # 更新任务状态为处理中
@@ -666,23 +665,15 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                 url = attachment.get('url', '')
                 if url:
                     logger.info(f"开始解析附件 {index+1}/{len(attach_url)}: {filename}")
-                    logger.info(f"附件URL: {url}")
-                    
                     content = parse_attachment_from_url(url)
                     
                     if content and not content.startswith("["):
-                        # 记录解析成功和前50个字符
-                        content_preview = content[:50].replace('\n', ' ').replace('\r', '')
-                        logger.info(f"✅ 附件解析成功: {filename}")
-                        logger.info(f"解析内容预览(前50字符): {content_preview}...")
-                        logger.info(f"解析内容总长度: {len(content)} 字符")
+                        logger.info(f"✅ 附件解析成功: {filename}, 内容长度: {len(content)} 字符")
                         attachment_contents.append(f"📎附件{index+1}: {filename}:\n{content}")
                     else:
                         logger.warning(f"⚠️ 附件解析失败或跳过: {filename} - {content}")
             
-            logger.info(f"="*60)
-            logger.info(f"附件解析总结: 成功 {len(attachment_contents)}/{len(attach_url)} 个附件")
-            logger.info(f"="*60)
+            logger.info(f"附件解析完成: 成功 {len(attachment_contents)}/{len(attach_url)} 个附件")
         
         # 合并邮件内容和附件内容
         full_email_content = email_content
@@ -1228,7 +1219,7 @@ def email_reply_worker():
             if task_data is None:
                 # 超时，继续循环
                 continue
-
+            
             # 解析任务数据
             _, task_json = task_data
             task_info = json.loads(task_json)
@@ -1278,8 +1269,6 @@ def start_email_reply_workers():
 
     logger.info(f"="*80)
     logger.info(f"[工作线程池] 准备启动 {thread_count} 个邮件回复工作线程")
-    print(f"\n{'='*80}")
-    print(f"[工作线程池] 准备启动 {thread_count} 个邮件回复工作线程")
 
     for i in range(thread_count):
         thread = threading.Thread(
@@ -1289,11 +1278,8 @@ def start_email_reply_workers():
         )
         thread.start()
         worker_threads.append(thread)
-        print(f"[工作线程池] 线程 {i+1}/{thread_count} 已启动: {thread.name}")
 
     logger.info(f"[工作线程池] ✅ 启动完成，共 {len(worker_threads)} 个线程")
-    print(f"[工作线程池] ✅ 启动完成，共 {len(worker_threads)} 个线程")
-    print(f"{'='*80}\n")
     logger.info(f"="*80)
 
 
@@ -3357,6 +3343,7 @@ async def reply_to_email(request: EmailReplyRequest):
         redis_client.expire(task_key, 3600)
 
         # 将任务放入Redis队列
+        attach_url_list = request.attach_url if request.attach_url else []
         queue_data = {
             "task_id": task_id,
             "email_content": request.email_content,
@@ -3364,11 +3351,12 @@ async def reply_to_email(request: EmailReplyRequest):
             "user_id": user_id,
             "email_basic_id": request.email_basic_id,
             "callback_url": request.callback_url,
-            "attach_url": request.attach_url if request.attach_url else []
+            "attach_url": attach_url_list
         }
-        redis_client.rpush(EMAIL_REPLY_QUEUE, json.dumps(queue_data))
-
-        logger.info(f"邮件回复任务已排队: {task_id}")
+        queue_json = json.dumps(queue_data)
+        redis_client.rpush(EMAIL_REPLY_QUEUE, queue_json)
+        attach_count = len(attach_url_list) if attach_url_list else 0
+        logger.info(f"邮件回复任务已排队: {task_id}, 附件数: {attach_count}")
 
         request_total_time = time.time() - request_start_time
         logger.info(f"[EMAIL_REPLY_API] 任务 {task_id} 接口处理完成，总耗时: {request_total_time:.3f}秒")

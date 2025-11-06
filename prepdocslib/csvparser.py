@@ -1,8 +1,7 @@
 import csv
 import json
-from collections.abc import AsyncGenerator
 from io import BufferedReader
-from typing import IO, cast
+from typing import IO, cast, Generator
 
 import pandas as pd               # 只用来判断 NaN，可移除
 
@@ -16,7 +15,7 @@ class CsvParser(Parser):
     page.page_text == '{"列1":"值1", "列2":"值2", ...}'
     """
 
-    async def parse(self, content: IO, encoding: str = "utf-8") -> AsyncGenerator[Page, None]:
+    def parse(self, content: IO, encoding: str = "utf-8") -> Generator[Page, None, None]:
         # -------- 1) 把输入统一为 str -------------- #
         if isinstance(content, (bytes, bytearray)):
             text = bytes(content).decode(encoding)

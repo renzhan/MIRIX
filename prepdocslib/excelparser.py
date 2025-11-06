@@ -1,7 +1,6 @@
 import logging
 import json
-from collections.abc import AsyncGenerator
-from typing import IO
+from typing import IO, Generator
 import pandas as pd
 from openpyxl import load_workbook
 from .page import Page
@@ -18,7 +17,7 @@ class ExcelParser(Parser):
     - 输出格式: {"列名":"行值", ...}
     """
 
-    async def parse(self, content: IO) -> AsyncGenerator[Page, None]:
+    def parse(self, content: IO) -> Generator[Page, None, None]:
         logger.info("Extracting data from '%s' using pandas/openpyxl", content.name)
         
         wb = load_workbook(content, data_only=True)

@@ -1,6 +1,5 @@
 import re
-from collections.abc import AsyncGenerator
-from typing import IO
+from typing import IO, Generator
 
 from .page import Page
 from .parser import Parser
@@ -24,7 +23,7 @@ def cleanup_data(data: str) -> str:
 class TextParser(Parser):
     """Parses simple text into a Page object."""
 
-    async def parse(self, content: IO) -> AsyncGenerator[Page, None]:
+    def parse(self, content: IO) -> Generator[Page, None, None]:
         data = content.read()
         decoded_data = data.decode("utf-8")
         text = cleanup_data(decoded_data)

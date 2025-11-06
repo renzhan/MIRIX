@@ -1,6 +1,5 @@
 import logging
-from collections.abc import AsyncGenerator
-from typing import IO
+from typing import IO, Generator
 from PyPDF2 import PdfReader
 from .page import Page
 from .parser import Parser
@@ -14,7 +13,7 @@ class LocalPdfParser(Parser):
     To learn more, please visit https://pypi.org/project/pypdf/
     """
 
-    async def parse(self, content: IO) -> AsyncGenerator[Page, None]:
+    def parse(self, content: IO) -> Generator[Page, None, None]:
         logger.info("Extracting text from '%s' using PyPDF", content.name)
 
         reader = PdfReader(content)
