@@ -11,6 +11,8 @@ import threading
 import time
 import hashlib
 import multiprocessing
+import tempfile
+import mimetypes
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -124,6 +126,131 @@ def _setup_logging():
 _setup_logging()
 
 logger = logging.getLogger(__name__)
+
+
+# Attachment parsing utilities
+MAX_ZIP_FILES = 10
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+async def download_file(url: str) -> tuple:
+    """下载文件并返回内容和文件扩展名"""
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+    
+    content_type = response.headers.get('Content-Type', '')
+    ext = mimetypes.guess_extension(content_type) or Path(url).suffix
+    
+    return response.content, ext
+
+
+def extract_zip_safely(zip_path: str) -> str:
+    """安全解压ZIP文件并解析内容"""
+    import zipfile
+    from prepdocslib.aioptools_parser import AiopToolsParser
+    from prepdocslib.parser_factory import get_parser_for_file
+    
+    extracted_contents = []
+    
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            file_list = zip_ref.namelist()[:MAX_ZIP_FILES]
+            
+            for index, file_name in enumerate(file_list):
+                file_info = zip_ref.getinfo(file_name)
+                
+                if file_info.file_size > MAX_FILE_SIZE:
+                    extracted_contents.append(f"[跳过: 附件{index+1}: {file_name} - 文件过大 ({file_info.file_size / 1024 / 1024:.1f}MB)]")
+                    continue
+                
+                if file_name.startswith('/') or '..' in file_name:
+                    continue
+                
+                if not file_info.is_dir():
+                    file_ext = Path(file_name).suffix.lower()
+                    
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
+                        tmp.write(zip_ref.read(file_name))
+                        tmp_path = tmp.name
+                    
+                    try:
+                        # 尝试使用AiopToolsParser
+                        aiop_parser = AiopToolsParser()
+                        try:
+                            content = aiop_parser.parse_file(tmp_path)
+                            if content:
+                                extracted_contents.append(f"📄 附件{index+1}: {file_name}:\n{content[:1000]}")
+                                continue
+                        except Exception as e:
+                            logger.warning(f"AiopTools解析失败: {file_name}, 错误: {str(e)}")
+                        
+                        # 回退到基本解析
+                        parser = get_parser_for_file(file_ext)
+                        if parser:
+                            parsed_text = []
+                            with open(tmp_path, 'rb') as f:
+                                for page in parser.parse(f):
+                                    parsed_text.append(page.text)
+                            extracted_contents.append(f"📄 附件{index+1}: {file_name}:\n{''.join(parsed_text)[:1000]}")
+                        else:
+                            extracted_contents.append(f"[不支持: 附件{index+1}: {file_name}]")
+                    finally:
+                        Path(tmp_path).unlink(missing_ok=True)
+
+            if len(zip_ref.namelist()) > MAX_ZIP_FILES:
+                extracted_contents.append(f"[仅显示前{MAX_ZIP_FILES}个附件，共{len(zip_ref.namelist())}个]")
+    
+    except zipfile.BadZipFile:
+        return "[ZIP附件损坏]"
+    except Exception as e:
+        return f"[ZIP附件解压失败: {str(e)}]"
+    
+    return "\n\n".join(extracted_contents) if extracted_contents else "[ZIP附件为空]"
+
+
+async def parse_attachment_from_url(attach_url: str) -> str:
+    """从URL解析附件内容"""
+    try:
+        from prepdocslib.aioptools_parser import AiopToolsParser
+        from prepdocslib.parser_factory import get_parser_for_file
+        
+        file_content, file_ext = await download_file(attach_url)
+        
+        if len(file_content) > MAX_FILE_SIZE:
+            return f"[文件过大: {len(file_content) / 1024 / 1024:.1f}MB，限制{MAX_FILE_SIZE / 1024 / 1024}MB]"
+        
+        with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
+            tmp.write(file_content)
+            tmp_path = tmp.name
+        
+        try:
+            if file_ext.lower() in ['.zip']:
+                return extract_zip_safely(tmp_path)
+            
+            # 尝试使用AiopToolsParser
+            aiop_parser = AiopToolsParser()
+            try:
+                content = aiop_parser.parse_file(tmp_path)
+                if content:
+                    return content
+            except Exception as e:
+                logger.warning(f"AiopTools解析失败: {attach_url}, 错误: {str(e)}")
+            
+            # 回退到基本解析
+            parser = get_parser_for_file(file_ext)
+            if not parser:
+                return f"[不支持的文件类型: {file_ext}]"
+            
+            parsed_text = []
+            with open(tmp_path, 'rb') as f:
+                for page in parser.parse(f):
+                    parsed_text.append(page.text)
+            return "\n\n".join(parsed_text)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+            
+    except Exception as e:
+        logger.error(f"解析附件失败: {attach_url}, 错误: {str(e)}")
+        return f"[附件解析失败: {str(e)}]"
 
 
 # User context switching utilities
@@ -503,7 +630,7 @@ _mcp_tools_registered = False
 
 
 def process_email_reply_task(task_id: str, email_content: str, category_list: str, user_id: str, email_basic_id: str,
-                             callback_url: str):
+                             callback_url: str, attach_url: Optional[List[Dict[str, str]]] = None):
     """后台处理邮件回复任务"""
     processing_start_time = time.time()
 
@@ -529,13 +656,41 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
         redis_client.hset(task_key, "processing_start_time", datetime.now().isoformat())
 
+        # 处理附件列表
+        attachment_contents = []
+        if attach_url and isinstance(attach_url, list):
+            logger.info(f"开始解析 {len(attach_url)} 个附件")
+            
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            for index, attachment in enumerate(attach_url):
+                filename = attachment.get('filename', '未知文件')
+                url = attachment.get('url', '')
+                if url:
+                    logger.info(f"解析附件: {filename} ({url})")
+                    content = loop.run_until_complete(
+                        parse_attachment_from_url(url)
+                    )
+                    if content and not content.startswith("["):
+                        attachment_contents.append(f"📎附件{index+1}: {filename}:\n{content}")
+            
+            loop.close()
+            logger.info(f"附件解析完成，成功解析 {len(attachment_contents)} 个附件")
+        
+        # 合并邮件内容和附件内容
+        full_email_content = email_content
+        if attachment_contents:
+            full_email_content += "\n\n" + "\n\n".join(attachment_contents)
+
         # 带标签
         absorb_content = f"""
-        {email_content}
+        {full_email_content}
         
         请根据上述邮件内容，作为Meta Memory Manager进行分析并协调相应的记忆管理器。
         {f'📌 注意：此邮件属于"{category_list}"分类，请在相关记忆中使用此分类作为 source_category 标签。' if category_list and category_list != '未分类' else ''}
         """
+        
         # 异步执行absorb，不等待结果
         threading.Thread(
             target=lambda: agent.send_message(
@@ -548,19 +703,12 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         ).start()
 
         # 执行邮件回复生成
-        absorb_content = f"""
-        {email_content}
-             
-        {f'  📌 注意：此邮件类别为："{category_list}"， 若有必要Procedural记忆则优先按照在{category_list}类别查找相关处理流程。' if category_list and category_list != '未分类' else ''}
-
-        """
-
         response, _ = agent.message_queue.send_message_in_queue(
             agent.client,
             agent.agent_states.email_reply_agent_state.id,
             {
                 "user_id": user_id,
-                "message": email_content,
+                "message": full_email_content,
                 "force_response": True
             },
             agent_type="email_reply",
@@ -1023,6 +1171,7 @@ class EmailReplyRequest(BaseModel):
     email_account: str
     email_basic_id: str
     callback_url: str  # 回调地址
+    attach_url: Optional[List[Dict[str, str]]] = None  # 附件列表，格式: [{"filename": "xxx", "url": "xxx"}]
 
 
 class EmailReplyResponse(BaseModel):
@@ -1082,6 +1231,7 @@ def email_reply_worker():
             user_id = task_info['user_id']
             email_basic_id = task_info['email_basic_id']
             callback_url = task_info['callback_url']
+            attach_url = task_info.get('attach_url', [])
 
             logger.info(f"工作线程 {threading.current_thread().name} 开始处理任务: {task_id}")
 
@@ -1099,7 +1249,7 @@ def email_reply_worker():
                 continue
 
             # 处理任务
-            process_email_reply_task(task_id, email_content, category_list, user_id, email_basic_id, callback_url)
+            process_email_reply_task(task_id, email_content, category_list, user_id, email_basic_id, callback_url, attach_url)
 
         except json.JSONDecodeError as e:
             logger.error(f"解析任务数据失败: {str(e)}")
@@ -1183,11 +1333,13 @@ def recover_email_reply_tasks():
                         "category_list": task_data.get("category_list"),
                         "user_id": task_data.get("user_id"),
                         "email_basic_id": task_data.get("email_basic_id"),
-                        "callback_url": task_data.get("callback_url")
+                        "callback_url": task_data.get("callback_url"),
+                        "attach_url": json.loads(task_data.get("attach_url", "[]")) if task_data.get("attach_url") else []
                     }
 
-                    # 检查必要字段是否存在
-                    if all(queue_data.values()):
+                    # 检查必要字段是否存在（attach_url可以为空列表）
+                    required_values = [queue_data.get(k) for k in ['task_id', 'email_content', 'category_list', 'user_id', 'email_basic_id', 'callback_url']]
+                    if all(required_values):
                         # 更新任务状态为重新排队
                         redis_client.hset(task_key, "status", "queued")
                         redis_client.hset(task_key, "updated_at", datetime.now().isoformat())
@@ -3179,6 +3331,7 @@ async def reply_to_email(request: EmailReplyRequest):
             "user_id": user_id,
             "email_basic_id": request.email_basic_id,
             "callback_url": request.callback_url,
+            "attach_url": json.dumps(request.attach_url) if request.attach_url else "",
             "status": "queued",
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
@@ -3195,7 +3348,8 @@ async def reply_to_email(request: EmailReplyRequest):
             "category_list": request.category_list,
             "user_id": user_id,
             "email_basic_id": request.email_basic_id,
-            "callback_url": request.callback_url
+            "callback_url": request.callback_url,
+            "attach_url": request.attach_url if request.attach_url else []
         }
         redis_client.rpush(EMAIL_REPLY_QUEUE, json.dumps(queue_data))
 
