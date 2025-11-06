@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import asyncio
 import json
 import logging
@@ -132,7 +132,7 @@ logger = logging.getLogger(__name__)
 MAX_ZIP_FILES = 10
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
-async def download_file(url: str) -> tuple:
+def download_file(url: str) -> tuple:
     """下载文件并返回内容和文件扩展名"""
     response = requests.get(url, timeout=30)
     response.raise_for_status()
@@ -207,13 +207,13 @@ def extract_zip_safely(zip_path: str) -> str:
     return "\n\n".join(extracted_contents) if extracted_contents else "[ZIP附件为空]"
 
 
-async def parse_attachment_from_url(attach_url: str) -> str:
+def parse_attachment_from_url(attach_url: str) -> str:
     """从URL解析附件内容"""
     try:
         from prepdocslib.aioptools_parser import AiopToolsParser
         from prepdocslib.parser_factory import get_parser_for_file
         
-        file_content, file_ext = await download_file(attach_url)
+        file_content, file_ext = download_file(attach_url)
         
         if len(file_content) > MAX_FILE_SIZE:
             return f"[文件过大: {len(file_content) / 1024 / 1024:.1f}MB，限制{MAX_FILE_SIZE / 1024 / 1024}MB]"
@@ -661,22 +661,28 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         if attach_url and isinstance(attach_url, list):
             logger.info(f"开始解析 {len(attach_url)} 个附件")
             
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
             for index, attachment in enumerate(attach_url):
                 filename = attachment.get('filename', '未知文件')
                 url = attachment.get('url', '')
                 if url:
-                    logger.info(f"解析附件: {filename} ({url})")
-                    content = loop.run_until_complete(
-                        parse_attachment_from_url(url)
-                    )
+                    logger.info(f"开始解析附件 {index+1}/{len(attach_url)}: {filename}")
+                    logger.info(f"附件URL: {url}")
+                    
+                    content = parse_attachment_from_url(url)
+                    
                     if content and not content.startswith("["):
+                        # 记录解析成功和前50个字符
+                        content_preview = content[:50].replace('\n', ' ').replace('\r', '')
+                        logger.info(f"✅ 附件解析成功: {filename}")
+                        logger.info(f"解析内容预览(前50字符): {content_preview}...")
+                        logger.info(f"解析内容总长度: {len(content)} 字符")
                         attachment_contents.append(f"📎附件{index+1}: {filename}:\n{content}")
+                    else:
+                        logger.warning(f"⚠️ 附件解析失败或跳过: {filename} - {content}")
             
-            loop.close()
-            logger.info(f"附件解析完成，成功解析 {len(attachment_contents)} 个附件")
+            logger.info(f"="*60)
+            logger.info(f"附件解析总结: 成功 {len(attachment_contents)}/{len(attach_url)} 个附件")
+            logger.info(f"="*60)
         
         # 合并邮件内容和附件内容
         full_email_content = email_content
@@ -1210,7 +1216,9 @@ def generate_task_id(user_id: str, email_basic_id: str, email_content: str) -> s
 
 def email_reply_worker():
     """邮件回复工作线程"""
-    logger.info(f"邮件回复工作线程启动: {threading.current_thread().name}")
+    thread_name = threading.current_thread().name
+    logger.info(f"[{thread_name}] 工作线程已启动，开始监听队列")
+    print(f"[{thread_name}] 工作线程已启动，开始监听队列")
 
     while not worker_shutdown_event.is_set():
         try:
@@ -1268,7 +1276,10 @@ def start_email_reply_workers():
     cpu_count = multiprocessing.cpu_count()
     thread_count = max(2, cpu_count * 2)
 
-    logger.info(f"启动 {thread_count} 个邮件回复工作线程")
+    logger.info(f"="*80)
+    logger.info(f"[工作线程池] 准备启动 {thread_count} 个邮件回复工作线程")
+    print(f"\n{'='*80}")
+    print(f"[工作线程池] 准备启动 {thread_count} 个邮件回复工作线程")
 
     for i in range(thread_count):
         thread = threading.Thread(
@@ -1278,8 +1289,12 @@ def start_email_reply_workers():
         )
         thread.start()
         worker_threads.append(thread)
+        print(f"[工作线程池] 线程 {i+1}/{thread_count} 已启动: {thread.name}")
 
-    logger.info(f"邮件回复工作线程池启动完成，共 {len(worker_threads)} 个线程")
+    logger.info(f"[工作线程池] ✅ 启动完成，共 {len(worker_threads)} 个线程")
+    print(f"[工作线程池] ✅ 启动完成，共 {len(worker_threads)} 个线程")
+    print(f"{'='*80}\n")
+    logger.info(f"="*80)
 
 
 def stop_email_reply_workers():
