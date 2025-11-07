@@ -73,6 +73,7 @@ COPY --from=frontend-builder /app/frontend/package*.json ./frontend/
 # 复制应用源码
 COPY pyproject.toml setup.py MANIFEST.in ./
 COPY mirix/ ./mirix/
+COPY prepdocslib/ ./prepdocslib/
 COPY main.py chat.py email_learning.py ./
 COPY database/ ./database/
 COPY assets/ ./assets/
