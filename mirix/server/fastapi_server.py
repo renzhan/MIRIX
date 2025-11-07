@@ -685,12 +685,13 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                 else:
                     tool_call = response.messages[-(num_tools_called * 2 + 1)].tool_call
                     parsed_args = parse_json(tool_call.arguments)
-
+                    logger.info(f"email_basic_id{email_basic_id} parsed_args: {parsed_args}")
+                    print(f"email_basic_id{email_basic_id} parsed_args: {parsed_args}")
                     # 提取message字段
                     message_content = parsed_args.get("message", "")
                     
-                    logger.info(f"message_content: {message_content}")
-                    print(f"message_content: {message_content}")
+                    logger.info(f"email_basic_id{email_basic_id} email_reply message_content: {message_content}")
+                    print(f"email_basic_id{email_basic_id} email_reply message_content: {message_content}")
                     # 如果message是JSON字符串，尝试解析提取email_reply.body
                     if message_content and isinstance(message_content, str):
                         try:
