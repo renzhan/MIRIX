@@ -119,8 +119,8 @@ Core Memory（用户身份/沟通风格）| Episodic Memory（往来历史）| P
   },
   "email_reply": {
     "subject": "RE: ...",
-    "body": "Hi {Name},\n\n{主体内容}\n\nBest regards,",
-    "signature": "AI Email Assistant"
+    "body": "Hi {Name},\n\n{主体内容}\n\nBest regards,",  # 注意邮件署名不写在body字段
+    "signature": "AI Email Assistant"   # 本字段进行署名
   }
 }
 ```

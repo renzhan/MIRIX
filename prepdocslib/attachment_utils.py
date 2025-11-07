@@ -397,4 +397,5 @@ def parse_attachment_from_url(url: str, original_filename: Optional[str] = None)
 
     except Exception as e:
         logger.error(f"解析附件失败: {url}, 错误: {str(e)}")
+        print(f"解析附件失败:error {url}, 错误: {str(e)}")
         return f"[附件解析失败: {str(e)}]"
