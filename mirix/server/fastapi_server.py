@@ -556,21 +556,21 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             
             for index, attachment in enumerate(attach_url):
                 filename = attachment.get('filename', '未知文件')
-                oss_key = attachment.get('realname', '')
-                download_url = build_download_url(oss_key)
+                realname = attachment.get('realname', '')
+                download_url = build_download_url(filename)
                 if download_url:
                     logger.info(
-                        f"开始解析附件 {index+1}/{len(attach_url)}: {filename} (下载URL: {download_url})"
+                        f"开始解析附件 {index+1}/{len(attach_url)}: {realname} (下载URL: {download_url})"
                     )
                     _write_attachment_log(
-                        f"任务 {task_id} 开始解析附件 {index+1}/{len(attach_url)}: {filename} (download={download_url})"
+                        f"任务 {task_id} 开始解析附件 {index+1}/{len(attach_url)}: {realname} (download={download_url})"
                     )
-                    content = parse_attachment_from_url(download_url, filename)
+                    content = parse_attachment_from_url(download_url, realname)
                     
                     if content and not content.startswith("["):
-                        logger.info(f"✅ 附件解析成功: {filename}, 内容长度: {len(content)} 字符")
-                        _write_attachment_log(f"✅ 附件解析成功: {filename}, 内容长度: {len(content)} 字符")
-                        attachment_contents.append(f"📎附件{index+1}: {filename}:\n{content}")
+                        logger.info(f"✅ 附件解析成功: {realname}, 内容长度: {len(content)} 字符")
+                        _write_attachment_log(f"✅ 附件解析成功: {realname}, 内容长度: {len(content)} 字符")
+                        attachment_contents.append(f"📎附件{index+1}: {realname}:\n{content}")
                     else:
                         logger.warning(f"⚠️ 附件解析失败或跳过: {filename} - {content}")
                         _write_attachment_log(f"⚠️ 附件解析失败或跳过: {filename} - {content}")

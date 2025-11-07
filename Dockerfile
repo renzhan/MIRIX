@@ -49,7 +49,7 @@ FROM python:3.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ffmpeg libpq5 ca-certificates \
+    curl ffmpeg libpq5 ca-certificates unar \
  && rm -rf /var/lib/apt/lists/*
 
 # 🔥 安装 Node.js（运行前端服务需要）
