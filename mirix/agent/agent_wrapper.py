@@ -38,8 +38,6 @@ from mirix.utils import parse_json
 
 from .app_utils import encode_image
 
-logging.basicConfig(level=logging.INFO, format="[%(name)s] %(levelname)s: %(message)s")
-
 
 def encode_image(image_path):
     with open(image_path, "rb") as img_file:

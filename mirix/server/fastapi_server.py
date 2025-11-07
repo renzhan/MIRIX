@@ -12,7 +12,6 @@ import time
 import hashlib
 import multiprocessing
 import tempfile
-import mimetypes
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -33,23 +32,44 @@ from ..services.mcp_marketplace import get_mcp_marketplace
 from ..services.mcp_tool_registry import get_mcp_tool_registry
 from ..utils import parse_json
 from ..schemas.mirix_message import MessageType
+from prepdocslib.attachment_utils import build_download_url, parse_attachment_from_url
 
 
-def _setup_logging():
+# 全局标志，确保日志只配置一次
+_logging_configured = False
+_attachment_log_file: Optional[str] = None
+
+
+def _setup_logging(force: bool = False):
     """Configure logging with flexible output options (console/file/both)."""
+    global _logging_configured
+    
+    if _logging_configured and not force:
+        return
+    
     try:
-        import os
+        root_logger = logging.getLogger()
+        # 在强制模式下，清理现有handlers，避免uvicorn覆盖配置后无法写入文件
+        if force:
+            for handler in root_logger.handlers[:]:
+                root_logger.removeHandler(handler)
+        elif root_logger.handlers:
+            _logging_configured = True
+            return
 
         # 日志配置环境变量
         log_output = os.getenv('LOG_OUTPUT', 'both').lower()  # console, file, both
         log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
         log_dir = os.getenv('LOG_DIR', './')
+        log_dir = os.path.abspath(log_dir)
 
         # 创建日志目录（如果需要文件输出）
         if log_output in ['file', 'both']:
             os.makedirs(log_dir, exist_ok=True)
 
         log_file = os.path.join(log_dir, 'api_backend.log')
+        global _attachment_log_file
+        _attachment_log_file = os.path.join(log_dir, 'attachment_debug.log')
 
         # 基础配置
         config = {
@@ -99,158 +119,31 @@ def _setup_logging():
 
         # 应用配置
         logging.config.dictConfig(config)
+        _logging_configured = True
 
         # 记录日志配置信息
         logger = logging.getLogger(__name__)
-        logger.info("=== 邮件回复服务日志配置完成 ===")
+        logger.info("=== 日志系统配置完成 ===")
         logger.info(f"日志输出模式: {log_output}")
         logger.info(f"日志级别: {log_level}")
 
         if log_output in ['file', 'both']:
             logger.info(f"日志文件路径: {log_file}")
             logger.info(f"日志文件最大大小: 50MB，保留备份数: 10")
-
-        if log_output == 'console':
-            logger.info("仅输出到控制台")
-        elif log_output == 'file':
-            logger.info("仅输出到文件")
-        else:
-            logger.info("同时输出到控制台和文件")
+            logger.info(f"附件调试日志路径: {_attachment_log_file}")
 
     except Exception as e:
         # Fall back gracefully without crashing the server if logging config fails
-        logging.basicConfig(level=logging.INFO)
+        if not root_logger.handlers:
+            logging.basicConfig(level=logging.INFO)
         print(f"日志配置失败，使用基础配置: {e}")
 
 
+# 在模块加载时配置日志（只配置一次）
 _setup_logging()
 
 logger = logging.getLogger(__name__)
 
-
-# Attachment parsing utilities
-MAX_ZIP_FILES = 10
-MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
-
-def download_file(url: str) -> tuple:
-    """下载文件并返回内容和文件扩展名"""
-    response = requests.get(url, timeout=30)
-    response.raise_for_status()
-    
-    content_type = response.headers.get('Content-Type', '')
-    ext = mimetypes.guess_extension(content_type) or Path(url).suffix
-    
-    return response.content, ext
-
-
-def extract_zip_safely(zip_path: str) -> str:
-    """安全解压ZIP文件并解析内容"""
-    import zipfile
-    from prepdocslib.aioptools_parser import AiopToolsParser
-    from prepdocslib.parser_factory import get_parser_for_file
-    
-    extracted_contents = []
-    
-    try:
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            file_list = zip_ref.namelist()[:MAX_ZIP_FILES]
-            
-            for index, file_name in enumerate(file_list):
-                file_info = zip_ref.getinfo(file_name)
-                
-                if file_info.file_size > MAX_FILE_SIZE:
-                    extracted_contents.append(f"[跳过: 附件{index+1}: {file_name} - 文件过大 ({file_info.file_size / 1024 / 1024:.1f}MB)]")
-                    continue
-                
-                if file_name.startswith('/') or '..' in file_name:
-                    continue
-                
-                if not file_info.is_dir():
-                    file_ext = Path(file_name).suffix.lower()
-                    
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
-                        tmp.write(zip_ref.read(file_name))
-                        tmp_path = tmp.name
-                    
-                    try:
-                        # 尝试使用AiopToolsParser
-                        aiop_parser = AiopToolsParser()
-                        try:
-                            content = aiop_parser.parse_file(tmp_path)
-                            if content:
-                                extracted_contents.append(f"📄 附件{index+1}: {file_name}:\n{content[:1000]}")
-                                continue
-                        except Exception as e:
-                            logger.warning(f"AiopTools解析失败: {file_name}, 错误: {str(e)}")
-                        
-                        # 回退到基本解析
-                        parser = get_parser_for_file(file_ext)
-                        if parser:
-                            parsed_text = []
-                            with open(tmp_path, 'rb') as f:
-                                for page in parser.parse(f):
-                                    parsed_text.append(page.text)
-                            extracted_contents.append(f"📄 附件{index+1}: {file_name}:\n{''.join(parsed_text)[:1000]}")
-                        else:
-                            extracted_contents.append(f"[不支持: 附件{index+1}: {file_name}]")
-                    finally:
-                        Path(tmp_path).unlink(missing_ok=True)
-
-            if len(zip_ref.namelist()) > MAX_ZIP_FILES:
-                extracted_contents.append(f"[仅显示前{MAX_ZIP_FILES}个附件，共{len(zip_ref.namelist())}个]")
-    
-    except zipfile.BadZipFile:
-        return "[ZIP附件损坏]"
-    except Exception as e:
-        return f"[ZIP附件解压失败: {str(e)}]"
-    
-    return "\n\n".join(extracted_contents) if extracted_contents else "[ZIP附件为空]"
-
-
-def parse_attachment_from_url(attach_url: str) -> str:
-    """从URL解析附件内容"""
-    try:
-        from prepdocslib.aioptools_parser import AiopToolsParser
-        from prepdocslib.parser_factory import get_parser_for_file
-        
-        file_content, file_ext = download_file(attach_url)
-        
-        if len(file_content) > MAX_FILE_SIZE:
-            return f"[文件过大: {len(file_content) / 1024 / 1024:.1f}MB，限制{MAX_FILE_SIZE / 1024 / 1024}MB]"
-        
-        with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
-            tmp.write(file_content)
-            tmp_path = tmp.name
-        
-        try:
-            if file_ext.lower() in ['.zip']:
-                return extract_zip_safely(tmp_path)
-            
-            # 尝试使用AiopToolsParser
-            aiop_parser = AiopToolsParser()
-            try:
-                content = aiop_parser.parse_file(tmp_path)
-                if content:
-                    return content
-            except Exception as e:
-                logger.warning(f"AiopTools解析失败: {attach_url}, 错误: {str(e)}")
-            
-            # 回退到基本解析
-            parser = get_parser_for_file(file_ext)
-            if not parser:
-                return f"[不支持的文件类型: {file_ext}]"
-            
-            parsed_text = []
-            with open(tmp_path, 'rb') as f:
-                for page in parser.parse(f):
-                    parsed_text.append(page.text)
-            return "\n\n".join(parsed_text)
-        finally:
-            Path(tmp_path).unlink(missing_ok=True)
-            
-    except Exception as e:
-        logger.error(f"解析附件失败: {attach_url}, 错误: {str(e)}")
-        return f"[附件解析失败: {str(e)}]"
 
 
 # User context switching utilities
@@ -541,7 +434,7 @@ async def startup_event():
     global agent
 
     try:
-        # Re-assert logging config in case a runner (e.g., Uvicorn) overwrote it
+        # 确保日志配置已生效（如果被覆盖则重新配置）
         _setup_logging()
         logger.info("Starting up Mirix FastAPI server...")
 
@@ -659,21 +552,31 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         attachment_contents = []
         if attach_url and isinstance(attach_url, list):
             logger.info(f"开始解析 {len(attach_url)} 个附件")
+            _write_attachment_log(f"任务 {task_id} 附件列表: {attach_url}")
             
             for index, attachment in enumerate(attach_url):
                 filename = attachment.get('filename', '未知文件')
-                url = attachment.get('url', '')
-                if url:
-                    logger.info(f"开始解析附件 {index+1}/{len(attach_url)}: {filename}")
-                    content = parse_attachment_from_url(url)
+                oss_key = attachment.get('realname', '')
+                download_url = build_download_url(oss_key)
+                if download_url:
+                    logger.info(
+                        f"开始解析附件 {index+1}/{len(attach_url)}: {filename} (下载URL: {download_url})"
+                    )
+                    _write_attachment_log(
+                        f"任务 {task_id} 开始解析附件 {index+1}/{len(attach_url)}: {filename} (download={download_url})"
+                    )
+                    content = parse_attachment_from_url(download_url, filename)
                     
                     if content and not content.startswith("["):
                         logger.info(f"✅ 附件解析成功: {filename}, 内容长度: {len(content)} 字符")
+                        _write_attachment_log(f"✅ 附件解析成功: {filename}, 内容长度: {len(content)} 字符")
                         attachment_contents.append(f"📎附件{index+1}: {filename}:\n{content}")
                     else:
                         logger.warning(f"⚠️ 附件解析失败或跳过: {filename} - {content}")
+                        _write_attachment_log(f"⚠️ 附件解析失败或跳过: {filename} - {content}")
             
             logger.info(f"附件解析完成: 成功 {len(attachment_contents)}/{len(attach_url)} 个附件")
+            _write_attachment_log(f"任务 {task_id} 附件解析完成: 成功 {len(attachment_contents)}/{len(attach_url)} 个")
         
         # 合并邮件内容和附件内容
         full_email_content = email_content
@@ -1168,7 +1071,7 @@ class EmailReplyRequest(BaseModel):
     email_account: str
     email_basic_id: str
     callback_url: str  # 回调地址
-    attach_url: Optional[List[Dict[str, str]]] = None  # 附件列表，格式: [{"filename": "xxx", "url": "xxx"}]
+    attach_url: Optional[List[Dict[str, str]]] = None  # 附件列表，格式: [{"filename": "xxx", "realname": "xxx"}]
 
 
 class EmailReplyResponse(BaseModel):
@@ -1209,7 +1112,7 @@ def email_reply_worker():
     """邮件回复工作线程"""
     thread_name = threading.current_thread().name
     logger.info(f"[{thread_name}] 工作线程已启动，开始监听队列")
-    print(f"[{thread_name}] 工作线程已启动，开始监听队列")
+
 
     while not worker_shutdown_event.is_set():
         try:
@@ -3647,6 +3550,16 @@ async def process_mysql_email(request: ProcessMysqlEmailRequest):
             status_code=500,
             detail=f"MySQL邮件处理失败: {str(e)}"
         )
+
+
+def _write_attachment_log(message: str) -> None:
+    try:
+        if _attachment_log_file:
+            with open(_attachment_log_file, "a", encoding="utf-8") as f:
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                f.write(f"{timestamp} - {message}\n")
+    except Exception as err:
+        logger.error(f"附件调试日志写入失败: {err}")
 
 
 if __name__ == "__main__":
