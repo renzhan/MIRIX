@@ -53,3 +53,5 @@ ruff
 nodeenv
 pyright
 pytest
+PyPDF2
+
