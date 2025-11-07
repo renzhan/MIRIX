@@ -654,6 +654,9 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         else:
             try:
                 # 解析响应
+
+                logger.info(f"response: {response.messages}")
+                
                 num_tools_called = 0
                 for message in response.messages[::-1]:
                     if message.message_type == MessageType.tool_return_message:
@@ -683,7 +686,23 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                     tool_call = response.messages[-(num_tools_called * 2 + 1)].tool_call
                     parsed_args = parse_json(tool_call.arguments)
 
-                    if "message" not in parsed_args:
+                    # 提取message字段
+                    message_content = parsed_args.get("message", "")
+                    
+                    logger.info(f"message_content: {message_content}")
+                    print(f"message_content: {message_content}")
+                    # 如果message是JSON字符串，尝试解析提取email_reply.body
+                    if message_content and isinstance(message_content, str):
+                        try:
+                            message_json = json.loads(message_content)
+                            if isinstance(message_json, dict) and "email_reply" in message_json:
+                                email_reply = message_json["email_reply"]
+                                if isinstance(email_reply, dict) and "body" in email_reply:
+                                    message_content = email_reply["body"]
+                        except (json.JSONDecodeError, KeyError, TypeError):
+                            pass  # 保持原始message_content
+                    
+                    if not message_content:
                         actual_processing_time = time.time() - processing_start_time
                         total_time = time.time() - created_at.timestamp()
                         logger.info(
