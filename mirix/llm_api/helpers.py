@@ -293,42 +293,46 @@ def unpack_inner_thoughts_from_kwargs(
         and message.tool_calls
         and len(message.tool_calls) >= 1
     ):
-        if len(message.tool_calls) > 1:
-            warnings.warn(
-                f"Unpacking inner thoughts from more than one tool call ({len(message.tool_calls)}) is not supported"
-            )
-        # TODO support multiple tool calls
-        tool_call = message.tool_calls[0]
-
-        try:
-            # Sadly we need to parse the JSON since args are in string format
-            func_args = dict(json.loads(tool_call.function.arguments))
-            if inner_thoughts_key in func_args:
-                # extract the inner thoughts
-                inner_thoughts = func_args.pop(inner_thoughts_key)
-
-                # replace the kwargs
-                new_choice = choice.model_copy(deep=True)
-                new_choice.message.tool_calls[0].function.arguments = json_dumps(
-                    func_args
-                )
-                # also replace the message content
-                if new_choice.message.content is not None:
-                    warnings.warn(
-                        f"Overwriting existing inner monologue ({new_choice.message.content}) with kwarg ({inner_thoughts})"
+        # Handle multiple tool calls by extracting inner thoughts from the first one that has it
+        new_choice = choice.model_copy(deep=True)
+        inner_thoughts_found = False
+        
+        for idx, tool_call in enumerate(message.tool_calls):
+            try:
+                # Parse the JSON since args are in string format
+                func_args = dict(json.loads(tool_call.function.arguments))
+                
+                if inner_thoughts_key in func_args:
+                    # Extract the inner thoughts from the first tool call that has it
+                    if not inner_thoughts_found:
+                        inner_thoughts = func_args.pop(inner_thoughts_key)
+                        inner_thoughts_found = True
+                        
+                        # Set the message content with inner thoughts
+                        if new_choice.message.content is not None:
+                            warnings.warn(
+                                f"Overwriting existing inner monologue ({new_choice.message.content}) with kwarg ({inner_thoughts})"
+                            )
+                        new_choice.message.content = inner_thoughts
+                    else:
+                        # Remove inner thoughts from subsequent tool calls
+                        func_args.pop(inner_thoughts_key)
+                    
+                    # Update the tool call arguments
+                    new_choice.message.tool_calls[idx].function.arguments = json_dumps(
+                        func_args
                     )
-                new_choice.message.content = inner_thoughts
-
-                # update the choice object
-                rewritten_choice = new_choice
-            else:
-                warnings.warn(
-                    f"Did not find inner thoughts in tool call: {str(tool_call)}"
-                )
-
-        except json.JSONDecodeError as e:
-            warnings.warn(f"Failed to strip inner thoughts from kwargs: {e}")
-            raise e
+                    
+            except json.JSONDecodeError as e:
+                warnings.warn(f"Failed to strip inner thoughts from tool call {idx}: {e}")
+                raise e
+        
+        if inner_thoughts_found:
+            rewritten_choice = new_choice
+        else:
+            warnings.warn(
+                f"Did not find inner thoughts in any of the {len(message.tool_calls)} tool calls"
+            )
     else:
         warnings.warn(f"Did not find tool call in message: {str(message)}")
 
@@ -387,7 +391,7 @@ def calculate_summarizer_cutoff(
                 )
                 break
 
-        while in_context_messages_openai[cutoff + 1]["role"] == MessageRole.tool:
+        while cutoff + 1 < len(in_context_messages_openai) and in_context_messages_openai[cutoff + 1]["role"] == MessageRole.tool:
             cutoff += 1
 
         logger.info(f"Evicting {cutoff}/{len(in_context_messages)} messages...")
