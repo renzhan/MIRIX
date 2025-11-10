@@ -3273,50 +3273,22 @@ async def update_system_prompt(request: UpdateSystemPromptRequest):
         for user in all_users:
             try:
                 logger.info(f"为用户 {user.name} (ID: {user.id}) 更新系统提示词")
+                print(f"为用户 {user.name} (ID: {user.id}) 更新系统提示词")
                 
-                # 1. 更新 agent_state.system 字段到数据库
-                agent_manager.update_agent_system_prompt(
+                # 更新系统提示词并立即生效（这会自动更新数据库、重建系统消息并替换）
+                agent_manager.update_system_prompt(
                     agent_id=agent_id,
                     system_prompt=new_system_prompt,
                     actor=user
                 )
-                
-                # 2. 调用 rebuild_system_prompt(force=True) 创建新的系统消息
-                new_system_message = agent_manager.rebuild_system_prompt(
-                    agent_id=agent_id,
-                    actor=user,
-                    force=True
-                )
-                
-                # 3. 替换 message_ids[0] 使其立即生效
-                current_messages = agent_manager.get_in_context_messages(
-                    agent_id=agent_id,
-                    actor=user
-                )
-                
-                if current_messages and len(current_messages) > 0:
-                    # 保留除第一条消息外的所有消息
-                    new_message_ids = [new_system_message.id] + [msg.id for msg in current_messages[1:]]
-                    
-                    agent_manager.set_in_context_messages(
-                        agent_id=agent_id,
-                        message_ids=new_message_ids,
-                        actor=user
-                    )
-                    logger.info(f"✅ 用户 {user.name}: 已替换系统消息，保留 {len(current_messages)-1} 条历史消息")
-                else:
-                    # 如果没有历史消息，只设置新的系统消息
-                    agent_manager.set_in_context_messages(
-                        agent_id=agent_id,
-                        message_ids=[new_system_message.id],
-                        actor=user
-                    )
-                    logger.info(f"✅ 用户 {user.name}: 已设置新的系统消息（无历史消息）")
+                logger.info(f"✅ 用户 {user.name}: 系统提示词已更新并立即生效")
+                print(f"✅ 用户 {user.name}: 系统提示词已更新并立即生效")
                 
                 updated_agents.append(f"{user.name}({user.id})")
                 
             except Exception as e:
                 logger.error(f"为用户 {user.name} 更新系统提示词失败: {str(e)}")
+                print(f"为用户 {user.name} 更新系统提示词失败: {str(e)}")
                 continue
         
         updated_at = datetime.now().isoformat()
