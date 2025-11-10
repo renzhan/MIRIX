@@ -602,7 +602,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             daemon=True
         ).start()
 
-        # 清理 email_reply_agent 消息历史，只保留系统提示词
+        # 清理 email_reply_agent 消息历史
         try:
             user = agent.client.server.user_manager.get_user_by_id(user_id)
             email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
@@ -617,7 +617,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                     message_ids=[email_reply_agent.message_ids[0]],
                     actor=user
                 )
-                logger.info(f"✅ 任务 {task_id}: 执行前清理 email_reply_agent，保留系统提示词")
+                logger.info(f"✅ 任务 {task_id}: 执行前清理 email_reply_agent")
         except Exception as e:
             logger.error(f"⚠️ 任务 {task_id}: 执行前清理失败: {str(e)}")
 
