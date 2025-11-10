@@ -606,22 +606,27 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         try:
             user = agent.client.server.user_manager.get_user_by_id(user_id)
             email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
-            
-            in_context_messages = agent.client.server.agent_manager.get_in_context_messages(
+            email_reply_agent = agent.client.server.agent_manager.get_agent_by_id(
                 agent_id=email_reply_agent_id,
                 actor=user
             )
             
-            if len(in_context_messages) > 1:
-                in_context_messages = in_context_messages[:1]
+            # 直接检查 message_ids 而不是过滤后的消息
+            if email_reply_agent.message_ids and len(email_reply_agent.message_ids) > 1:
+                original_count = len(email_reply_agent.message_ids)
+                # 只保留第一个 message_id（系统消息）
                 agent.client.server.agent_manager.set_in_context_messages(
                     agent_id=email_reply_agent_id,
-                    message_ids=[message.id for message in in_context_messages],
+                    message_ids=[email_reply_agent.message_ids[0]],
                     actor=user
                 )
-                logger.info(f"✅ 任务 {task_id}: 执行前清理 email_reply_agent")
+                logger.info(f"✅ 任务 {task_id}: 执行前清理 email_reply_agent: {original_count} -> 1")
+            else:
+                logger.info(f"ℹ️ 任务 {task_id}: email_reply_agent 无需执行前清理")
         except Exception as e:
             logger.error(f"⚠️ 任务 {task_id}: 执行前清理失败: {str(e)}")
+            import traceback
+            logger.error(f"错误详情: {traceback.format_exc()}")
 
         # 执行邮件回复生成
         response, _ = agent.message_queue.send_message_in_queue(
@@ -634,6 +639,29 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             },
             agent_type="email_reply",
         )
+        
+        # 立即清理 email_reply_agent 消息历史（防止并发竞态）
+        try:
+            user = agent.client.server.user_manager.get_user_by_id(user_id)
+            email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
+            email_reply_agent = agent.client.server.agent_manager.get_agent_by_id(
+                agent_id=email_reply_agent_id,
+                actor=user
+            )
+            
+            # 强制清理：无论有多少消息，都只保留第一个
+            if email_reply_agent.message_ids and len(email_reply_agent.message_ids) > 1:
+                original_count = len(email_reply_agent.message_ids)
+                agent.client.server.agent_manager.set_in_context_messages(
+                    agent_id=email_reply_agent_id,
+                    message_ids=[email_reply_agent.message_ids[0]],
+                    actor=user
+                )
+                logger.info(f"🔄 任务 {task_id}: 消息处理后立即清理 email_reply_agent: {original_count} -> 1")
+        except Exception as e:
+            logger.error(f"⚠️ 任务 {task_id}: 消息处理后立即清理失败: {str(e)}")
+            import traceback
+            logger.error(f"错误详情: {traceback.format_exc()}")
 
         # 处理响应
         if response == "ERROR":
@@ -781,27 +809,30 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                     }
                 }
 
-        # 执行后清理 email_reply_agent 消息历史
+        # 最终清理 email_reply_agent 消息历史（双重保险）
         try:
             user = agent.client.server.user_manager.get_user_by_id(user_id)
             email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
-            
-            in_context_messages = agent.client.server.agent_manager.get_in_context_messages(
+            email_reply_agent = agent.client.server.agent_manager.get_agent_by_id(
                 agent_id=email_reply_agent_id,
                 actor=user
             )
             
-            if len(in_context_messages) > 1:
-                original_count = len(in_context_messages)
-                in_context_messages = in_context_messages[:1]
+            # 最终强制清理：确保绝对只保留系统消息
+            if email_reply_agent.message_ids and len(email_reply_agent.message_ids) > 1:
+                original_count = len(email_reply_agent.message_ids)
                 agent.client.server.agent_manager.set_in_context_messages(
                     agent_id=email_reply_agent_id,
-                    message_ids=[message.id for message in in_context_messages],
+                    message_ids=[email_reply_agent.message_ids[0]],
                     actor=user
                 )
-                logger.info(f"✅ 任务 {task_id}: 执行后清理 email_reply_agent: {original_count} -> 1")
+                logger.info(f"🔒 任务 {task_id}: 最终清理 email_reply_agent: {original_count} -> 1")
+            else:
+                logger.info(f"✅ 任务 {task_id}: email_reply_agent 已保持清洁状态")
         except Exception as e:
-            logger.error(f"⚠️ 任务 {task_id}: 执行后清理失败: {str(e)}")
+            logger.error(f"⚠️ 任务 {task_id}: 最终清理失败: {str(e)}")
+            import traceback
+            logger.error(f"错误详情: {traceback.format_exc()}")
 
         # 发送回调
         try:
