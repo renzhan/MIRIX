@@ -602,7 +602,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             daemon=True
         ).start()
 
-        # 清理 email_reply_agent 消息历史
+        # 执行前清理 email_reply_agent 消息历史
         try:
             user = agent.client.server.user_manager.get_user_by_id(user_id)
             email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
@@ -778,6 +778,29 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                         "total_time": round(total_time, 2)
                     }
                 }
+
+        # 清理 email_reply_agent 消息历史
+        try:
+            user = agent.client.server.user_manager.get_user_by_id(user_id)
+            email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
+            email_reply_agent = agent.client.server.agent_manager.get_agent_by_id(
+                agent_id=email_reply_agent_id,
+                actor=user
+            )
+            
+            if len(email_reply_agent.message_ids) > 1:
+                original_count = len(email_reply_agent.message_ids)
+                new_message_ids = [email_reply_agent.message_ids[0]]
+                
+                agent.client.server.agent_manager.set_in_context_messages(
+                    agent_id=email_reply_agent_id,
+                    message_ids=new_message_ids,
+                    actor=user
+                )
+                
+                logger.info(f"✅ 任务 {task_id}: 已清理 email_reply_agent 消息历史: {original_count} -> 1")
+        except Exception as e:
+            logger.error(f"⚠️ 任务 {task_id}: 清理 email_reply_agent 消息历史失败: {str(e)}")
 
         # 发送回调
         try:
