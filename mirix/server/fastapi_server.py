@@ -3149,6 +3149,18 @@ class CreateUserResponse(BaseModel):
     user: Optional[Dict[str, Any]] = None
 
 
+class UpdateSystemPromptRequest(BaseModel):
+    agent_type: str  # "chat", "email_reply", "meta_memory", etc.
+
+
+class UpdateSystemPromptResponse(BaseModel):
+    success: bool
+    message: str
+    updated_agents: List[str] = []  # 更新的Agent ID列表
+    updated_at: Optional[str] = None
+    prompt_source: Optional[str] = None  # 提示词来源文件
+
+
 @app.post("/users/create", response_model=CreateUserResponse)
 async def create_user(request: CreateUserRequest):
     """Create a new user in the system"""
@@ -3170,6 +3182,161 @@ async def create_user(request: CreateUserRequest):
     except Exception as e:
         return CreateUserResponse(
             success=False, message=f"Error creating user: {str(e)}"
+        )
+
+
+@app.post("/system_prompt/update", response_model=UpdateSystemPromptResponse)
+async def update_system_prompt(request: UpdateSystemPromptRequest):
+    """
+    从文件重新加载系统提示词并对所有用户生效
+    
+    参数:
+    - agent_type: Agent类型 ("chat", "email_reply", "meta_memory", "workflow", etc.)
+    
+    返回:
+    - success: 是否成功
+    - message: 操作结果消息
+    - updated_agents: 更新的Agent ID列表
+    - updated_at: 更新时间
+    - prompt_source: 提示词来源文件
+    """
+    if agent is None:
+        raise HTTPException(status_code=500, detail="Agent not initialized")
+    
+    try:
+        # 参数验证
+        if not request.agent_type.strip():
+            raise HTTPException(status_code=400, detail="agent_type不能为空")
+        
+        logger.info(f"开始更新系统提示词 - agent_type: {request.agent_type}")
+        
+        # 根据agent_type映射到对应的提示词文件
+        prompt_file_mapping = {
+            "chat": "base/chat_agent",
+            "email_reply": "base/email_reply_agent", 
+            "meta_memory": "base/meta_memory_agent",
+            "workflow": "base/workflow_agent",
+            "episodic_memory": "base/episodic_memory_agent",
+            "semantic_memory": "base/semantic_memory_agent",
+            "procedural_memory": "base/procedural_memory_agent",
+            "resource_memory": "base/resource_memory_agent",
+            "knowledge_vault": "base/knowledge_vault_agent",
+        }
+        
+        prompt_file = prompt_file_mapping.get(request.agent_type.lower())
+        if not prompt_file:
+            available_types = list(prompt_file_mapping.keys())
+            raise HTTPException(
+                status_code=400, 
+                detail=f"不支持的agent_type: {request.agent_type}. 可用类型: {available_types}"
+            )
+        
+        # 从文件系统读取新的系统提示词
+        try:
+            new_system_prompt = gpt_system.get_system_text(prompt_file)
+            logger.info(f"✅ 从文件读取系统提示词: {prompt_file}, 长度: {len(new_system_prompt)} 字符")
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"无法读取提示词文件 {prompt_file}: {str(e)}"
+            )
+        
+        # 根据agent_type获取对应的agent_state
+        agent_type_mapping = {
+            "chat": agent.agent_states.agent_state,
+            "email_reply": agent.agent_states.email_reply_agent_state,
+            "meta_memory": agent.agent_states.meta_memory_agent_state,
+            "workflow": agent.agent_states.workflow_agent_state,
+            "episodic_memory": agent.agent_states.episodic_memory_agent_state,
+            "semantic_memory": agent.agent_states.semantic_memory_agent_state,
+            "procedural_memory": agent.agent_states.procedural_memory_agent_state,
+            "resource_memory": agent.agent_states.resource_memory_agent_state,
+            "knowledge_vault": agent.agent_states.knowledge_vault_agent_state,
+        }
+        
+        agent_state = agent_type_mapping.get(request.agent_type.lower())
+        if not agent_state:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Agent state not found for type: {request.agent_type}"
+            )
+        
+        agent_id = agent_state.id
+        logger.info(f"找到目标Agent - ID: {agent_id}, 类型: {request.agent_type}")
+        
+        # 获取所有用户列表
+        all_users = agent.client.server.user_manager.list_users()
+        agent_manager = agent.client.server.agent_manager
+        updated_agents = []
+        
+        # 对每个用户更新系统提示词
+        for user in all_users:
+            try:
+                logger.info(f"为用户 {user.name} (ID: {user.id}) 更新系统提示词")
+                
+                # 1. 更新 agent_state.system 字段到数据库
+                agent_manager.update_agent_system_prompt(
+                    agent_id=agent_id,
+                    system_prompt=new_system_prompt,
+                    actor=user
+                )
+                
+                # 2. 调用 rebuild_system_prompt(force=True) 创建新的系统消息
+                new_system_message = agent_manager.rebuild_system_prompt(
+                    agent_id=agent_id,
+                    actor=user,
+                    force=True
+                )
+                
+                # 3. 替换 message_ids[0] 使其立即生效
+                current_messages = agent_manager.get_in_context_messages(
+                    agent_id=agent_id,
+                    actor=user
+                )
+                
+                if current_messages and len(current_messages) > 0:
+                    # 保留除第一条消息外的所有消息
+                    new_message_ids = [new_system_message.id] + [msg.id for msg in current_messages[1:]]
+                    
+                    agent_manager.set_in_context_messages(
+                        agent_id=agent_id,
+                        message_ids=new_message_ids,
+                        actor=user
+                    )
+                    logger.info(f"✅ 用户 {user.name}: 已替换系统消息，保留 {len(current_messages)-1} 条历史消息")
+                else:
+                    # 如果没有历史消息，只设置新的系统消息
+                    agent_manager.set_in_context_messages(
+                        agent_id=agent_id,
+                        message_ids=[new_system_message.id],
+                        actor=user
+                    )
+                    logger.info(f"✅ 用户 {user.name}: 已设置新的系统消息（无历史消息）")
+                
+                updated_agents.append(f"{user.name}({user.id})")
+                
+            except Exception as e:
+                logger.error(f"为用户 {user.name} 更新系统提示词失败: {str(e)}")
+                continue
+        
+        updated_at = datetime.now().isoformat()
+        
+        return UpdateSystemPromptResponse(
+            success=True,
+            message=f"成功为 {len(updated_agents)} 个用户更新 {request.agent_type} Agent 的系统提示词",
+            updated_agents=updated_agents,
+            updated_at=updated_at,
+            prompt_source=prompt_file
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新系统提示词失败: {str(e)}")
+        logger.error(f"错误堆栈: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"更新系统提示词失败: {str(e)}"
         )
 
 
