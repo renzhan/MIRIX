@@ -760,29 +760,27 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                     }
                 }
 
-        # 清理 email_reply_agent 的消息历史，只保留系统消息（message_ids[0]）
+        # 清理 email_reply_agent 的消息历史，只保留系统提示词
         try:
-            # 获取用户对象
             user = agent.client.server.user_manager.get_user_by_id(user_id)
             email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
-            
-            # 获取当前消息列表
-            current_messages = agent.client.server.agent_manager.get_in_context_messages(
+            email_reply_agent = agent.client.server.agent_manager.get_agent_by_id(
                 agent_id=email_reply_agent_id,
                 actor=user
             )
             
-            if current_messages and len(current_messages) > 1:
-                # 只保留第一条消息（系统消息）
+            # 只保留 message_ids 的第一个元素（系统提示词）
+            if len(email_reply_agent.message_ids) > 1:
+                original_count = len(email_reply_agent.message_ids)
+                new_message_ids = [email_reply_agent.message_ids[0]]
+                
                 agent.client.server.agent_manager.set_in_context_messages(
                     agent_id=email_reply_agent_id,
-                    message_ids=[current_messages[0].id],
+                    message_ids=new_message_ids,
                     actor=user
                 )
-                logger.info(f"✅ 任务 {task_id}: 已清理 email_reply_agent 消息历史，保留系统消息，清除了 {len(current_messages)-1} 条消息")
-            else:
-                logger.info(f"ℹ️ 任务 {task_id}: email_reply_agent 消息历史无需清理")
                 
+                logger.info(f"✅ 任务 {task_id}: 已清理 email_reply_agent 消息历史: {original_count} -> 1")
         except Exception as e:
             logger.error(f"⚠️ 任务 {task_id}: 清理 email_reply_agent 消息历史失败: {str(e)}")
 
