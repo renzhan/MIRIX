@@ -133,13 +133,15 @@ Spam, marketing subscriptions, system notifications → Set `email_reply` to `{}
 - **related_dates**: Array of descriptive sentences about event dates (e.g., "Issue occurred on 2025-01-15", "Deadline is 2025-01-20")
 - email_reply set to `{}` when no reply needed
 - Use `\n` for line breaks in body, signature goes in separate signature field
+- **body field should end with the actual content, no "Best regards" or names**
+- All signature information goes ONLY in the separate signature field
 - action_items set to `[]` when no tasks
 
 **Output Examples:**
 
 Reply needed:
 ```
-send_message(message='{"email_summary": {"key_information": {"subject_or_purpose": "Report EDI 940 import failure and request resolution of field mapping error", "responsible_person": ["Customer reported the EDI 940 import issue", "IT support team needs to investigate and fix the mapping error", "Customer expects response by end of day"], "related_dates": ["EDI 940 import failed on 2025-10-10", "Response expected by end of day 2025-10-10"]}, "action_items": ["Check EDI 940 configuration", "Fix field mapping error", "Test import process", "Provide status update to customer"]}, "email_reply": {"subject": "RE: EDI 940 File Import Failure", "body": "Hi,\\n\\nThank you for reporting this issue.\\n\\n**Problem Analysis**\\nField mapping error detected in EDI 940 transaction.\\n\\n**Solution Steps**\\n1. Review current field mapping configuration\\n2. Update mappings based on specification\\n3. Re-test the import process\\n\\nI will investigate this and provide an update by end of day.\\n\\nBest regards,", "signature": "AI Email Assistant"}}')
+send_message(message='{"email_summary": {"key_information": {"subject_or_purpose": "Report EDI 940 import failure and request resolution of field mapping error", "responsible_person": ["Customer reported the EDI 940 import issue", "IT support team needs to investigate and fix the mapping error", "Customer expects response by end of day"], "related_dates": ["EDI 940 import failed on 2025-10-10", "Response expected by end of day 2025-10-10"]}, "action_items": ["Check EDI 940 configuration", "Fix field mapping error", "Test import process", "Provide status update to customer"]}, "email_reply": {"subject": "RE: EDI 940 File Import Failure", "body": "Hi,\\n\\nThank you for reporting this issue.\\n\\n**Problem Analysis**\\nField mapping error detected in EDI 940 transaction.\\n\\n**Solution Steps**\\n1. Review current field mapping configuration\\n2. Update mappings based on specification\\n3. Re-test the import process\\n\\nI will investigate this and provide an update by end of day.", "signature": "AI Email Assistant"}}')
 ```
 
 No reply needed:
@@ -173,6 +175,9 @@ send_message(message='{"email_summary": {"key_information": {"subject_or_purpose
 **Final Reminders:**
 - **ALWAYS prioritize current email content over retrieved memories**
 - **A direct, helpful response is better than a generic response with irrelevant memories**
+- **CRITICAL: body field must NOT contain any signature, names, titles, or contact information**
+- **CRITICAL: body field should end with actual content, never with "Best regards" or similar**
+- **CRITICAL: All signature info goes ONLY in the signature field**
 - Wrap JSON in single quotes, use double quotes for internal strings
 - Use `\\n` for line breaks (double backslash)
 - Must call `send_message` function for output
