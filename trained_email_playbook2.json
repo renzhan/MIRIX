@@ -1,0 +1,108 @@
+{
+  "bullets": {
+    "resolving-00001": {
+      "id": "resolving-00001",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Coordinate with Frances Parro Belleza for EDI order logic adjustments.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:44:42.973171+00:00",
+      "updated_at": "2025-11-07T05:45:58.338242+00:00"
+    },
+    "resolving-00002": {
+      "id": "resolving-00002",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Ensure 'Regular Order' is set for B2B ground orders.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:44:42.973171+00:00",
+      "updated_at": "2025-11-07T05:44:42.973171+00:00"
+    },
+    "resolving-00003": {
+      "id": "resolving-00003",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Integrate feedback from B-Solutions and Unis regarding API handling and order type differentiation.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:44:42.973171+00:00",
+      "updated_at": "2025-11-07T05:45:58.338242+00:00"
+    },
+    "resolving-00004": {
+      "id": "resolving-00004",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Maintain regular updates with Frances Parro Belleza and Michael Jan Francisco.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:44:42.973171+00:00",
+      "updated_at": "2025-11-07T05:45:58.338242+00:00"
+    },
+    "resolving-00005": {
+      "id": "resolving-00005",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Communicate with Cody Gorsuch to verify order types are sent correctly.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:45:01.647314+00:00",
+      "updated_at": "2025-11-07T05:45:01.647314+00:00"
+    },
+    "resolving-00006": {
+      "id": "resolving-00006",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Check the WMS for any pre-import changes affecting order type.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:45:01.647314+00:00",
+      "updated_at": "2025-11-07T05:45:01.647314+00:00"
+    },
+    "resolving-00007": {
+      "id": "resolving-00007",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Engage with the Joliet team to explore their capabilities and potential solutions.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:45:01.647314+00:00",
+      "updated_at": "2025-11-07T05:45:01.647314+00:00"
+    },
+    "resolving-00008": {
+      "id": "resolving-00008",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Integrate feedback from B-Solutions and Unis regarding API handling and order type differentiation.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:45:37.993355+00:00",
+      "updated_at": "2025-11-07T05:45:37.993355+00:00"
+    },
+    "resolving-00009": {
+      "id": "resolving-00009",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Maintain regular updates with Frances Parro Belleza and Michael Jan Francisco.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:45:37.993355+00:00",
+      "updated_at": "2025-11-07T05:45:37.993355+00:00"
+    }
+  },
+  "sections": {
+    "Resolving Duke Cannon B2B Order Type Issues": [
+      "resolving-00001",
+      "resolving-00002",
+      "resolving-00003",
+      "resolving-00004",
+      "resolving-00005",
+      "resolving-00006",
+      "resolving-00007",
+      "resolving-00008",
+      "resolving-00009"
+    ]
+  },
+  "next_id": 9
+}

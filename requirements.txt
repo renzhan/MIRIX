@@ -19,6 +19,7 @@ humps
 composio
 colorama
 anthropic
+httpx>=0.24.0
 httpx_sse
 rapidfuzz
 rank-bm25
@@ -53,3 +54,4 @@ pyright
 pytest
 ace-framework>=0.2.0
 litellm>=1.79.0
+pymysql>=1.0.0
