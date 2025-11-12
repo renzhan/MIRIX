@@ -641,27 +641,48 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         )
         
         # 立即清理 email_reply_agent 消息历史（防止并发竞态）
+        logger.info(f"🔄 任务 {task_id}: 开始立即清理流程")
+        print(f"🔄 任务 {task_id}: 开始立即清理流程")
         try:
             user = agent.client.server.user_manager.get_user_by_id(user_id)
+            logger.info(f"🔄 任务 {task_id}: 获取用户成功: {user.id}")
+            print(f"🔄 任务 {task_id}: 获取用户成功: {user.id}")
+            
             email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
+            logger.info(f"🔄 任务 {task_id}: email_reply_agent_id: {email_reply_agent_id}")
+            print(f"🔄 任务 {task_id}: email_reply_agent_id: {email_reply_agent_id}")
+            
             email_reply_agent = agent.client.server.agent_manager.get_agent_by_id(
                 agent_id=email_reply_agent_id,
                 actor=user
             )
+            logger.info(f"🔄 任务 {task_id}: 获取 agent 成功，当前 message_ids 数量: {len(email_reply_agent.message_ids)}")
+            print(f"🔄 任务 {task_id}: 获取 agent 成功，当前 message_ids 数量: {len(email_reply_agent.message_ids)}")
+            print(f"🔄 任务 {task_id}: message_ids: {email_reply_agent.message_ids}")
             
             # 强制清理：无论有多少消息，都只保留第一个
             if email_reply_agent.message_ids and len(email_reply_agent.message_ids) > 1:
                 original_count = len(email_reply_agent.message_ids)
+                logger.info(f"🔄 任务 {task_id}: 需要清理，从 {original_count} 个消息清理到 1 个")
+                print(f"🔄 任务 {task_id}: 需要清理，从 {original_count} 个消息清理到 1 个")
+                
                 agent.client.server.agent_manager.set_in_context_messages(
                     agent_id=email_reply_agent_id,
                     message_ids=[email_reply_agent.message_ids[0]],
                     actor=user
                 )
+                
                 logger.info(f"🔄 任务 {task_id}: 消息处理后立即清理 email_reply_agent: {original_count} -> 1")
+                print(f"🔄 任务 {task_id}: 消息处理后立即清理 email_reply_agent: {original_count} -> 1")
+            else:
+                logger.info(f"ℹ️ 任务 {task_id}: 无需清理，message_ids 数量: {len(email_reply_agent.message_ids) if email_reply_agent.message_ids else 0}")
+                print(f"ℹ️ 任务 {task_id}: 无需清理，message_ids 数量: {len(email_reply_agent.message_ids) if email_reply_agent.message_ids else 0}")
         except Exception as e:
             logger.error(f"⚠️ 任务 {task_id}: 消息处理后立即清理失败: {str(e)}")
+            print(f"⚠️ 任务 {task_id}: 消息处理后立即清理失败: {str(e)}")
             import traceback
             logger.error(f"错误详情: {traceback.format_exc()}")
+            print(f"错误详情: {traceback.format_exc()}")
 
         # 处理响应
         if response == "ERROR":
@@ -1166,6 +1187,13 @@ class EmailReplyRequest(BaseModel):
     email_basic_id: str
     callback_url: str  # 回调地址
     attach_url: Optional[List[Dict[str, str]]] = None  # 附件列表，格式: [{"filename": "xxx", "realname": "xxx"}]
+
+
+class EmailReply(BaseModel):
+    email_content: str
+    category_list: str
+    user_id: str
+    attach_url: Optional[List[Dict[str, str]]] = None
 
 
 class EmailReplyResponse(BaseModel):
@@ -3782,6 +3810,240 @@ async def process_mysql_email(request: ProcessMysqlEmailRequest):
         raise HTTPException(
             status_code=500,
             detail=f"MySQL邮件处理失败: {str(e)}"
+        )
+
+
+@app.post("/api/process_email_reply")   
+async def process_email_reply(request: EmailReply):
+    """
+    处理邮件回复任务
+    """
+
+    email_content = request.email_content
+    category_list = request.category_list
+    user_id = request.user_id
+    attach_url = request.attach_url
+    """后台处理邮件回复任务"""
+    processing_start_time = time.time()
+
+    try:
+
+        # 处理附件列表
+        attachment_contents = []
+        if attach_url and isinstance(attach_url, list):
+            logger.info(f"开始解析 {len(attach_url)} 个附件")
+            
+            for index, attachment in enumerate(attach_url):
+                filename = attachment.get('filename', '未知文件')
+                realname = attachment.get('realname', '')
+                download_url = build_download_url(filename)
+                if download_url:
+                    logger.info(
+                        f"开始解析附件 {index+1}/{len(attach_url)}: {realname} (下载URL: {download_url})"
+                    )
+                    content = parse_attachment_from_url(download_url, realname)
+                    
+                    if content and not content.startswith("["):
+                        attachment_contents.append(f"📎附件{index+1}: {realname}:\n{content}")
+                    else:
+                        logger.warning(f"⚠️ 附件解析失败或跳过: {filename} - {content}")
+        
+        # 合并邮件内容和附件内容
+        full_email_content = email_content
+        if attachment_contents:
+            full_email_content += "\n\n" + "\n\n".join(attachment_contents)
+
+        # 带标签
+        absorb_content = f"""
+        {full_email_content}
+        
+        请根据上述邮件内容，作为Meta Memory Manager进行分析并协调相应的记忆管理器。
+        {f'📌 注意：此邮件属于"{category_list}"分类，请在相关记忆中使用此分类作为 source_category 标签。' if category_list and category_list != '未分类' else ''}
+        """
+        
+        # 异步执行absorb，不等待结果
+        threading.Thread(
+            target=lambda: agent.send_message(
+                message=absorb_content,
+                memorizing=True,
+                force_absorb_content=True,
+                user_id=user_id
+            ),
+            daemon=True
+        ).start()
+
+        # 执行前清理 email_reply_agent 消息历史
+        try:
+            user = agent.client.server.user_manager.get_user_by_id(user_id)
+            email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
+            email_reply_agent = agent.client.server.agent_manager.get_agent_by_id(
+                agent_id=email_reply_agent_id,
+                actor=user
+            )
+            
+            # 直接检查 message_ids 而不是过滤后的消息
+            if email_reply_agent.message_ids and len(email_reply_agent.message_ids) > 1:
+                original_count = len(email_reply_agent.message_ids)
+                # 只保留第一个 message_id（系统消息）
+                agent.client.server.agent_manager.set_in_context_messages(
+                    agent_id=email_reply_agent_id,
+                    message_ids=[email_reply_agent.message_ids[0]],
+                    actor=user
+                )
+            else:
+                pass
+        except Exception as e:
+            pass
+
+        # 执行邮件回复生成
+        response, _ = agent.message_queue.send_message_in_queue(
+            agent.client,
+            agent.agent_states.email_reply_agent_state.id,
+            {
+                "user_id": user_id,
+                "message": full_email_content,
+                "force_response": True
+            },
+            agent_type="email_reply",
+        )
+        
+        # 立即清理 email_reply_agent 消息历史（防止并发竞态）
+        try:
+            user = agent.client.server.user_manager.get_user_by_id(user_id)
+            email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
+            email_reply_agent = agent.client.server.agent_manager.get_agent_by_id(
+                agent_id=email_reply_agent_id,
+                actor=user
+            )
+            # 强制清理：无论有多少消息，都只保留第一个
+            if email_reply_agent.message_ids and len(email_reply_agent.message_ids) > 1:
+                original_count = len(email_reply_agent.message_ids)
+                agent.client.server.agent_manager.set_in_context_messages(
+                    agent_id=email_reply_agent_id,
+                    message_ids=[email_reply_agent.message_ids[0]],
+                    actor=user
+                )
+                
+            else:
+                pass
+        except Exception as e:
+            pass
+
+        # 处理响应
+        if response == "ERROR":
+            actual_processing_time = time.time() - processing_start_time
+            result = {
+                "status": "error",
+                "error": "邮件回复生成失败",
+                "category_list": category_list,
+                "timing": {
+                    "processing_time": round(actual_processing_time, 2),
+                }
+            }
+        elif not hasattr(response, "messages") or len(response.messages) < 2:
+            actual_processing_time = time.time() - processing_start_time
+            result = {
+                "status": "error",
+                "error": "响应结构无效",
+                "category_list": category_list,
+                "timing": {
+                    "processing_time": round(actual_processing_time, 2),
+                }
+            }
+        else:
+            try:
+                # 解析响应
+
+                num_tools_called = 0
+                for message in response.messages[::-1]:
+                    if message.message_type == MessageType.tool_return_message:
+                        num_tools_called += 1
+                    else:
+                        break
+
+                if not hasattr(response.messages[-(num_tools_called * 2 + 1)], "tool_call"):
+                    actual_processing_time = time.time() - processing_start_time
+
+                    result = {
+                        "status": "error",
+                        "error": "缺少工具调用",
+                        "category_list": category_list,
+                        "timing": {
+                        "processing_time": round(actual_processing_time, 2),
+                        }
+                    }
+                    
+                else:
+                    tool_call = response.messages[-(num_tools_called * 2 + 1)].tool_call
+                    parsed_args = parse_json(tool_call.arguments)
+
+                    # 提取message字段
+                    message_content = parsed_args.get("message", "")
+                    
+                    # 如果message是JSON字符串，尝试解析提取email_reply.body
+                    if message_content and isinstance(message_content, str):
+                        try:
+                            message_json = json.loads(message_content)
+                            if isinstance(message_json, dict) and "email_reply" in message_json:
+                                email_reply = message_json["email_reply"]
+                                if isinstance(email_reply, dict) and "body" in email_reply:
+                                    message_content = email_reply["body"]
+                        except (json.JSONDecodeError, KeyError, TypeError):
+                            pass  # 保持原始message_content
+                    
+                    if not message_content:
+                        actual_processing_time = time.time() - processing_start_time
+                        result = {
+                            "status": "error",
+                            "error": "缺少消息内容",
+                            "category_list": category_list,
+                            "timing": {
+                                "processing_time": round(actual_processing_time, 2),
+                            }
+                        }
+                    else:
+                        actual_processing_time = time.time() - processing_start_time
+                        result = {
+                            "status": "completed",
+                            "reply_content": parsed_args["message"],
+                            "category_list": category_list,
+                            "timing": {
+                                "processing_time": round(actual_processing_time, 2),
+                            }
+                        }
+            except Exception as e:
+                actual_processing_time = time.time() - processing_start_time
+                result = {
+                    "status": "error",
+                    "error": f"解析响应失败: {str(e)}",
+                    "category_list": category_list,
+                    "timing": {
+                        "processing_time": round(actual_processing_time, 2),
+                    }
+                }
+
+
+        user = agent.client.server.user_manager.get_user_by_id(user_id)
+        email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
+        email_reply_agent = agent.client.server.agent_manager.get_agent_by_id(
+            agent_id=email_reply_agent_id,
+            actor=user
+        )
+
+        # 最终强制清理：确保绝对只保留系统消息
+        if email_reply_agent.message_ids and len(email_reply_agent.message_ids) > 1:
+            original_count = len(email_reply_agent.message_ids)
+            agent.client.server.agent_manager.set_in_context_messages(
+                agent_id=email_reply_agent_id,
+                message_ids=[email_reply_agent.message_ids[0]],
+                actor=user
+            )
+        return result
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"处理邮件回复任务失败: {str(e)}"
         )
 
 
