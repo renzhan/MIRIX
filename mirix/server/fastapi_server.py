@@ -3849,9 +3849,9 @@ async def process_email_reply(request: EmailReply):
                         logger.warning(f"⚠️ 附件解析失败或跳过: {filename} - {content}")
         
         # 合并邮件内容和附件内容
-        full_email_content = email_content
+        full_email_content = "Write an email reply as the recipient, using memory to help craft a more appropriate response.\n\n" + email_content
         if attachment_contents:
-            full_email_content += "\n\n" + "\n\n".join(attachment_contents)
+            full_email_content += "Attachment content as follows:\n\n" + "\n\n".join(attachment_contents)
 
         # 带标签
         absorb_content = f"""
@@ -3875,25 +3875,14 @@ async def process_email_reply(request: EmailReply):
         # 执行前清理 email_reply_agent 消息历史
         try:
             user = agent.client.server.user_manager.get_user_by_id(user_id)
-            email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
-            email_reply_agent = agent.client.server.agent_manager.get_agent_by_id(
-                agent_id=email_reply_agent_id,
-                actor=user
+            agent.client.server.agent_manager.reset_messages(
+                agent_id=agent.agent_states.agent_state.id,
+                actor=user,
+                add_default_initial_messages=True,  # Keep system message and initial setup
             )
-            
-            # 直接检查 message_ids 而不是过滤后的消息
-            if email_reply_agent.message_ids and len(email_reply_agent.message_ids) > 1:
-                original_count = len(email_reply_agent.message_ids)
-                # 只保留第一个 message_id（系统消息）
-                agent.client.server.agent_manager.set_in_context_messages(
-                    agent_id=email_reply_agent_id,
-                    message_ids=[email_reply_agent.message_ids[0]],
-                    actor=user
-                )
-            else:
-                pass
+
         except Exception as e:
-            pass
+            print("清理错误：", e)
 
         # 执行邮件回复生成
         response, _ = agent.message_queue.send_message_in_queue(
@@ -3906,28 +3895,6 @@ async def process_email_reply(request: EmailReply):
             },
             agent_type="email_reply",
         )
-        
-        # 立即清理 email_reply_agent 消息历史（防止并发竞态）
-        try:
-            user = agent.client.server.user_manager.get_user_by_id(user_id)
-            email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
-            email_reply_agent = agent.client.server.agent_manager.get_agent_by_id(
-                agent_id=email_reply_agent_id,
-                actor=user
-            )
-            # 强制清理：无论有多少消息，都只保留第一个
-            if email_reply_agent.message_ids and len(email_reply_agent.message_ids) > 1:
-                original_count = len(email_reply_agent.message_ids)
-                agent.client.server.agent_manager.set_in_context_messages(
-                    agent_id=email_reply_agent_id,
-                    message_ids=[email_reply_agent.message_ids[0]],
-                    actor=user
-                )
-                
-            else:
-                pass
-        except Exception as e:
-            pass
 
         # 处理响应
         if response == "ERROR":
@@ -4022,22 +3989,12 @@ async def process_email_reply(request: EmailReply):
                     }
                 }
 
-
         user = agent.client.server.user_manager.get_user_by_id(user_id)
-        email_reply_agent_id = agent.agent_states.email_reply_agent_state.id
-        email_reply_agent = agent.client.server.agent_manager.get_agent_by_id(
-            agent_id=email_reply_agent_id,
-            actor=user
+        agent.client.server.agent_manager.reset_messages(
+            agent_id=agent.agent_states.agent_state.id,
+            actor=user,
+            add_default_initial_messages=True,  # Keep system message and initial setup
         )
-
-        # 最终强制清理：确保绝对只保留系统消息
-        if email_reply_agent.message_ids and len(email_reply_agent.message_ids) > 1:
-            original_count = len(email_reply_agent.message_ids)
-            agent.client.server.agent_manager.set_in_context_messages(
-                agent_id=email_reply_agent_id,
-                message_ids=[email_reply_agent.message_ids[0]],
-                actor=user
-            )
         return result
 
     except Exception as e:
