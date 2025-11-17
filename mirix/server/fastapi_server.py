@@ -12,6 +12,7 @@ import time
 import hashlib
 import multiprocessing
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -591,16 +592,17 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         {f'📌 注意：此邮件属于"{category_list}"分类，请在相关记忆中使用此分类作为 source_category 标签。' if category_list and category_list != '未分类' else ''}
         """
         
-        # 异步执行absorb，不等待结果
-        threading.Thread(
-            target=lambda: agent.send_message(
+        # 使用线程池异步执行absorb，避免线程累积
+        if _absorb_executor:
+            _absorb_executor.submit(
+                agent.send_message,
                 message=absorb_content,
                 memorizing=True,
                 force_absorb_content=True,
                 user_id=user_id
-            ),
-            daemon=True
-        ).start()
+            )
+        else:
+            logger.warning("Absorb线程池未初始化，跳过记忆吸收")
 
         # 执行前清理 email_reply_agent 消息历史
         try:
@@ -1229,6 +1231,9 @@ EMAIL_REPLY_QUEUE = "email_reply_queue"
 worker_threads = []
 worker_shutdown_event = threading.Event()
 
+# Absorb线程池 - 用于异步记忆吸收,避免线程累积
+_absorb_executor: Optional[ThreadPoolExecutor] = None
+
 
 def generate_task_id(user_id: str, email_basic_id: str, email_content: str) -> str:
     """根据用户ID和邮件内容生成MD5任务ID"""
@@ -1292,7 +1297,7 @@ def email_reply_worker():
 
 def start_email_reply_workers():
     """启动邮件回复工作线程池"""
-    global worker_threads
+    global worker_threads, _absorb_executor
 
     # 计算线程数：CPU核数的2倍，最少2个
     cpu_count = multiprocessing.cpu_count()
@@ -1310,13 +1315,17 @@ def start_email_reply_workers():
         thread.start()
         worker_threads.append(thread)
 
+    # 初始化Absorb线程池 - 最多4个线程用于记忆吸收
+    _absorb_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="AbsorbWorker")
+    logger.info(f"[Absorb线程池] ✅ 初始化完成，最大工作线程: 4")
+
     logger.info(f"[工作线程池] ✅ 启动完成，共 {len(worker_threads)} 个线程")
     logger.info(f"="*80)
 
 
 def stop_email_reply_workers():
     """停止邮件回复工作线程池"""
-    global worker_threads
+    global worker_threads, _absorb_executor
 
     logger.info("正在停止邮件回复工作线程池...")
     worker_shutdown_event.set()
@@ -1326,6 +1335,14 @@ def stop_email_reply_workers():
         thread.join(timeout=10)
 
     worker_threads.clear()
+
+    # 关闭Absorb线程池
+    if _absorb_executor:
+        logger.info("正在关闭Absorb线程池...")
+        _absorb_executor.shutdown(wait=True, cancel_futures=False)
+        _absorb_executor = None
+        logger.info("Absorb线程池已关闭")
+
     logger.info("邮件回复工作线程池已停止")
 
 
@@ -3864,16 +3881,17 @@ async def process_email_reply(request: EmailReply):
         {f'📌 注意：此邮件属于"{category_list}"分类，请在相关记忆中使用此分类作为 source_category 标签。' if category_list and category_list != '未分类' else ''}
         """
         
-        # 异步执行absorb，不等待结果
-        threading.Thread(
-            target=lambda: agent.send_message(
+        # 使用线程池异步执行absorb，避免线程累积
+        if _absorb_executor:
+            _absorb_executor.submit(
+                agent.send_message,
                 message=absorb_content,
                 memorizing=True,
                 force_absorb_content=True,
                 user_id=user_id
-            ),
-            daemon=True
-        ).start()
+            )
+        else:
+            logger.warning("Absorb线程池未初始化，跳过记忆吸收")
 
         # 执行前清理 email_reply_agent 消息历史
         try:
