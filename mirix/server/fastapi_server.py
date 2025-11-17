@@ -628,13 +628,21 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             import traceback
             logger.error(f"错误详情: {traceback.format_exc()}")
 
-        # 执行邮件回复生成
+        # 执行邮件回复生成 - 加强角色提示
+        role_enhanced_content = f"""You are the RECIPIENT of the following email. The sender is asking YOU to respond.
+
+=== EMAIL YOU RECEIVED ===
+{full_email_content}
+=== END OF EMAIL ===
+
+Now write YOUR reply as the RECIPIENT to address what the sender is asking YOU to do."""
+        
         response, _ = agent.message_queue.send_message_in_queue(
             agent.client,
             agent.agent_states.email_reply_agent_state.id,
             {
                 "user_id": user_id,
-                "message": full_email_content,
+                "message": role_enhanced_content,
                 "force_response": True
             },
             agent_type="email_reply",
@@ -724,9 +732,7 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         else:
             try:
                 # 解析响应
-
                 logger.info(f"response: {response.messages}")
-                
                 num_tools_called = 0
                 for message in response.messages[::-1]:
                     if message.message_type == MessageType.tool_return_message:
@@ -3444,9 +3450,6 @@ async def reply_to_email(request: EmailReplyRequest):
         if not request.email_content.strip():
             raise HTTPException(status_code=400, detail="email_content不能为空")
 
-        if not request.category_list.strip():
-            raise HTTPException(status_code=400, detail="category_list不能为空")
-
         if not request.email_basic_id.strip():
             raise HTTPException(status_code=400, detail="email_basic_id不能为空")
 
@@ -3884,13 +3887,21 @@ async def process_email_reply(request: EmailReply):
         except Exception as e:
             print("清理错误：", e)
 
-        # 执行邮件回复生成
+        # 执行邮件回复生成 - 加强角色提示
+        role_enhanced_content = f"""You are the RECIPIENT of the following email. The sender is asking YOU to respond.
+
+=== EMAIL YOU RECEIVED ===
+{full_email_content}
+=== END OF EMAIL ===
+
+Now write YOUR reply as the RECIPIENT to address what the sender is asking YOU to do."""
+        
         response, _ = agent.message_queue.send_message_in_queue(
             agent.client,
             agent.agent_states.email_reply_agent_state.id,
             {
                 "user_id": user_id,
-                "message": full_email_content,
+                "message": role_enhanced_content,
                 "force_response": True
             },
             agent_type="email_reply",
