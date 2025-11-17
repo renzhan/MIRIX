@@ -55,3 +55,4 @@ pytest
 ace-framework>=0.2.0
 litellm>=1.79.0
 pymysql>=1.0.0
+pycryptodome>=3.19.0
