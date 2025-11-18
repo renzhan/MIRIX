@@ -381,6 +381,7 @@ def parse_attachment_from_url(url: str, original_filename: Optional[str] = None)
                     return content
             except Exception as e:
                 logger.warning(f"AiopTools解析失败: {url}, 错误: {str(e)}")
+                print(f"AiopTools解析失败: {url}, 错误: {str(e)}")
 
             parser_ext = suffix
             parser = get_parser_for_file(parser_ext)

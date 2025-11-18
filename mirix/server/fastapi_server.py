@@ -1301,7 +1301,8 @@ def start_email_reply_workers():
 
     # 计算线程数：CPU核数的2倍，最少2个
     cpu_count = multiprocessing.cpu_count()
-    thread_count = max(2, cpu_count * 2)
+    # thread_count = max(2, cpu_count * 2)
+    thread_count = 2 # 设小点
 
     logger.info(f"="*80)
     logger.info(f"[工作线程池] 准备启动 {thread_count} 个邮件回复工作线程")
@@ -1320,6 +1321,7 @@ def start_email_reply_workers():
     logger.info(f"[Absorb线程池] ✅ 初始化完成，最大工作线程: 4")
 
     logger.info(f"[工作线程池] ✅ 启动完成，共 {len(worker_threads)} 个线程")
+    print(f"[工作线程池] ✅ 启动完成，共 {len(worker_threads)} 个线程")
     logger.info(f"="*80)
 
 
@@ -3541,6 +3543,7 @@ async def reply_to_email(request: EmailReplyRequest):
         redis_client.rpush(EMAIL_REPLY_QUEUE, queue_json)
         attach_count = len(attach_url_list) if attach_url_list else 0
         logger.info(f"邮件回复任务已排队: {task_id}, 附件数: {attach_count}")
+        print(f"邮件回复任务已排队: {task_id}, 附件数: {attach_count}")
 
         request_total_time = time.time() - request_start_time
         logger.info(f"[EMAIL_REPLY_API] 任务 {task_id} 接口处理完成，总耗时: {request_total_time:.3f}秒")
