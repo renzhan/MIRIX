@@ -1656,7 +1656,7 @@ async def summarize_email(request: EmailSummaryRequest):
         # 直接调用大模型
         from mirix.llm_api.llm_api_tools import create
 
-        llm_config = agent.client.server.server_llm_config
+        llm_config = agent.agent_states.agent_state.llm_config
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
             None,
