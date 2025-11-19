@@ -1660,12 +1660,12 @@ async def summarize_email(request: EmailSummaryRequest):
         )
         
         response = client.chat.completions.create(
-            model="gpt-4.1",
+            model="gpt-5.1",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.7
+            temperature=0.4
         )
 
         summary = response.choices[0].message.content
