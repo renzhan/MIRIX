@@ -1,0 +1,86 @@
+{
+  "bullets": {
+    "resolving-00001": {
+      "id": "resolving-00001",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Coordinate with Frances Parro Belleza to discuss the logic changes needed for Duke Cannon’s EDI orders, ensuring that B2B ground orders are set to 'Regular Order'. Confirm this specific configuration value as part of the resolution process. Regularly sync progress with Michael Jan Francisco to ensure alignment.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:25:19.718988+00:00",
+      "updated_at": "2025-11-07T05:26:26.498580+00:00"
+    },
+    "resolving-00002": {
+      "id": "resolving-00002",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Communicate with Cody Gorsuch to verify order types are sent correctly.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:25:19.718988+00:00",
+      "updated_at": "2025-11-07T05:25:19.718988+00:00"
+    },
+    "resolving-00003": {
+      "id": "resolving-00003",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Check the WMS for any pre-import changes affecting order type.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:25:37.197586+00:00",
+      "updated_at": "2025-11-07T05:25:37.197586+00:00"
+    },
+    "resolving-00004": {
+      "id": "resolving-00004",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Engage with the Joliet team to explore their capabilities and potential solutions.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:25:37.197586+00:00",
+      "updated_at": "2025-11-07T05:25:37.197586+00:00"
+    },
+    "resolving-00005": {
+      "id": "resolving-00005",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Incorporate feedback from B-Solutions and Unis regarding API handling and order type differentiation.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:25:37.197586+00:00",
+      "updated_at": "2025-11-07T05:25:37.197586+00:00"
+    },
+    "resolving-00006": {
+      "id": "resolving-00006",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Regularly review updates from Frances Parro Belleza and Michael Jan Francisco to align on progress.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:25:37.197586+00:00",
+      "updated_at": "2025-11-07T05:25:37.197586+00:00"
+    },
+    "resolving-00007": {
+      "id": "resolving-00007",
+      "section": "Resolving Duke Cannon B2B Order Type Issues",
+      "content": "Ensure EDI order logic is adjusted to set B2B ground orders to 'Regular Order'. Provide a detailed step-by-step approach for this configuration.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-07T05:25:53.950334+00:00",
+      "updated_at": "2025-11-07T05:25:53.950334+00:00"
+    }
+  },
+  "sections": {
+    "Resolving Duke Cannon B2B Order Type Issues": [
+      "resolving-00001",
+      "resolving-00002",
+      "resolving-00003",
+      "resolving-00004",
+      "resolving-00005",
+      "resolving-00006",
+      "resolving-00007"
+    ]
+  },
+  "next_id": 7
+}
