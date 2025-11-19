@@ -1665,8 +1665,7 @@ async def summarize_email(request: EmailSummaryRequest):
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
-                ],
-                user_id=None
+                ]
             )
         )
 
