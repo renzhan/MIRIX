@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
+from openai import OpenAI
 import yaml
 import redis
 import requests
@@ -1653,29 +1653,22 @@ async def summarize_email(request: EmailSummaryRequest):
 {request.email_content}
 === 邮件内容结束 ==="""
 
-        # 直接调用大模型
-        from mirix.llm_api.llm_api_tools import create
 
-        llm_config = agent.agent_states.agent_state.llm_config
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None,
-            lambda: create(
-                llm_config=llm_config,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ]
-            )
+
+        client = OpenAI(
+            api_key=os.getenv('OPENAI_API_KEY'),
+        )
+        
+        response = client.chat.completions.create(
+            model="gpt-4.1",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.7
         )
 
-        if not response or not response.choices or not response.choices[0].message:
-            raise HTTPException(status_code=500, detail="邮件总结生成失败")
-
         summary = response.choices[0].message.content
-
-        if response == "ERROR" or not response:
-            raise HTTPException(status_code=500, detail="邮件总结生成失败")
 
         logger.info(f"[EMAIL_SUMMARY] 邮件总结完成 - email_account: {request.email_account}")
         
