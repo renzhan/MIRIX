@@ -36,6 +36,14 @@ from ..schemas.mirix_message import MessageType
 from prepdocslib.attachment_utils import build_download_url, parse_attachment_from_url
 
 
+def _load_system_prompt(prompt_name: str) -> str:
+    """Load system prompt from file"""
+    prompt_path = Path(__file__).parent.parent / "prompts" / "system" / "base" / f"{prompt_name}.txt"
+    if prompt_path.exists():
+        return prompt_path.read_text(encoding="utf-8")
+    return ""
+
+
 # 全局标志，确保日志只配置一次
 _logging_configured = False
 _attachment_log_file: Optional[str] = None
@@ -1058,6 +1066,16 @@ class WorkflowExtractionResponse(BaseModel):
     workflow_result: Any  # 可以是字典或字符串
 
 
+class EmailSummaryRequest(BaseModel):
+    email_content: str
+    email_account: str
+
+
+class EmailSummaryResponse(BaseModel):
+    summary: str
+    status: str = "success"
+
+
 # API Key validation functionality
 def get_required_api_keys_for_model(model_endpoint_type: str) -> List[str]:
     """Get required API keys for a given model endpoint type"""
@@ -1604,6 +1622,72 @@ async def send_message_endpoint(request: MessageRequest):
         raise HTTPException(
             status_code=500, detail=f"Error processing message: {str(e)}"
         )
+
+
+@app.post("/email/summary", response_model=EmailSummaryResponse)
+async def summarize_email(request: EmailSummaryRequest):
+    """
+    邮件总结接口
+    
+    输入:
+    - email_content: 完整的邮件内容（包含过往上下文）
+    - email_account: 邮箱账号
+    
+    输出:
+    - summary: 邮件总结内容
+    - status: 处理状态
+    """
+    try:
+        if not request.email_account.strip():
+            raise HTTPException(status_code=400, detail="email_account不能为空")
+        if not request.email_content.strip():
+            raise HTTPException(status_code=400, detail="email_content不能为空")
+
+        # 加载系统提示词
+        system_prompt = _load_system_prompt("email_summary")
+        
+        # 构建用户提示词
+        user_prompt = f"""我的邮箱账号是：{request.email_account}, 帮我对邮件做出总结
+
+=== 邮件内容 ===
+{request.email_content}
+=== 邮件内容结束 ==="""
+
+        # 直接调用大模型
+        from mirix.llm_api.llm_api_tools import create
+
+        llm_config = agent.client.server.server_llm_config
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: create(
+                llm_config=llm_config,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                user_id=None
+            )
+        )
+
+        if not response or not response.choices or not response.choices[0].message:
+            raise HTTPException(status_code=500, detail="邮件总结生成失败")
+
+        summary = response.choices[0].message.content
+
+        if response == "ERROR" or not response:
+            raise HTTPException(status_code=500, detail="邮件总结生成失败")
+
+        logger.info(f"[EMAIL_SUMMARY] 邮件总结完成 - email_account: {request.email_account}")
+        
+        return EmailSummaryResponse(summary=summary, status="success")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[EMAIL_SUMMARY] 处理失败: {str(e)}")
+        logger.error(f"[EMAIL_SUMMARY] 错误堆栈: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"邮件总结失败: {str(e)}")
 
 
 @app.post("/workflow/extract", response_model=WorkflowExtractionResponse)
