@@ -50,3 +50,5 @@ test-results/
 test_*.db
 .venv/
 .idea/
+.DS_Store
+*.log
