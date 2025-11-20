@@ -532,7 +532,7 @@ _mcp_tools_registered = False
 
 
 def process_email_reply_task(task_id: str, email_content: str, category_list: str, user_id: str, email_basic_id: str,
-                             callback_url: str, attach_url: Optional[List[Dict[str, str]]] = None):
+                             callback_url: str, email_account: str = "", attach_url: Optional[List[Dict[str, str]]] = None):
     """后台处理邮件回复任务"""
     processing_start_time = time.time()
 
@@ -592,9 +592,10 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         if attachment_contents:
             full_email_content += "\n\n" + "\n\n".join(attachment_contents)
 
-        # 带标签
+        # 带标签和用户邮箱身份
+        user_identity_text = f"\n📧 我的邮箱账户: {email_account} ，注意有些只是抄送给我的" if email_account else ""
         absorb_content = f"""
-        {full_email_content}
+        {full_email_content}{user_identity_text}
         
         请根据上述邮件内容，作为Meta Memory Manager进行分析并协调相应的记忆管理器。
         {f'📌 注意：此邮件属于"{category_list}"分类，请在相关记忆中使用此分类作为 source_category 标签。' if category_list and category_list != '未分类' else ''}
@@ -638,14 +639,15 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             import traceback
             logger.error(f"错误详情: {traceback.format_exc()}")
 
-        # 执行邮件回复生成 - 加强角色提示
-        role_enhanced_content = f"""You are the RECIPIENT of the following email. The sender is asking YOU to respond.
+        # 执行邮件回复生成 - 加强角色提示并添加用户邮箱身份
+        recipient_identity = f"\n\n📧 MY EMAIL ADDRESS: {email_account}" if email_account else ""
+        role_enhanced_content = f"""You are the RECIPIENT of the following email. The sender is asking YOU to respond.{recipient_identity}
 
 === EMAIL YOU RECEIVED ===
 {full_email_content}
 === END OF EMAIL ===
 
-Now write YOUR reply as the RECIPIENT to address what the sender is asking YOU to do."""
+Now write YOUR reply as the RECIPIENT to address what the sender is asking YOU to do.{" Check if this email is addressed to you (TO field) or if you're CC'd. Consider this when crafting your response." if email_account else ""}"""
         
         response, _ = agent.message_queue.send_message_in_queue(
             agent.client,
@@ -1284,6 +1286,7 @@ def email_reply_worker():
             user_id = task_info['user_id']
             email_basic_id = task_info['email_basic_id']
             callback_url = task_info['callback_url']
+            email_account = task_info.get('email_account', '')
             attach_url = task_info.get('attach_url', [])
 
             logger.info(f"工作线程 {threading.current_thread().name} 开始处理任务: {task_id}")
@@ -1302,7 +1305,7 @@ def email_reply_worker():
                 continue
 
             # 处理任务
-            process_email_reply_task(task_id, email_content, category_list, user_id, email_basic_id, callback_url, attach_url)
+            process_email_reply_task(task_id, email_content, category_list, user_id, email_basic_id, callback_url, email_account, attach_url)
 
         except json.JSONDecodeError as e:
             logger.error(f"解析任务数据失败: {str(e)}")
@@ -1401,6 +1404,7 @@ def recover_email_reply_tasks():
                         "email_content": task_data.get("email_content"),
                         "category_list": task_data.get("category_list"),
                         "user_id": task_data.get("user_id"),
+                        "email_account": task_data.get("email_account", ""),
                         "email_basic_id": task_data.get("email_basic_id"),
                         "callback_url": task_data.get("callback_url"),
                         "attach_url": json.loads(task_data.get("attach_url", "[]")) if task_data.get("attach_url") else []
@@ -3592,6 +3596,7 @@ async def reply_to_email(request: EmailReplyRequest):
             "email_content": request.email_content,
             "category_list": request.category_list,
             "user_id": user_id,
+            "email_account": request.email_account,
             "email_basic_id": request.email_basic_id,
             "callback_url": request.callback_url,
             "attach_url": json.dumps(request.attach_url) if request.attach_url else "",
@@ -3611,6 +3616,7 @@ async def reply_to_email(request: EmailReplyRequest):
             "email_content": request.email_content,
             "category_list": request.category_list,
             "user_id": user_id,
+            "email_account": request.email_account,
             "email_basic_id": request.email_basic_id,
             "callback_url": request.callback_url,
             "attach_url": attach_url_list

@@ -28,7 +28,17 @@ def core_memory_append(
             "You should not include 'Line n:' (here n is a number) in the content."
         )
 
-    current_value = str(agent_state.memory.get_block(label).value)
+    # 🔒 Multi-user isolation check: Verify block belongs to current user
+    current_block = agent_state.memory.get_block(label)
+    if hasattr(current_block, 'user_id') and hasattr(self, 'user') and self.user:
+        if current_block.user_id != self.user.id:
+            raise ValueError(
+                f"Security violation: Attempting to modify memory block '{label}' belonging to "
+                f"user {current_block.user_id} while acting as user {self.user.id}. "
+                f"This indicates a multi-user isolation failure."
+            )
+
+    current_value = str(current_block.value)
     new_value = (current_value + "\n" + str(content)).strip()
     agent_state.memory.update_block_value(label=label, value=new_value)
     return None
@@ -46,7 +56,17 @@ def core_memory_rewrite(
     Returns:
         Optional[str]: None is always returned as this function does not produce a response.
     """
-    current_value = str(agent_state.memory.get_block(label).value)
+    # 🔒 Multi-user isolation check: Verify block belongs to current user
+    current_block = agent_state.memory.get_block(label)
+    if hasattr(current_block, 'user_id') and hasattr(self, 'user') and self.user:
+        if current_block.user_id != self.user.id:
+            raise ValueError(
+                f"Security violation: Attempting to modify memory block '{label}' belonging to "
+                f"user {current_block.user_id} while acting as user {self.user.id}. "
+                f"This indicates a multi-user isolation failure."
+            )
+
+    current_value = str(current_block.value)
     new_value = content.strip()
     if current_value != new_value:
         agent_state.memory.update_block_value(label=label, value=new_value)
