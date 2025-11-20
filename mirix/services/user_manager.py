@@ -154,6 +154,7 @@ class UserManager:
 
         - Name defaults to the part before '@' in email_account.
         - Uses default timezone and organization_id.
+        - Initializes core memory blocks (human and persona) for new users.
         """
         local_name = name
         if not local_name:
@@ -174,7 +175,23 @@ class UserManager:
                     email_account=email_account,
                 )
                 new_user.create(session)
-                return new_user.to_pydantic()
+                pydantic_user = new_user.to_pydantic()
+                
+                # Initialize core memory blocks for the new user
+                from mirix.schemas.memory import ChatMemory
+                from mirix.services.block_manager import BlockManager
+                
+                new_chat_memory = ChatMemory(
+                    persona="You are a helpful personal assitant who can help the user remember things.",
+                    human="",
+                    actor=pydantic_user,
+                )
+                
+                block_manager = BlockManager()
+                for block in new_chat_memory.get_blocks():
+                    block_manager.create_or_update_block(block, actor=pydantic_user)
+                
+                return pydantic_user
 
 
     @enforce_types
