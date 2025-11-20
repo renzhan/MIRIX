@@ -444,7 +444,7 @@ async def startup_event():
 
     try:
         # 确保日志配置已生效（如果被覆盖则重新配置）
-        _setup_logging()
+        _setup_logging(force=True)
         logger.info("Starting up Mirix FastAPI server...")
 
         # Initialize the agent

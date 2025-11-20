@@ -40,7 +40,7 @@ def main():
 
     from mirix.server import app
 
-    uvicorn.run(app, host=args.host, port=port)
+    uvicorn.run(app, host=args.host, port=port, log_config=None)
 
 
 if __name__ == "__main__":
