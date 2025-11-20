@@ -1,3 +1,4 @@
+import logging
 import re
 from typing import List, Optional
 
@@ -7,6 +8,9 @@ from mirix.schemas.knowledge_vault import KnowledgeVaultItemBase
 from mirix.schemas.procedural_memory import ProceduralMemoryItemBase
 from mirix.schemas.resource_memory import ResourceMemoryItemBase
 from mirix.schemas.semantic_memory import SemanticMemoryItemBase
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 
 def core_memory_append(
@@ -31,16 +35,42 @@ def core_memory_append(
     # 🔒 Multi-user isolation check: Verify block belongs to current user
     current_block = agent_state.memory.get_block(label)
     if hasattr(current_block, 'user_id') and hasattr(self, 'user') and self.user:
+        logger.info(
+            f"[CORE_MEMORY_APPEND] 验证用户权限 - "
+            f"block_label={label}, block_user_id={current_block.user_id}, "
+            f"current_user_id={self.user.id}, user_name={self.user.name}"
+        )
         if current_block.user_id != self.user.id:
+            logger.error(
+                f"🚨 [SECURITY_VIOLATION] 核心记忆跨用户访问被阻止！"
+                f"尝试修改block='{label}' (owner={current_block.user_id}) "
+                f"但当前用户为 {self.user.id} (name={self.user.name})"
+            )
             raise ValueError(
                 f"Security violation: Attempting to modify memory block '{label}' belonging to "
                 f"user {current_block.user_id} while acting as user {self.user.id}. "
                 f"This indicates a multi-user isolation failure."
             )
+        logger.info(
+            f"✅ [CORE_MEMORY_APPEND] 用户权限验证通过 - "
+            f"user {self.user.id} 正在更新自己的 {label} 记忆块"
+        )
+    else:
+        logger.warning(
+            f"⚠️ [CORE_MEMORY_APPEND] 无法验证用户权限 - "
+            f"block_has_user_id={hasattr(current_block, 'user_id')}, "
+            f"self_has_user={hasattr(self, 'user')}, "
+            f"user_exists={self.user is not None if hasattr(self, 'user') else False}"
+        )
 
     current_value = str(current_block.value)
     new_value = (current_value + "\n" + str(content)).strip()
     agent_state.memory.update_block_value(label=label, value=new_value)
+    logger.info(
+        f"[CORE_MEMORY_APPEND] 记忆块更新成功 - "
+        f"label={label}, old_length={len(current_value)}, new_length={len(new_value)}, "
+        f"added_content_preview={content[:100]}..."
+    )
     return None
 
 
@@ -59,17 +89,47 @@ def core_memory_rewrite(
     # 🔒 Multi-user isolation check: Verify block belongs to current user
     current_block = agent_state.memory.get_block(label)
     if hasattr(current_block, 'user_id') and hasattr(self, 'user') and self.user:
+        logger.info(
+            f"[CORE_MEMORY_REWRITE] 验证用户权限 - "
+            f"block_label={label}, block_user_id={current_block.user_id}, "
+            f"current_user_id={self.user.id}, user_name={self.user.name}"
+        )
         if current_block.user_id != self.user.id:
+            logger.error(
+                f"🚨 [SECURITY_VIOLATION] 核心记忆跨用户访问被阻止！"
+                f"尝试重写block='{label}' (owner={current_block.user_id}) "
+                f"但当前用户为 {self.user.id} (name={self.user.name})"
+            )
             raise ValueError(
                 f"Security violation: Attempting to modify memory block '{label}' belonging to "
                 f"user {current_block.user_id} while acting as user {self.user.id}. "
                 f"This indicates a multi-user isolation failure."
             )
+        logger.info(
+            f"✅ [CORE_MEMORY_REWRITE] 用户权限验证通过 - "
+            f"user {self.user.id} 正在重写自己的 {label} 记忆块"
+        )
+    else:
+        logger.warning(
+            f"⚠️ [CORE_MEMORY_REWRITE] 无法验证用户权限 - "
+            f"block_has_user_id={hasattr(current_block, 'user_id')}, "
+            f"self_has_user={hasattr(self, 'user')}, "
+            f"user_exists={self.user is not None if hasattr(self, 'user') else False}"
+        )
 
     current_value = str(current_block.value)
     new_value = content.strip()
     if current_value != new_value:
         agent_state.memory.update_block_value(label=label, value=new_value)
+        logger.info(
+            f"[CORE_MEMORY_REWRITE] 记忆块重写成功 - "
+            f"label={label}, old_length={len(current_value)}, new_length={len(new_value)}, "
+            f"new_content_preview={new_value[:100]}..."
+        )
+    else:
+        logger.info(
+            f"[CORE_MEMORY_REWRITE] 记忆块内容未变化，跳过更新 - label={label}"
+        )
     return None
 
 
