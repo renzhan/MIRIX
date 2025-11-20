@@ -1,0 +1,1123 @@
+{
+  "bullets": {
+    "handling-00001": {
+      "id": "handling-00001",
+      "section": "Handling EDI 940 Import Errors",
+      "content": "Confirm the issue is due to missing UOM values and submit a Wise ticket for configuration issues.",
+      "helpful": 2,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:04:10.130518+00:00",
+      "updated_at": "2025-11-11T10:04:36.261579+00:00"
+    },
+    "handling-00002": {
+      "id": "handling-00002",
+      "section": "Handling EDI 940 Import Errors",
+      "content": "Re-import the data after configuration is complete and verify successful import into the Wise system.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:04:10.130518+00:00",
+      "updated_at": "2025-11-11T10:04:36.261579+00:00"
+    },
+    "handling-00003": {
+      "id": "handling-00003",
+      "section": "Handling ZURU Label Image Quality Issues",
+      "content": "Ensure the following steps are followed for resolving ZURU label image quality issues: 1) Confirm EDI system configuration with Frances, including ISA ID and PO numbers, 2) Discuss WMS and CubeShip API integration with Anthony, 3) Arrange for Jeff and Eaden to conduct a technical evaluation for system compatibility, 4) Notify the Joliet team about the upcoming system update and provide a detailed timeline, 5) Coordinate with the B-Solutions team to verify all technical details before implementation, 6) Conduct comprehensive testing post-implementation to ensure all systems function correctly.",
+      "helpful": 2,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:04:54.667638+00:00",
+      "updated_at": "2025-11-11T12:45:05.794802+00:00"
+    },
+    "handling-00004": {
+      "id": "handling-00004",
+      "section": "Handling Hiring Decisions",
+      "content": "Ensure the following steps are followed for confirming Goutham Lokku as the preferred candidate: 1) Confirm Goutham as the preferred candidate based on experience, communication, and technical skills, 2) Offer a monthly salary of $75K, 3) If Goutham declines, notify relevant parties and consider Manasa Pittala as an alternative, 4) Ensure the new hire has received and acknowledged the offer letter, 5) Verify the completion of the new hire application, 6) Confirm with HR that the candidate is aware of their start date and orientation schedule, 7) Initiate the onboarding process. Include specific evaluation steps for Goutham Lokku and mention Manasa Pittala as an alternative.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:05:13.608437+00:00",
+      "updated_at": "2025-11-11T12:45:38.975500+00:00"
+    },
+    "handling-00005": {
+      "id": "handling-00005",
+      "section": "Handling Epicor Certificate Updates",
+      "content": "Contact Mason and Yaheli for certificate replacement and customer list. Notify customers via email about the certificate update. Ensure the following steps are followed: 1) Replace the expiring certificate managed by Epicor, 2) Obtain the list of customers currently using the certificate, 3) Share information to notify customers about the upcoming certificate update.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:05:39.121873+00:00",
+      "updated_at": "2025-11-11T12:46:00.269113+00:00"
+    },
+    "handling-00006": {
+      "id": "handling-00006",
+      "section": "Handling EDI 940 Import Errors",
+      "content": "Ensure to include detailed procedural steps for EDI 940 import: 1) Confirm the issue is due to missing UOM values and submit a Wise ticket for configuration issues, 2) Re-import the data after configuration is complete and verify successful import into the Wise system, 3) Confirm receipt of EDI 940 and perform structure validation, 4) Confirm the absence of the RDD field in the 940 message and the presence of EDD and Ship On This Date fields, 5) Map 'Scheduled Date' to 'Ship On This Date' and 'MABD' to 'Estimated Delivery Date', 6) Adjust logic to store these fields in WMS and notify relevant stakeholders post-implementation, 7) If no format issues, EDI returns 997 confirmation, 8) EDI calls OMS interface, 9) If OMS processes without error, message is pushed to WMS Kafka queue within a minute, 10) WMS consumes message to generate WMS order within another minute, 11) Once order is closed, send delivery confirmation message to OMS Kafka queue, 12) OMS consumes message and calls EDI API within a minute, 13) EDI generates and sends 945 promptly, 14) Ensure no job-based or polling mechanisms are used for inbound and outbound processes, 15) If no intermediate system issues, process completes in 2-3 minutes, 16) Address known issue with OMS team if WMS order is not generated, 17) Notify Bob about the progress of the updates. Include contacts such as Linggang Wu, Shelia Sun, and Eaden Wu for WMS status confirmation, Anthony for EDI configuration, and Jeff for API verification. Additionally, communicate with Frances Parro Belleza, Cody Gorsuch, and the Joliet team for WMS, EDI, and API updates.",
+      "helpful": 7,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:06:20.835296+00:00",
+      "updated_at": "2025-11-11T12:54:27.214033+00:00"
+    },
+    "handling-00007": {
+      "id": "handling-00007",
+      "section": "Handling SKU Synchronization",
+      "content": "Ensure the incoming shipment number (RN-5002911) is ready. Add new SKUs to the synchronization list and ensure inventory is available in WISE before syncing with Shopify. Specific SKUs include SN2534-BLACK/GREEN-OSFM, SN2530-REALTREE-OSFM, SN2529-REALTREE-OSFM, SN2531-BLACK/GOLD-OSFM, SN2525-WHITE/GREEN-OSFM, SN2524-WHITE/BLACK-OSFM. Contact Caleb Reams and Cara Gao for coordination. Include detailed steps for checking inventory in the WISE system.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:06:47.609554+00:00",
+      "updated_at": "2025-11-11T12:47:24.519083+00:00"
+    },
+    "handling-00008": {
+      "id": "handling-00008",
+      "section": "Handling EDI 940 Import Errors",
+      "content": "Arrange a conference call with Mia Chen for customer communication, ensure Scott is informed of any issues, and coordinate with Jennifer Kuo or Mia Chen for communication with Unisco. Include specific actions such as arranging a phone meeting and reporting issues to Scott. Ensure to include all relevant stakeholders and provide a clear, structured sequence of steps that address both technical and communication aspects.",
+      "helpful": 0,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:07:10.545142+00:00",
+      "updated_at": "2025-11-11T12:47:51.065133+00:00"
+    },
+    "handling-00009": {
+      "id": "handling-00009",
+      "section": "Handling 5-star Inventory Report Updates",
+      "content": "- [handling-00009] Confirm receipt of the 5-star and 5-star Amazon 1P daily inventory reports. Check for red-marked fields and contact Jinsong Han and Sophie Gao for implementation. Ensure to identify and include all critical entities such as '5-star and 5-star Amazon 1P daily inventory reports', 'red-marked fields', and 'relevant technical team'. Update the report template, ensure the updated report is generated correctly, and notify all relevant teams about the changes. Ensure the updated report can be generated and sent correctly. Confirm receipt of the reports, ensure the updated report is generated and sent correctly, and notify all relevant teams.",
+      "helpful": 3,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:07:28.479328+00:00",
+      "updated_at": "2025-11-11T12:48:13.887229+00:00"
+    },
+    "handling-00010": {
+      "id": "handling-00010",
+      "section": "Handling EDI 856 Project Development",
+      "content": "Ensure the following steps are followed for EDI 856 project development: 1) Confirm the need for the Generic 856 project development, 2) Provide label requirements to Michael Jan Francisco, 3) Close tasks related to labels if not needed, 4) Confirm CHEP has received the 856 file, 5) Verify the Ship-To code in the EDI file, 6) Wait for CHEP's response with the correct Ship-To Party GLID, 7) Update the EDI file with the correct GLID, 8) Confirm the development of Generic 856 is complete, 9) Send one or two 856 files to Filippo's test environment, 10) Begin integration testing. Maintain communication with all relevant stakeholders. Ensure to confirm order processing, contact the EDI team, and check the status of specific test orders such as order 9050370121. Arrange meetings with stakeholders, including Shelia Sun and Scott Simanek, and obtain the 856 specifications from relevant personnel.",
+      "helpful": 7,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:09:19.609281+00:00",
+      "updated_at": "2025-11-11T13:14:16.101895+00:00"
+    },
+    "handling-00011": {
+      "id": "handling-00011",
+      "section": "Handling Lennox Project Go-Live and Contract Signing",
+      "content": "Ensure all relevant entities and steps are included in project workflows. Contact Frances Parro Belleza, Anthony, and Jeff for coordination. Verify WMS system configuration and ISA ID. Communicate with the Joliet team to ensure they understand the new PO number format and verify API connections with the CubeShip system. Ensure to include CubeShip system and B-Solutions team updates. Follow a clear sequence: 1) Contact Anthony and confirm receipt of Jeff's latest EDI configuration file, 2) Check ISA ID configuration in the WMS system for consistency with EDI file information, 3) Coordinate with the Joliet team to ensure API interface integration with CubeShip is functioning, 4) Notify B-Solutions team about any EDI configuration updates, 5) Send a detailed report to Eaden after completing all steps. Expected completion time is two days.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:10:25.415058+00:00",
+      "updated_at": "2025-11-11T12:50:36.951878+00:00"
+    },
+    "handling-00012": {
+      "id": "handling-00012",
+      "section": "Handling GLS Implementation Project",
+      "content": "Ensure the following steps are followed for ARN and EXW mapping testing: 1) Confirm ARN issues are resolved, 2) Understand new ARN logic, 3) Apply changes during China working hours, 4) Update status post-changes, 5) Monitor EXW's status in the WMS development queue. Notify relevant parties when EXW is ready for testing.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:11:00.868739+00:00",
+      "updated_at": "2025-11-11T12:12:07.253309+00:00"
+    },
+    "handling-00013": {
+      "id": "handling-00013",
+      "section": "Handling Walmart/True Commerce AS2 Information Requests",
+      "content": "Ensure to gather all necessary AS2 configuration details in a structured, step-by-step manner: 1) Contact Walmart/True Commerce to receive AS2 connection details, 2) Record the Contact email, 3) Record the AS2 ID, 4) Record the AS2 URL, 5) Record the AS2 Port, 6) Record the Public IP, 7) Record the Encryption information, 8) Record the Signing information, 9) Record if Compression is used, 10) Record the MDN information, 11) Record the Content encoding information, 12) Record the Certificate file. Contact Shelia Sun, Xiang Cui, Howard Chang, and Eaden Wu for coordination.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:11:49.811462+00:00",
+      "updated_at": "2025-11-11T12:52:26.702366+00:00"
+    },
+    "handling-00014": {
+      "id": "handling-00014",
+      "section": "Handling Email Management Tasks",
+      "content": "Log into the company's email management system, specifically mentioning the system name. Search for the email address in question, review all associated email groups, and remove the email address from each group. Save changes and confirm that the email address has been successfully removed from all groups. Additionally, check company policies for any required communications or approvals and include a more human-like tone in responses. Ensure to mention specific systems and actions like logging into the email management system, searching for the email address, reviewing associated email groups, removing the email address, and saving changes.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:12:11.927814+00:00",
+      "updated_at": "2025-11-11T12:53:19.044673+00:00"
+    },
+    "handling-00015": {
+      "id": "handling-00015",
+      "section": "Handling Unfulfillable Requests",
+      "content": "Ensure the model recognizes when a request cannot be fulfilled and responds with a simple refusal, aligning with the ground truth response. Focus on context recognition to provide accurate responses. It's crucial for the model to accurately interpret the context and limitations of a request to provide an appropriate response, especially when the correct action is to express inability to assist.",
+      "helpful": 0,
+      "harmful": 3,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:12:30.408413+00:00",
+      "updated_at": "2025-11-11T13:17:33.107003+00:00"
+    },
+    "handling-00016": {
+      "id": "handling-00016",
+      "section": "Handling EDI 940 Import Errors",
+      "content": "Confirm the absence of the RDD field in the 940 message and the presence of EDD and Ship On This Date fields. Map 'Scheduled Date' to 'Ship On This Date' and 'MABD' to 'Estimated Delivery Date'. Adjust logic to store these fields in WMS and notify relevant stakeholders post-implementation.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:12:53.086725+00:00",
+      "updated_at": "2025-11-11T10:12:53.086725+00:00"
+    },
+    "handling-00017": {
+      "id": "handling-00017",
+      "section": "Handling Recruitment Communication",
+      "content": "Ensure the following steps are followed for recruitment communication: 1) Confirm current recruitment needs, 2) Contact the recruitment team if needs exist, 3) Update recruitment status, 4) Notify relevant personnel, 5) Record and close the request if no recruitment needs exist.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:13:16.011998+00:00",
+      "updated_at": "2025-11-11T12:54:47.012162+00:00"
+    },
+    "handling-00018": {
+      "id": "handling-00018",
+      "section": "Handling ARN Configuration and EDI Integration",
+      "content": "Ensure responses include both key entities and a clear sequence of operations: 1) Confirm default ARN, 2) Understand new ARN logic, 3) Apply changes during China working hours, 4) Update status post-changes, 5) Confirm ARN issues are resolved, 6) Monitor EXW's status in the WMS development queue, and notify relevant parties when EXW is ready for testing.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:15:00.565832+00:00",
+      "updated_at": "2025-11-11T12:56:26.336922+00:00"
+    },
+    "handling-00019": {
+      "id": "handling-00019",
+      "section": "Handling Missing 945s and Missing ARNs for Amazon Orders",
+      "content": "Ensure the following steps are followed for resolving Amazon 945 failures and label printing issues: 1) Check for system indications of printed pallet UCC labels, 2) Confirm the printing and application of these labels, 3) Verify the scanning of PRO numbers, 4) Ensure the WISE system has options for printing pallet UCC labels, 5) If unavailable in WISE, print from the Amazon portal. Additionally, verify the printing of shipping labels immediately after order closure, check for missing EDI fields, and involve Pierre Pettigrew for further validation. Contact Frances for WMS status, Anthony for EDI configuration, and Jeff for API checks. Ensure continuous monitoring and follow-up until resolution.",
+      "helpful": 4,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:15:31.278726+00:00",
+      "updated_at": "2025-11-11T13:13:51.720766+00:00"
+    },
+    "handling-00020": {
+      "id": "handling-00020",
+      "section": "Handling DIAGEO Customer Go-Live",
+      "content": "Ensure Mia prioritizes the DIAGEO account and resolves all issues before go-live. Facilitate communication between the Joliet and B-Solutions teams to address technical issues promptly. Verify all system configurations, including WMS, EDI, and API, ensuring ISA ID and PO numbers are correct. Confirm CubeShip system permissions with Frances, Anthony, Jeff, and Eaden. Conduct comprehensive testing of all systems to prevent technical failures during go-live. Update all relevant teams after resolving issues to maintain information consistency. Expected completion time is two weeks.",
+      "helpful": 3,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:15:59.964034+00:00",
+      "updated_at": "2025-11-11T12:57:14.731724+00:00"
+    },
+    "handling-00021": {
+      "id": "handling-00021",
+      "section": "Handling IT Implementation Specialist Interviews",
+      "content": "Ensure to identify and include all relevant personnel such as Frances, Anthony, Jeff, and Eaden. Outline specific steps like confirming participation times, checking system configurations including WMS, EDI, API, and CubeShip, testing connections, notifying teams, and preparing technical details. Exclude Thursday and Friday as potential meeting days. Additionally, confirm the candidate's location, inform them of the next steps, request additional information if needed, and express gratitude for their participation. Evaluate the candidate's knowledge in API or EDI, their familiarity with e-commerce platforms like Shopify, and their experience level. Decide on recommending a second interview based on these assessments. Ensure to notify the Joliet and B-Solutions teams about the meeting time and agenda, and check ISA ID and PO numbers. Prepare all technical details and documents required for the meeting. Confirm the meeting time as 4:30 PST. Include specific details such as confirming the candidate's salary, start date, and HR onboarding process. Ensure to include specific configuration checks for ISA ID and PO numbers, and provide a detailed description of the technical preparation required for the meeting.",
+      "helpful": 6,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:16:18.892838+00:00",
+      "updated_at": "2025-11-11T12:58:42.212556+00:00"
+    },
+    "handling-00022": {
+      "id": "handling-00022",
+      "section": "Handling EDI 940 Import Errors",
+      "content": "Ensure VitaCoco's SPS system can accept standalone PECO pallet 856 messages. Confirm the need for PECO line items in the 940 file. Suggest leaving notes in the order remarks if VitaCoco only wants to remind the warehouse to use PECO pallets.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:16:46.850888+00:00",
+      "updated_at": "2025-11-11T12:58:17.299799+00:00"
+    },
+    "handling-00023": {
+      "id": "handling-00023",
+      "section": "Handling IT Implementation Specialist Interviews",
+      "content": "Ensure to include Vinay Katnam's name, assess his technical experience with API, Shopify, WMS, and OMS systems, evaluate his practical onboarding experience, discuss onboarding with relevant teams, set his salary at $75K, and arrange onboarding discussions promptly. Confirm Vinay has received and acknowledged the offer letter, verify the completion of the new hire application, confirm with HR that Vinay is aware of his start date and orientation schedule, and initiate the onboarding process. Additionally, confirm interview results and record technical experience details. Ensure to contact HR to confirm the start date and begin the onboarding process.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:17:40.544719+00:00",
+      "updated_at": "2025-11-11T12:55:41.705589+00:00"
+    },
+    "handling-00024": {
+      "id": "handling-00024",
+      "section": "Handling Duplicate SSCC Number Issues for UNIS",
+      "content": "Ensure the following steps are followed to resolve duplicate SSCC number issues: 1) Confirm the order is a 4-pallet shipment, 2) Check the number of pallet UCC labels printed by 'tcl.seabrook', 3) Identify the use of carton SSCC in place of missing pallet SSCC in the EDI system, 4) Confirm the duplication issue caused by carton SSCC. Document each step and contact relevant stakeholders for resolution.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:18:02.520034+00:00",
+      "updated_at": "2025-11-11T12:59:30.203661+00:00"
+    },
+    "handling-00025": {
+      "id": "handling-00025",
+      "section": "Handling JIRA Ticket Prioritization and System Error Handling",
+      "content": "Ensure the following steps are followed for JIRA ticket prioritization and system error handling: 1) Contact Gwendolyn and Quinn to address Hexclad's shipping service issues with Fulfil.IO encountering 500/502 server errors. 2) Contact Frances and Tracy to address orders defaulting to UNISRS carrier without Delivery Service, ticket number WSP-94307. 3) Send Commercial Invoice via API to FedEx and UPS, ticket number L2S-1240. 4) Resolve issues with shipped SN not showing up in Client Portal Outbound Shipped Inquiry, ticket number WSP-95350. Clearly specify the responsible individuals for each task and outline the exact actions they need to take.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:19:02.620701+00:00",
+      "updated_at": "2025-11-11T13:00:30.760880+00:00"
+    },
+    "handling-00026": {
+      "id": "handling-00026",
+      "section": "Handling FedEx Account Setup for Modern Living LLC",
+      "content": "Ensure all relevant entities and steps are included in the FedEx account setup workflow: 1) Confirm account number 634354557, 2) Contact Frances for WMS access, 3) Coordinate with Anthony to ensure EDI configuration and ISA ID are correct, 4) Verify PO numbers in the system, 5) Discuss API integration details with Jeff and Eaden, 6) Confirm CubeShip setup with the Joliet team, 7) Confirm successful deployment of all system configurations with B-Solutions team. Estimated completion time is two weeks.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:19:27.634342+00:00",
+      "updated_at": "2025-11-11T13:00:59.124107+00:00"
+    },
+    "handling-00027": {
+      "id": "handling-00027",
+      "section": "Handling Webhook Authentication and Information Sending Issues",
+      "content": "Ensure the following steps are followed to resolve webhook authentication and information sending issues: 1) Open an L2 Jira ticket, 2) Contact Frances to confirm WMS configuration, 3) Verify EDI interface ISA ID settings with Anthony, 4) Check API logs with Jeff, 5) Discuss CubeShip updates with Eaden, 6) Notify the Joliet team about PO number issues, 7) Contact the B-Solutions team for further support. Estimated completion time is two days.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:20:33.148016+00:00",
+      "updated_at": "2025-11-11T13:01:29.963630+00:00"
+    },
+    "handling-00028": {
+      "id": "handling-00028",
+      "section": "Handling SMEG System Webhook Setup and Testing",
+      "content": "Ensure the following steps are followed for SMEG system webhook setup and testing: 1) Contact Frances for WMS system access, 2) Configure the webhook in the WMS system with the correct ISA ID, 3) Confirm EDI and API connection settings with Anthony, 4) Input PO numbers in CubeShip to verify data transmission, 5) Coordinate initial tests with Jeff and Eaden, 6) Confirm test results with the Joliet team and B-Solutions team, 7) Document all test results and prepare a report. Estimated completion time is two days.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:20:58.799372+00:00",
+      "updated_at": "2025-11-11T12:22:37.478762+00:00"
+    },
+    "handling-00029": {
+      "id": "handling-00029",
+      "section": "Handling EDI 856 Project Development",
+      "content": "Include procedural verifications such as confirming EDI file time limits, checking the age of 940 files, assessing the accuracy of GLN extraction from past EDI files, and verifying the existence of a complete GLN spreadsheet. Additionally, mention the roles of Edwin Vega and Jacob Zwagerman.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:21:17.905323+00:00",
+      "updated_at": "2025-11-11T12:23:04.954462+00:00"
+    },
+    "handling-00030": {
+      "id": "handling-00030",
+      "section": "Handling Carrier AJC Configuration",
+      "content": "Ensure the following steps are followed for Carrier AJC configuration: 1) Confirm the project number, specifically project #2, 2) Verify the involvement of joe.garcia@unisco.com in the DC re-push, 3) Check the configuration settings for Carrier AJC in WMS 3.0, 4) Document the verification steps and notify relevant stakeholders. Explicitly confirm Joe Garcia's involvement in the DC re-push for project #2.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:21:40.433055+00:00",
+      "updated_at": "2025-11-11T13:02:44.177355+00:00"
+    },
+    "handling-00031": {
+      "id": "handling-00031",
+      "section": "Handling Meeting Participation and Personnel Replacement",
+      "content": "Ensure the following steps are followed for meeting participation and personnel replacement: 1) Contact Jennifer to confirm her availability to join the meeting during your absence, 2) Ensure Jennifer is prepared with all relevant technical details to support the meeting, 3) Confirm Jennifer understands the meeting agenda and key discussion points, 4) Request Jennifer to send meeting minutes to the team post-meeting for follow-up. Include Frances as a key entity to be contacted for coordination. Specify the meeting agenda and ensure the task is completed within one hour after the meeting ends.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:22:33.571834+00:00",
+      "updated_at": "2025-11-11T13:03:37.329981+00:00"
+    },
+    "handling-00032": {
+      "id": "handling-00032",
+      "section": "Handling EDI Implementation for Plant Baby",
+      "content": "Ensure Mia and Linggang Wu are responsible for following up on the account. Update all relevant information in the WMS system. Confirm EDI and API configurations are correctly set, including ISA ID and PO numbers. Contact the Joliet team for the latest system updates. Coordinate with the B-Solutions team to ensure smooth CubeShip integration. Confirm all technical details with Frances, Anthony, Jeff, and Eaden. Include specific actions for each step, such as updating specific fields in the WMS system or verifying particular configurations in the EDI and API settings. Ensure the response includes a clear sequence of steps and an estimated completion time of two weeks.",
+      "helpful": 4,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:23:01.523644+00:00",
+      "updated_at": "2025-11-11T13:03:59.447066+00:00"
+    },
+    "handling-00033": {
+      "id": "handling-00033",
+      "section": "Handling CODA Northampton Location Code Authorization",
+      "content": "Ensure the following steps are followed for CODA Northampton location code authorization: 1) Confirm Cesanek's location code is 825 and provided to the client Coda, 2) Check Pipe17's authorization settings to ensure the connection is properly authorized, 3) If Pipe17 is not authorizing the connection, contact the relevant technical support team for further investigation. Include Frances Parro Belleza as a contact. Additionally, ensure communication is polite and includes expressions of gratitude and politeness, such as 'please' and 'thank you'.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:23:18.923514+00:00",
+      "updated_at": "2025-11-11T13:04:20.746319+00:00"
+    },
+    "handling-00034": {
+      "id": "handling-00034",
+      "section": "Handling UNIS System Training Requests",
+      "content": "Ensure the following steps are followed for UNIS system training requests: 1) Check the WMS system for pallet information including Ti/Hi, 2) Explain the meaning of 'In Yard Date' and its calculation start time, 3) Use API or other methods for bulk order import if EDI is not enabled, 4) Check POD timestamps in the system, 5) Contact Shelia Sun for training coordination. Document each step and ensure they are in a logical sequence. Explicitly mention the use of API or other methods as alternatives only when EDI is not enabled.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:23:46.943562+00:00",
+      "updated_at": "2025-11-11T13:04:52.804439+00:00"
+    },
+    "handling-00035": {
+      "id": "handling-00035",
+      "section": "Handling Client Portal Introductions and Meeting Coordination",
+      "content": "Ensure to confirm the timing of the client portal introduction and coordinate the weekly meeting communication. Identify relevant stakeholders, confirm their availability, and send calendar invites. Prepare necessary documentation and follow up with meeting notes and action items post-meeting. Include specific actions such as confirming Frances' availability, coordinating WMS system configuration with Anthony, checking EDI and API connectivity with Jeff, verifying CubeShip updates with Eaden, and ensuring all team members are informed of the meeting time and agenda. Confirm the client portal introduction can end at 10 AM and transition to the weekly meeting if possible. Additionally, ensure to address specific timing and transition requirements, ensuring all stakeholders are informed and aligned with the schedule.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:24:30.712498+00:00",
+      "updated_at": "2025-11-11T13:06:07.958090+00:00"
+    },
+    "handling-00036": {
+      "id": "handling-00036",
+      "section": "Handling EDI 832 Material Master Data Import",
+      "content": "Ensure the following steps are followed for importing 832 material master data: 1) Confirm receipt of the 832 file and identify specific project numbers such as ITEM-10003168, ITEM-10003169, ITEM-10003170, ITEM-10003171, ITEM-10003126, ITEM-10003128, ITEM-10003127, ITEM-10003172, ITEM-10003129, ITEM-10003173, 2) Successfully import these items into the WMS system, 3) Verify the import and notify relevant stakeholders. Ensure to contact Shelia Sun and check the WMS system for confirmation.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:25:15.044949+00:00",
+      "updated_at": "2025-11-11T13:06:55.470541+00:00"
+    },
+    "handling-00037": {
+      "id": "handling-00037",
+      "section": "Handling EDI 945 Unit Errors",
+      "content": "Ensure the following steps are followed to resolve EDI 945 unit errors: 1) Check EDI 945 configuration to confirm the unit is set to EA instead of CS, 2) Verify system and customer ASN configurations to ensure they are set to receive EA units, 3) Analyze received 945 documents during testing to confirm they are received in EA units, 4) Adjust EDI 945 configuration based on analysis to ensure the receiving unit is EA, 5) Conduct tests to confirm successful configuration changes. Involve key personnel such as Shelia Sun and Leo.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:25:42.382039+00:00",
+      "updated_at": "2025-11-11T13:07:22.607850+00:00"
+    },
+    "handling-00038": {
+      "id": "handling-00038",
+      "section": "Handling UNIS and Fulfill.io Integration Issues",
+      "content": "Ensure the following steps are followed to resolve integration issues between UNIS and Fulfill.io: 1) Confirm Rhino's integration with Fulfill.io and Walmart, 2) Check the public API links between UNIS and Fulfill.io for connectivity issues, 3) Verify that Fulfill.io receives order updates after UNIS marks them as shipped, 4) Investigate any 500/502 errors when Fulfill.io queries order status, 5) Assess the impact of manually closing a large number of orders on operational efficiency, 6) Review emails titled 'Re: Walmart / Sam’s / Sam’s DSV Connection' for additional details, 7) Contact the Wise team for further investigation. Ensure to include key entities such as Yazmin Rosas, Cristy Llones, and the EDI system, and address ticket WSP-96443. Verify that automated reports correctly display lot codes and inventory status. Expected resolution time is one week.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:27:35.700729+00:00",
+      "updated_at": "2025-11-11T13:08:44.951352+00:00"
+    },
+    "handling-00039": {
+      "id": "handling-00039",
+      "section": "Handling Duplicate 945 Orders",
+      "content": "Ensure the following steps are followed to resolve duplicate 945 order issues: 1) Contact Anthony and confirm receipt of Jeff's latest EDI configuration file, 2) Check ISA ID configuration in the WMS system for consistency with EDI file information, 3) Coordinate with the Joliet team to ensure API interface integration with CubeShip is functioning, 4) Verify PO number is correctly recorded in B-Solutions system, 5) Notify Eaden for final review once all steps are completed. Include a greeting such as 'Frances,' at the beginning of the communication. Expected completion time is two days.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:29:19.485099+00:00",
+      "updated_at": "2025-11-11T13:10:22.725741+00:00"
+    },
+    "handling-00040": {
+      "id": "handling-00040",
+      "section": "Handling Hiring Decisions",
+      "content": "Ensure the following steps are followed for confirming job offers: 1) Confirm the candidate has verbally accepted the job offer with the specified salary of $75K, 2) Verify the expected start date with the candidate, 3) Contact HR to initiate the onboarding process, including sending necessary documentation and scheduling orientation. Ensure the new hire has received and acknowledged the offer letter, verify the completion of the new hire application, and confirm with HR that the candidate is aware of their start date and orientation schedule. Additionally, ensure to verify system configurations and notify relevant teams only if they are pertinent to the hiring process.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:30:04.838773+00:00",
+      "updated_at": "2025-11-11T12:15:55.346900+00:00"
+    },
+    "handling-00041": {
+      "id": "handling-00041",
+      "section": "Handling Trello Board Invitations",
+      "content": "Ensure the following steps are followed for inviting new members to a Trello board: 1) Log into Trello and navigate to your board, 2) Click on 'Show Menu' on the right side of the board, 3) Select 'More' and then 'Invite to Board', 4) Enter the email address of the person you want to invite and click 'Send Invitation', 5) Contact Shelia Sun and Irene Cui to confirm the invitation, 6) Send a separate invitation email to linggang.wu@item.com to confirm their addition to the board.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:30:35.456623+00:00",
+      "updated_at": "2025-11-11T13:11:36.352491+00:00"
+    },
+    "handling-00042": {
+      "id": "handling-00042",
+      "section": "Handling Missing 945s and Missing ARNs for Amazon Orders",
+      "content": "Ensure the following steps are followed for resolving Lumistella orders missing Case SSCC data: 1) Contact Frances to confirm WMS status, 2) Communicate with Anthony for EDI configuration values, including ISA ID and PO numbers, 3) Have Jeff check API connections and CubeShip integration, 4) Notify Joliet team about data patch plans, 5) Coordinate with B-Solutions for system checks post-patch, 6) Update Silvia Sanchez post-patch. Expected completion time is two days.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:31:42.628435+00:00",
+      "updated_at": "2025-11-11T13:10:00.812366+00:00"
+    },
+    "handling-00043": {
+      "id": "handling-00043",
+      "section": "Handling Shopify Order Quantity Changes",
+      "content": "Ensure the following steps are followed for handling Shopify order quantity changes: 1) Contact the Shopify customer to confirm changes to order AE45199, 2) Verify the initial quantity of order AE45199 when first pulled, 3) Confirm if the customer added any additional quantities to the order, 4) Decide on the next steps based on customer feedback and update relevant systems. Include Frances Parro Belleza and Jennifer Kuo as key contacts. Ensure to include procedural steps such as confirming order changes, verifying product quantities, and handling customer feedback.",
+      "helpful": 1,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:32:17.543249+00:00",
+      "updated_at": "2025-11-11T13:13:00.985547+00:00"
+    },
+    "handling-00044": {
+      "id": "handling-00044",
+      "section": "Handling Data Transmission and Label Testing Issues",
+      "content": "Ensure the following steps are followed for resolving data transmission and label testing issues: 1) Contact Dan Linnihan and confirm meeting time, 2) Verify ASN data transmission increase, 3) Confirm any charges to the client due to data processing, 4) Coordinate label testing with the client for Target and Walmart, 5) Conduct multiple tests to resolve label issues, 6) Pay attention to the meeting time, which is set for 12 PM Central Time, 7) Confirm Mia's participation in the call, 8) Verify the increased ASN data transmission in the production environment, 9) Wait for Dan to send the meeting invitation. Include specific testing frequencies and communication details with the client. Ensure Shelia and Eaden Wu are contacted for coordination.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:32:46.218287+00:00",
+      "updated_at": "2025-11-11T13:13:29.852071+00:00"
+    },
+    "handling-00045": {
+      "id": "handling-00045",
+      "section": "Handling System Access Requests",
+      "content": "Ensure the following steps are followed for granting access to specific accounts: 1) Confirm Vignesh Krishnan's identity and related information by contacting Stacy Nguyen and Claude Belleza, 2) Locate the accounts requiring access in the system, 3) Grant access to edi@item.com, 4) Grant access to edi@unisco.com, 5) Grant access to implementation@item.com, 6) Grant access to implementation@unisco.com. Estimated completion time is two business days.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:34:55.155112+00:00",
+      "updated_at": "2025-11-11T13:15:07.705530+00:00"
+    },
+    "handling-00046": {
+      "id": "handling-00046",
+      "section": "Handling WMS Deployment Processes",
+      "content": "Ensure the following steps are followed for WMS production environment deployment: 1) Confirm cancellation of all outbound and inbound test orders in the staging environment, 2) Ensure all relevant personnel are informed of the decision, 3) Continue monitoring the system to ensure no unexpected issues occur. Additionally, ensure the Item Master is initialized in the PROD WMS environment and verify there are no items in PROD that could affect EDI message processing and reception. Contact Frances Parro Belleza and Anthony for coordination. Confirm the non-requirement of backend team involvement and ensure all relevant personnel are informed of decisions.",
+      "helpful": 1,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:35:27.602534+00:00",
+      "updated_at": "2025-11-11T13:18:36.348575+00:00"
+    },
+    "handling-00047": {
+      "id": "handling-00047",
+      "section": "Handling Hiring Decisions",
+      "content": "Ensure the following steps are included when assessing a candidate's suitability for a position: 1) Review the candidate's resume to confirm their role and experience, 2) Evaluate their broad experience in EDI and related fields, 3) Assess the depth of their knowledge, 4) Compare their operational background with EDI requirements, 5) Determine their suitability for the position based on the evaluation results.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:35:54.128702+00:00",
+      "updated_at": "2025-11-11T10:35:54.128702+00:00"
+    },
+    "handling-00048": {
+      "id": "handling-00048",
+      "section": "Handling Powermax and SPS Integration",
+      "content": "Ensure the following steps are followed for Powermax and SPS integration: 1) Evaluate Powermax's integration work, 2) Arrange the task of uploading ASN, 3) Access the link https://jira.logisticsteam.com/browse/DTS-6553 for detailed information, 4) Provide a time estimate after evaluation. Ensure to follow EDI/API Operations & Integration protocols. Include key entities such as Powermax, SPS, and ASN, and specific steps like evaluation, task arrangement, and accessing the provided link.",
+      "helpful": 1,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:36:16.768807+00:00",
+      "updated_at": "2025-11-11T13:16:27.572581+00:00"
+    },
+    "handling-00049": {
+      "id": "handling-00049",
+      "section": "Handling GLS Implementation Project",
+      "content": "Ensure the following steps are followed for GLS Canada label deployment: 1) Contact the Joliet team to confirm label verification in the test environment, 2) Email the B-Solutions team with label details and verification results, 3) Request the B-Solutions team to deploy the label to the production environment, 4) Notify Anthony and Jeff about the deployment progress, 5) Confirm deployment completion and notify Frances and Eaden for final verification. Ensure to include detailed procedural steps for verification, email communication, deployment requests, and notifications.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:36:39.793275+00:00",
+      "updated_at": "2025-11-11T13:17:04.128068+00:00"
+    },
+    "handling-00050": {
+      "id": "handling-00050",
+      "section": "Handling System Configuration Adjustments",
+      "content": "Ensure the following steps are followed for system configuration adjustments due to daylight saving time: 1) Contact Frances to confirm the current time settings in the WMS system, 2) Log into the EDI system with admin access to adjust time settings, 3) Communicate with Anthony to ensure API interface time synchronization, 4) Check CubeShip system time configuration for consistency with EDI, 5) Notify the Joliet team and B-Solutions about the completion of time adjustments, 6) Confirm with Jeff and Eaden that all systems are synchronized correctly. Estimated completion time is approximately 2 hours.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:37:44.711090+00:00",
+      "updated_at": "2025-11-11T13:18:06.911573+00:00"
+    },
+    "handling-00051": {
+      "id": "handling-00051",
+      "section": "Handling Transaction Status Updates and Error Resolution",
+      "content": "Ensure the following steps are followed for transaction status updates and error resolution: 1) Review the validation errors from the transaction, 2) Fix the error by updating the data in your System of Record and creating a new transaction, 3) Update your connector mapping and create a new transaction, 4) Write a rule to fix the existing transaction, 5) If unable to fix errors by writing a rule and not intending to send the transaction to the trading partner, delete the transaction and resend a new transaction, 6) Identify the EDI 214 transactions that have encountered errors, particularly those with missing mandatory segment information (e.g., N1 or N3 segments), 7) Communicate with the EDI support team and relevant stakeholders (e.g., Joel Abraham, Marco Gracilla, Debbie Lu, Andrew Pilat, Victor Kang, Frances Parro Belleza, Cody Gorsuch, Michael Jan Francisco) to gather error details and transaction logs, 8) Review the transaction logs to pinpoint missing or incorrect segment information, 9) Coordinate with the partner or carrier responsible for the transaction to correct the segment information, 10) Resubmit the corrected transactions for processing, 11) Monitor the status of the resubmitted transactions to ensure successful completion, 12) Update all involved parties on the resolution and close the issue once resolved. Include critical entities such as WMS and Regular Order.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:38:36.012241+00:00",
+      "updated_at": "2025-11-11T13:19:02.411087+00:00"
+    },
+    "handling-00052": {
+      "id": "handling-00052",
+      "section": "Handling Onboarding Materials",
+      "content": "Ensure the following steps are followed for onboarding new employees: 1) Download and open the onboarding materials provided in the attachment, 2) Carefully read all contents of the onboarding materials, 3) Understand and familiarize yourself with all introductions and information, 4) Include a personalized greeting and mention the individual by name, such as 'Hi Wu linggang, Welcome aboard!'",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:39:07.117182+00:00",
+      "updated_at": "2025-11-11T13:19:39.261820+00:00"
+    },
+    "handling-00053": {
+      "id": "handling-00053",
+      "section": "Handling Salesforce D2C Production Environment Connectivity Issues",
+      "content": "Ensure the following steps are followed for resolving Salesforce D2C production environment connectivity issues: 1) Confirm availability of developers to review work orders, including Frances Parro Belleza, Cody Gorsuch, Michael Jan Francisco, and the Joliet team, 2) Investigate work order WISE2018-30919 for issues with Preview RN Webhook not being received, 3) Investigate work order WISE2018-30920 for issues with SharkNinja API user receiving a 400 error when attempting to post orders in the production environment, 4) Coordinate with SharkNinja API users and ensure all relevant personnel are informed.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:39:39.414403+00:00",
+      "updated_at": "2025-11-11T13:20:01.879966+00:00"
+    },
+    "handling-00054": {
+      "id": "handling-00054",
+      "section": "Handling API Integration for Complex Systems",
+      "content": "Ensure the following steps are followed for API integration in complex systems: 1) Identify all stakeholders and systems involved, including Shelia Sun, Scott Simanek, Jennifer Kuo, Tom Yu, and the development team, 2) Confirm specific customer requirements, including DN/DC/RN/RC, 3) Access the Trello link for API details, 4) Verify CubeShip system configurations, including PO number settings, 5) Request a Jira work order after the Chinese National Day holiday and involve the development team to prioritize the task, 6) Provide necessary test accounts and tokens, 7) Verify system configurations and compatibility, including ISA ID and PO number settings, 8) Coordinate technical support with Frances, Anthony, Jeff, and Eaden for issue resolution, 9) Discuss EDI and API integration with Anthony, send PO numbers to Jeff, confirm CubeShip's ISA ID configuration with Eaden, and coordinate with the Joliet team, 10) Document all integration steps and ensure thorough testing, 11) Confirm successful integration with all stakeholders and update relevant teams. Ensure verification of PO numbers and provide a time estimate for task completion. Include explicit steps to contact the Joliet and B-Solutions teams, verify ISA ID and PO number settings, and ensure all systems and configurations are checked thoroughly. Additionally, provide continuous updates on progress to stakeholders. Ensure to identify and include all relevant systems and personnel when diagnosing complex inventory discrepancies, and follow a structured approach to cover all potential sources of error. Ensure to include detailed procedural steps for verification and communication tasks, including notifying the Joliet team about meeting times and agendas.",
+      "helpful": 20,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:40:06.300599+00:00",
+      "updated_at": "2025-11-11T13:21:47.277510+00:00"
+    },
+    "handling-00055": {
+      "id": "handling-00055",
+      "section": "Handling Onboarding Processes",
+      "content": "Ensure the following steps are followed for onboarding new employees: 1) Review the presentation prepared for team members to understand the IT environment, 2) Attend a 30-minute meeting to discuss the presentation details, 3) Wait for system access, expected to be ready by the next day, 4) Access Staging with login credentials to explore and familiarize with the system, 5) Contact direct manager Shelia in Beijing, 6) For urgent matters, contact Jennifer, 7) Follow guidance from Jennifer when available, 8) Refer to the new employee guide for system training and self-study, 9) Reach out for any questions. Ensure all relevant personnel such as Frances Parro Belleza, Jennifer, Shelia, and the Joliet team are included in the onboarding communication. Include procedural steps for accessing systems and using the new employee guide.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:40:50.972939+00:00",
+      "updated_at": "2025-11-11T13:20:52.169089+00:00"
+    },
+    "handling-00056": {
+      "id": "handling-00056",
+      "section": "Handling EDI 940 Import Errors",
+      "content": "Ensure the following steps are followed to address missing Ship-To ID in 940 messages: 1) Confirm with Hisense if the N104 – Ship-To ID field can be included in the 940 message, 2) If possible, ensure this field is populated in the 856 message, 3) Consider maintaining a mapping table for Ship-To addresses to Ship-To IDs, but recognize that directly receiving the ID in the 940 message is the most efficient method. Involve stakeholders like Brian Hernandez and Chris Gardner in the process. Additionally, acknowledge the challenges PECO and UNIS might face in maintaining a mapping table and emphasize the importance of directly receiving the ID in the 940 message.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:45:47.482208+00:00",
+      "updated_at": "2025-11-11T12:46:57.100952+00:00"
+    },
+    "handling-00057": {
+      "id": "handling-00057",
+      "section": "Handling Sick Leave Notifications and Arrangements",
+      "content": "Ensure the following steps are followed for sick leave notifications and arrangements: 1) Contact Frances to confirm WMS system configuration and ISA ID, 2) Communicate with Anthony to ensure EDI interface API connection is normal, 3) Verify PO numbers provided by Jeff are correctly recorded in the system, 4) Contact Eaden to verify CubeShip system updates have been applied successfully, 5) Confirm with the Joliet team that all relevant configurations are synchronized, 6) Contact B-Solutions for any potential technical support. Expected completion time is two days. Consider adding a closing statement to enhance tone consistency and professionalism.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:47:28.409268+00:00",
+      "updated_at": "2025-11-11T12:48:37.810432+00:00"
+    },
+    "handling-00058": {
+      "id": "handling-00058",
+      "section": "Handling Employee Leave Arrangements",
+      "content": "Ensure the following steps are followed for confirming employee leave arrangements: 1) Contact Frances to confirm WMS system configuration and ISA ID, 2) Discuss EDI interface details with Anthony, 3) Check API documentation for CubeShip integration, 4) Send PO numbers to Jeff for further processing, 5) Coordinate with the Joliet team and B-Solutions team to ensure smooth project execution, 6) Confirm accuracy of all configuration values with Eaden, 7) Evaluate the entire process and provide a time estimate.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:48:53.477847+00:00",
+      "updated_at": "2025-11-11T12:50:13.911504+00:00"
+    },
+    "handling-00059": {
+      "id": "handling-00059",
+      "section": "Handling EDI 856 Project Development",
+      "content": "Ensure the following steps are followed for EDI 856/944/940/945 project development: 1) Confirm the development projects for 856/944/940/945 are on track, 2) Review 947 specifications for any discrepancies, 3) If no discrepancies, proceed with 947 development based on standard specifications, 4) Jennifer Kuo - Unisco needs to submit a request to the WMS development team for 846 CSV development, 5) Jennifer Kuo - Unisco should submit a work order to the WMS team to allocate development resources. Ensure to include specific project steps and personnel responsibilities for accurate coordination.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:49:53.832423+00:00",
+      "updated_at": "2025-11-11T12:51:07.863054+00:00"
+    },
+    "handling-00060": {
+      "id": "handling-00060",
+      "section": "Handling EDI Team Task Follow-Up",
+      "content": "Ensure the following steps are followed for EDI team task follow-up: 1) Each team member should speak about current integrations and any new requirements or issues from live clients, discussing what was done yesterday, what is planned for today, any problems encountered, and any help needed. 2) Night shift colleagues should communicate with clients during meetings, record discussions in Trello, and tag relevant colleagues for action. 3) @Yamy Liu should document key points and follow-up items, sharing them with the EDI group for collective tracking. 4) Before 2:00 AM, night shift colleagues must sync Jira tasks or other items requiring follow-up with day shift or US colleagues, recording these in Trello and tagging relevant colleagues. 5) Ensure all meetings are coordinated via Microsoft Teams Meeting. Include specific personnel such as night shift colleagues, EDI group, day shift colleagues, and US colleagues to ensure a comprehensive understanding of the task flow.",
+      "helpful": 3,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:50:51.313281+00:00",
+      "updated_at": "2025-11-11T12:52:01.633854+00:00"
+    },
+    "handling-00061": {
+      "id": "handling-00061",
+      "section": "Handling ZURU Integration and EDI Testing",
+      "content": "Ensure the following steps are followed for ZURU integration and EDI testing: 1) Contact key personnel including Frances Parro Belleza, Cody Gorsuch, Michael Jan Francisco, and the Joliet team, 2) Confirm EDI configurations and API integrations, 3) Coordinate with the Joliet team and B-Solutions team, 4) Verify system configurations in WMS and EDI, 5) Conduct comprehensive testing for orders like 8000015533, 8000015536, and 8000015566, 6) Address any issues with missing 945 files for orders, 7) Ensure 944 files are returned with correct information and scenarios, 8) Update all relevant teams on testing progress and results. Additionally, address the title error issue on 943 RN by verifying EDI configurations and coordinating with the Joliet and B-Solutions teams.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:52:36.706452+00:00",
+      "updated_at": "2025-11-11T12:53:49.254460+00:00"
+    },
+    "handling-00062": {
+      "id": "handling-00062",
+      "section": "Handling EDI 940 Import Errors",
+      "content": "Ensure VitaCoco's SPS system can accept standalone PECO pallet 856 messages. Confirm the need for PECO line items in the 940 file. Suggest leaving notes in the order remarks if VitaCoco only wants to remind the warehouse to use PECO pallets.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T10:57:14.103079+00:00",
+      "updated_at": "2025-11-11T10:57:14.103079+00:00"
+    },
+    "handling-00063": {
+      "id": "handling-00063",
+      "section": "Handling EDI 856 Project Development",
+      "content": "Include procedural verifications such as confirming EDI file time limits, checking the age of 940 files, assessing the accuracy of GLN extraction from past EDI files, and verifying the existence of a complete GLN spreadsheet.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:01:41.063432+00:00",
+      "updated_at": "2025-11-11T11:01:41.063432+00:00"
+    },
+    "handling-00064": {
+      "id": "handling-00064",
+      "section": "Handling Admin Rights Requests",
+      "content": "Ensure the following steps are followed for handling admin rights requests: 1) Contact the Helpdesk team for admin rights requests related to laptops, as they are responsible for verifying and granting access, 2) Consult Stacy Nguyen for additional guidance if needed, 3) Identify specific individuals involved such as Frances, Anthony, Jeff, and Eaden, 4) Verify systems involved including WMS, EDI, and CubeShip, 5) Outline specific steps required such as contacting the Joliet team, checking the EDI system's ISA ID configuration, verifying PO numbers, and communicating with the B-Solutions team. Expected completion time is two days. Additionally, ensure to include detailed procedural steps and specific individuals when they are explicitly outlined in the playbook for comprehensive task execution.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:12:54.587338+00:00",
+      "updated_at": "2025-11-11T13:11:56.727537+00:00"
+    },
+    "handling-00065": {
+      "id": "handling-00065",
+      "section": "Handling Missing 945s and Missing ARNs for Amazon Orders",
+      "content": "Ensure the following steps are followed for resolving Lumistella order issues: 1) Confirm Lumistella Amazon orders entered the Wise system at the beginning of August, 2) Check for label code mismatches between the EDI system and Wise configuration, 3) Correct mappings to ensure consistency between systems, 4) Complete data corrections and reprocess listed order numbers, 5) Verify existing data for incorrect label codes, 6) Execute data patches if incorrect label codes are found, 7) Regenerate SSCCs, 8) Resend DCs accordingly. Expected completion time is two days.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:13:45.108336+00:00",
+      "updated_at": "2025-11-11T13:12:30.880257+00:00"
+    },
+    "handling-00066": {
+      "id": "handling-00066",
+      "section": "Handling Hiring Decisions",
+      "content": "Ensure the following steps are included when assessing a candidate's suitability for the EDI Coordinator position: 1) Review the candidate's resume to confirm their role and experience, 2) Evaluate their broad experience in EDI and related fields, 3) Assess the depth of their knowledge, 4) Compare their operational background with EDI requirements, 5) Determine their suitability for the position based on the evaluation results. Include specific personnel such as Jennifer Kuo, Shelia Sun, Stacy Nguyen, and Jimoh Yusuf in the evaluation process.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:18:03.056394+00:00",
+      "updated_at": "2025-11-11T13:16:03.821881+00:00"
+    },
+    "handling-00067": {
+      "id": "handling-00067",
+      "section": "Handling Unfulfillable Requests",
+      "content": "Ensure the model recognizes when a request cannot be fulfilled and responds with a simple refusal, aligning with the ground truth response. Focus on context recognition to provide accurate responses.",
+      "helpful": 0,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:19:17.475118+00:00",
+      "updated_at": "2025-11-11T11:19:17.475118+00:00"
+    },
+    "handling-00068": {
+      "id": "handling-00068",
+      "section": "Handling Unfulfillable Requests",
+      "content": "Ensure the model recognizes when a request cannot be fulfilled and responds with a simple refusal, aligning with the ground truth response. Focus on context recognition to provide accurate responses.",
+      "helpful": 0,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:19:39.822776+00:00",
+      "updated_at": "2025-11-11T11:19:39.822776+00:00"
+    },
+    "handling-00069": {
+      "id": "handling-00069",
+      "section": "Handling Unfulfillable Requests",
+      "content": "Ensure the model provides an acknowledgment of inability to assist when the ground truth indicates such a response is expected. Avoid generating procedural responses in these scenarios.",
+      "helpful": 0,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:34:24.650524+00:00",
+      "updated_at": "2025-11-11T11:34:24.650524+00:00"
+    },
+    "handling-00070": {
+      "id": "handling-00070",
+      "section": "Handling EDI 940 Import Errors",
+      "content": "Ensure VitaCoco's SPS system can accept standalone PECO pallet 856 messages. Confirm the need for PECO line items in the 940 file. Suggest leaving notes in the order remarks if VitaCoco only wants to remind the warehouse to use PECO pallets.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:38:52.635552+00:00",
+      "updated_at": "2025-11-11T11:38:52.635552+00:00"
+    },
+    "handling-00071": {
+      "id": "handling-00071",
+      "section": "Handling EDI 856 Project Development",
+      "content": "Include procedural verifications such as confirming EDI file time limits, checking the age of 940 files, assessing the accuracy of GLN extraction from past EDI files, and verifying the existence of a complete GLN spreadsheet.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:42:40.598786+00:00",
+      "updated_at": "2025-11-11T11:42:40.598786+00:00"
+    },
+    "handling-00072": {
+      "id": "handling-00072",
+      "section": "Handling EDI Order Processing and Testing",
+      "content": "Ensure the following steps are followed for EDI order processing and testing: 1) Confirm the order has passed through production, 2) Contact the EDI team to confirm the order status, 3) Check the status of specific test orders, such as order 9050370121, 4) Ensure all steps are executed in a logical sequence and involve key personnel as needed, including Frances Parro Belleza, Cody Gorsuch, Michael Jan Francisco, and the Joliet team, 5) Follow the detailed sequence of actions as outlined in the playbook for EDI order processing.",
+      "helpful": 3,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:43:32.789796+00:00",
+      "updated_at": "2025-11-11T13:08:18.003546+00:00"
+    },
+    "handling-00073": {
+      "id": "handling-00073",
+      "section": "Handling IT Implementation Specialist Interviews",
+      "content": "Ensure to confirm Naveen Thallam's location in Buena Park, inform him of the next steps in detail, express gratitude for his participation, and notify him if additional information is required. Include key personnel such as Jennifer Kuo, Stacy Nguyen, and Jimoh Yusuf in the communication.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:50:54.023868+00:00",
+      "updated_at": "2025-11-11T13:10:51.498683+00:00"
+    },
+    "handling-00074": {
+      "id": "handling-00074",
+      "section": "Handling Missing 945s and Missing ARNs for Amazon Orders",
+      "content": "Ensure the following steps are followed for resolving Lumistella order issues: 1) Confirm Lumistella Amazon orders entered the Wise system at the beginning of August, 2) Check for label code mismatches between the EDI system and Wise configuration, 3) Correct mappings to ensure consistency between systems, 4) Complete data corrections and reprocess listed order numbers, 5) Verify existing data for incorrect label codes, 6) Execute data patches if incorrect label codes are found, 7) Regenerate SSCCs, 8) Resend DCs accordingly. Expected completion time is two days.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:52:33.450031+00:00",
+      "updated_at": "2025-11-11T11:52:33.450031+00:00"
+    },
+    "handling-00075": {
+      "id": "handling-00075",
+      "section": "Handling EDI 856 Project Development",
+      "content": "Ensure the following steps are followed for EDI 856 project development: 1) Contact relevant personnel to obtain the '856规范', 2) Arrange a meeting time for project discussions, 3) Follow the detailed sequence of actions as outlined in the playbook for EDI 856 project development.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:54:33.874782+00:00",
+      "updated_at": "2025-11-11T11:54:33.874782+00:00"
+    },
+    "handling-00076": {
+      "id": "handling-00076",
+      "section": "Handling Belk and SMEG System Integration and Testing",
+      "content": "Ensure the following steps are followed for Belk and SMEG system integration and testing: 1) Request Tracy to complete the task by Monday, October 13th, 2) Notify the customer two days in advance that the task will be completed by next Wednesday, 3) Communicate with the customer daily regarding this issue. Include specific task assignments and timelines to ensure alignment with real-world requirements.",
+      "helpful": 2,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:55:04.594198+00:00",
+      "updated_at": "2025-11-11T13:14:47.603271+00:00"
+    },
+    "handling-00077": {
+      "id": "handling-00077",
+      "section": "Handling Unfulfillable Requests",
+      "content": "Ensure the model recognizes when a request should be declined and responds with a simple refusal, avoiding unnecessary procedural details. Focus on accurately interpreting the user's intent to align with the ground truth response. When the ground truth indicates a simple response, the model should avoid overcomplicating the answer with unnecessary details.",
+      "helpful": 0,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:57:24.678515+00:00",
+      "updated_at": "2025-11-11T13:09:36.850732+00:00"
+    },
+    "handling-00078": {
+      "id": "handling-00078",
+      "section": "Handling Unfulfillable Requests",
+      "content": "Ensure the model recognizes when a request should be declined and responds with a simple refusal, avoiding unnecessary procedural details. Focus on accurately interpreting the user's intent to align with the ground truth response.",
+      "helpful": 0,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T11:57:44.389446+00:00",
+      "updated_at": "2025-11-11T11:57:44.389446+00:00"
+    },
+    "handling-00079": {
+      "id": "handling-00079",
+      "section": "Handling Unfulfillable Requests",
+      "content": "Ensure the model recognizes when a request should be declined and responds with a simple refusal, avoiding unnecessary procedural details. Focus on accurately interpreting the user's intent to align with the ground truth response.",
+      "helpful": 0,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T12:13:53.538465+00:00",
+      "updated_at": "2025-11-11T12:13:53.538465+00:00"
+    },
+    "handling-00080": {
+      "id": "handling-00080",
+      "section": "Handling EDI 940 Import Errors",
+      "content": "Ensure VitaCoco's SPS system can accept standalone PECO pallet 856 messages. Confirm the need for PECO line items in the 940 file. Suggest leaving notes in the order remarks if VitaCoco only wants to remind the warehouse to use PECO pallets.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T12:18:47.014288+00:00",
+      "updated_at": "2025-11-11T12:18:47.014288+00:00"
+    },
+    "handling-00081": {
+      "id": "handling-00081",
+      "section": "Handling Client Portal Introductions and Meeting Coordination",
+      "content": "Ensure to include all relevant stakeholders and specific actions when adjusting meeting schedules: 1) Confirm Frances' availability for the proposed meeting times, 2) Coordinate WMS system configuration with Anthony, ensuring ISA ID and PO numbers are correct, 3) Notify Jeff to check EDI and API connectivity, 4) Request Eaden to confirm CubeShip system updates, 5) Communicate with the Joliet team to ensure all team members are informed of the meeting time and agenda, 6) Contact the B-Solutions team to confirm any technical support needs during the meeting. Expected completion time is two days.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T12:26:59.039485+00:00",
+      "updated_at": "2025-11-11T12:26:59.039485+00:00"
+    },
+    "handling-00082": {
+      "id": "handling-00082",
+      "section": "Handling Hiring Decisions",
+      "content": "Ensure the following steps are included when assessing a candidate's suitability for the EDI Coordinator position: 1) Review the candidate's resume to confirm their role and experience, 2) Evaluate their broad experience in EDI and related fields, 3) Assess the depth of their knowledge, 4) Compare their operational background with EDI requirements, 5) Determine their suitability for the position based on the evaluation results.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T12:37:29.071445+00:00",
+      "updated_at": "2025-11-11T12:37:29.071445+00:00"
+    },
+    "handling-00083": {
+      "id": "handling-00083",
+      "section": "Handling Unfulfillable Requests",
+      "content": "Ensure the model can accurately identify when a request is unfulfillable and respond with a simple refusal, such as '抱歉，我无法协助处理此请求。', avoiding unnecessary procedural details.",
+      "helpful": 0,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T12:38:51.050787+00:00",
+      "updated_at": "2025-11-11T12:39:15.079786+00:00"
+    },
+    "handling-00084": {
+      "id": "handling-00084",
+      "section": "Handling System Configuration Adjustments",
+      "content": "Ensure the following steps are followed for system configuration adjustments due to daylight saving time: 1) Contact Frances to confirm the current time settings in the WMS system, 2) Log into the EDI system with admin access to adjust time settings, 3) Communicate with Anthony to ensure API interface time synchronization, 4) Check CubeShip system time configuration for consistency with EDI, 5) Notify the Joliet team and B-Solutions about the completion of time adjustments, 6) Confirm with Jeff and Eaden that all systems are synchronized correctly. Estimated completion time is approximately 2 hours.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T12:39:36.504515+00:00",
+      "updated_at": "2025-11-11T12:39:36.504515+00:00"
+    },
+    "handling-00085": {
+      "id": "handling-00085",
+      "section": "Handling Onboarding Materials",
+      "content": "Ensure the following steps are followed for onboarding new employees: 1) Download and open the onboarding materials provided in the attachment, 2) Carefully read all contents of the onboarding materials, 3) Understand and familiarize yourself with all introductions and information, 4) Include a personalized greeting and mention the individual by name, such as 'Hi Wu linggang, Welcome aboard!'",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T12:41:00.344969+00:00",
+      "updated_at": "2025-11-11T12:41:00.344969+00:00"
+    },
+    "handling-00086": {
+      "id": "handling-00086",
+      "section": "Handling Missing 945s and Missing ARNs for Amazon Orders",
+      "content": "Ensure the following steps are followed for resolving Amazon 945 trigger and delay issues: 1) Ensure 945s trigger immediately after shipment closure, 2) Check for missing EDI fields that could cause 945 failures, 3) Confirm there are no delays in processing, 4) Share order examples for validation if potential delays are suspected. Involve Pierre Pettigrew for further validation and ensure all steps are documented and communicated.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T12:56:48.931111+00:00",
+      "updated_at": "2025-11-11T12:56:48.931111+00:00"
+    },
+    "handling-00087": {
+      "id": "handling-00087",
+      "section": "Handling IT Implementation Specialist Interviews",
+      "content": "Ensure to include Vinay Katnam's name, assess his technical experience with API, Shopify, WMS, and OMS systems, evaluate his practical onboarding experience, discuss onboarding with relevant teams, set his salary at $75K, and arrange onboarding discussions promptly. Confirm Vinay has received and acknowledged the offer letter, verify the completion of the new hire application, confirm with HR that Vinay is aware of his start date and orientation schedule, and initiate the onboarding process.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T12:59:04.849628+00:00",
+      "updated_at": "2025-11-11T12:59:04.849628+00:00"
+    },
+    "handling-00088": {
+      "id": "handling-00088",
+      "section": "Handling UNIS WISE System Transition Issues",
+      "content": "Ensure the following steps are followed for UNIS WISE system upgrade and issue follow-up: 1) Contact key personnel including Frances Parro Belleza, Corey Wheeler, Yazmin Rosas, Cristy Llones, and relevant IT support teams, 2) Verify systems including WMS and EDI for accurate configuration, 3) Follow up on ticket WSP-96443 regarding unresolved system transition issues, 4) Ensure automated reports are correctly displaying lot codes, 5) Verify inventory status and goods type are accurately represented in reports, 6) Communicate with relevant team members to confirm updates and corrections, 7) Monitor system for any further discrepancies post-transition.",
+      "helpful": 0,
+      "harmful": 1,
+      "neutral": 0,
+      "created_at": "2025-11-11T12:59:57.791839+00:00",
+      "updated_at": "2025-11-11T12:59:57.791839+00:00"
+    },
+    "handling-00089": {
+      "id": "handling-00089",
+      "section": "Handling SMEG System Webhook Setup and Testing",
+      "content": "Ensure the following steps are followed for SMEG system webhook setup and testing: 1) Contact Frances for WMS system access, 2) Configure the webhook in the WMS system with the correct ISA ID, 3) Confirm EDI and API connection settings with Anthony, 4) Input PO numbers in CubeShip to verify data transmission, 5) Coordinate initial tests with Jeff and Eaden, 6) Confirm test results with the Joliet team and B-Solutions team, 7) Document all test results and prepare a report. Estimated completion time is two days.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T13:01:56.255202+00:00",
+      "updated_at": "2025-11-11T13:01:56.255202+00:00"
+    },
+    "handling-00090": {
+      "id": "handling-00090",
+      "section": "Handling EDI 856 Project Development",
+      "content": "Include procedural verifications such as confirming EDI file time limits, checking the age of 940 files, assessing the accuracy of GLN extraction from past EDI files, and verifying the existence of a complete GLN spreadsheet. Additionally, mention the roles of Shelia Sun, Edwin Vega, and Jacob Zwagerman.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T13:02:23.301142+00:00",
+      "updated_at": "2025-11-11T13:02:23.301142+00:00"
+    },
+    "handling-00091": {
+      "id": "handling-00091",
+      "section": "Handling Hiring Decisions",
+      "content": "Ensure the following steps are followed for confirming job offers: 1) Confirm the candidate has verbally accepted the job offer with the specified salary of $75K, 2) Verify the expected start date with the candidate, 3) Contact HR to initiate the onboarding process, including sending necessary documentation and scheduling orientation. Ensure the new hire has received and acknowledged the offer letter, verify the completion of the new hire application, and confirm with HR that the candidate is aware of their start date and orientation schedule. Additionally, ensure to verify system configurations and notify relevant teams only if they are pertinent to the hiring process.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T13:11:14.806407+00:00",
+      "updated_at": "2025-11-11T13:11:14.806407+00:00"
+    },
+    "handling-00092": {
+      "id": "handling-00092",
+      "section": "Handling IT Implementation Specialist Interviews",
+      "content": "Ensure the following steps are included when assessing a candidate's suitability for the IT Implementation Specialist position: 1) Evaluate the candidate's practical knowledge in API or EDI settings/mapping, 2) Assess the depth of their knowledge in e-commerce platforms like Shopify, 3) Determine their suitability for the position based on their experience level, 4) Decide on recommending a second interview based on these assessments. Include specific personnel such as Jennifer Kuo, Stacy Nguyen, and Shelia Sun in the evaluation process.",
+      "helpful": 1,
+      "harmful": 0,
+      "neutral": 0,
+      "created_at": "2025-11-11T13:21:15.218222+00:00",
+      "updated_at": "2025-11-11T13:21:15.218222+00:00"
+    }
+  },
+  "sections": {
+    "Handling EDI 940 Import Errors": [
+      "handling-00001",
+      "handling-00002",
+      "handling-00006",
+      "handling-00008",
+      "handling-00016",
+      "handling-00022",
+      "handling-00056",
+      "handling-00062",
+      "handling-00070",
+      "handling-00080"
+    ],
+    "Handling ZURU Label Image Quality Issues": [
+      "handling-00003"
+    ],
+    "Handling Hiring Decisions": [
+      "handling-00004",
+      "handling-00040",
+      "handling-00047",
+      "handling-00066",
+      "handling-00082",
+      "handling-00091"
+    ],
+    "Handling Epicor Certificate Updates": [
+      "handling-00005"
+    ],
+    "Handling SKU Synchronization": [
+      "handling-00007"
+    ],
+    "Handling 5-star Inventory Report Updates": [
+      "handling-00009"
+    ],
+    "Handling EDI 856 Project Development": [
+      "handling-00010",
+      "handling-00029",
+      "handling-00059",
+      "handling-00063",
+      "handling-00071",
+      "handling-00075",
+      "handling-00090"
+    ],
+    "Handling Lennox Project Go-Live and Contract Signing": [
+      "handling-00011"
+    ],
+    "Handling GLS Implementation Project": [
+      "handling-00012",
+      "handling-00049"
+    ],
+    "Handling Walmart/True Commerce AS2 Information Requests": [
+      "handling-00013"
+    ],
+    "Handling Email Management Tasks": [
+      "handling-00014"
+    ],
+    "Handling Unfulfillable Requests": [
+      "handling-00015",
+      "handling-00067",
+      "handling-00068",
+      "handling-00069",
+      "handling-00077",
+      "handling-00078",
+      "handling-00079",
+      "handling-00083"
+    ],
+    "Handling Recruitment Communication": [
+      "handling-00017"
+    ],
+    "Handling ARN Configuration and EDI Integration": [
+      "handling-00018"
+    ],
+    "Handling Missing 945s and Missing ARNs for Amazon Orders": [
+      "handling-00019",
+      "handling-00042",
+      "handling-00065",
+      "handling-00074",
+      "handling-00086"
+    ],
+    "Handling DIAGEO Customer Go-Live": [
+      "handling-00020"
+    ],
+    "Handling IT Implementation Specialist Interviews": [
+      "handling-00021",
+      "handling-00023",
+      "handling-00073",
+      "handling-00087",
+      "handling-00092"
+    ],
+    "Handling Duplicate SSCC Number Issues for UNIS": [
+      "handling-00024"
+    ],
+    "Handling JIRA Ticket Prioritization and System Error Handling": [
+      "handling-00025"
+    ],
+    "Handling FedEx Account Setup for Modern Living LLC": [
+      "handling-00026"
+    ],
+    "Handling Webhook Authentication and Information Sending Issues": [
+      "handling-00027"
+    ],
+    "Handling SMEG System Webhook Setup and Testing": [
+      "handling-00028",
+      "handling-00089"
+    ],
+    "Handling Carrier AJC Configuration": [
+      "handling-00030"
+    ],
+    "Handling Meeting Participation and Personnel Replacement": [
+      "handling-00031"
+    ],
+    "Handling EDI Implementation for Plant Baby": [
+      "handling-00032"
+    ],
+    "Handling CODA Northampton Location Code Authorization": [
+      "handling-00033"
+    ],
+    "Handling UNIS System Training Requests": [
+      "handling-00034"
+    ],
+    "Handling Client Portal Introductions and Meeting Coordination": [
+      "handling-00035",
+      "handling-00081"
+    ],
+    "Handling EDI 832 Material Master Data Import": [
+      "handling-00036"
+    ],
+    "Handling EDI 945 Unit Errors": [
+      "handling-00037"
+    ],
+    "Handling UNIS and Fulfill.io Integration Issues": [
+      "handling-00038"
+    ],
+    "Handling Duplicate 945 Orders": [
+      "handling-00039"
+    ],
+    "Handling Trello Board Invitations": [
+      "handling-00041"
+    ],
+    "Handling Shopify Order Quantity Changes": [
+      "handling-00043"
+    ],
+    "Handling Data Transmission and Label Testing Issues": [
+      "handling-00044"
+    ],
+    "Handling System Access Requests": [
+      "handling-00045"
+    ],
+    "Handling WMS Deployment Processes": [
+      "handling-00046"
+    ],
+    "Handling Powermax and SPS Integration": [
+      "handling-00048"
+    ],
+    "Handling System Configuration Adjustments": [
+      "handling-00050",
+      "handling-00084"
+    ],
+    "Handling Transaction Status Updates and Error Resolution": [
+      "handling-00051"
+    ],
+    "Handling Onboarding Materials": [
+      "handling-00052",
+      "handling-00085"
+    ],
+    "Handling Salesforce D2C Production Environment Connectivity Issues": [
+      "handling-00053"
+    ],
+    "Handling API Integration for Complex Systems": [
+      "handling-00054"
+    ],
+    "Handling Onboarding Processes": [
+      "handling-00055"
+    ],
+    "Handling Sick Leave Notifications and Arrangements": [
+      "handling-00057"
+    ],
+    "Handling Employee Leave Arrangements": [
+      "handling-00058"
+    ],
+    "Handling EDI Team Task Follow-Up": [
+      "handling-00060"
+    ],
+    "Handling ZURU Integration and EDI Testing": [
+      "handling-00061"
+    ],
+    "Handling Admin Rights Requests": [
+      "handling-00064"
+    ],
+    "Handling EDI Order Processing and Testing": [
+      "handling-00072"
+    ],
+    "Handling Belk and SMEG System Integration and Testing": [
+      "handling-00076"
+    ],
+    "Handling UNIS WISE System Transition Issues": [
+      "handling-00088"
+    ]
+  },
+  "next_id": 92
+}

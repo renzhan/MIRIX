@@ -33,6 +33,7 @@ mirix.egg-info
 .local
 .venv/
 .idea/
+agentic-context-engine-main/
+user_data_export/
 .env
 api_backend.log
-user_data_export/
