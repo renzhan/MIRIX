@@ -56,3 +56,4 @@ SpeechRecognition
 sqlalchemy
 tiktoken
 uvicorn[standard]>=0.31.1
+PyPDF2
