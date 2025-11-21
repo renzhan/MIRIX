@@ -771,35 +771,23 @@ Now write YOUR reply as the RECIPIENT to address what the sender is asking YOU t
                         }
                     }
                 else:
-                    tool_call = response.messages[-(num_tools_called * 2 + 1)].tool_call
-                    parsed_args = parse_json(tool_call.arguments)
-                    logger.info(f"email_basic_id{email_basic_id} parsed_args: {parsed_args}")
-                    print(f"email_basic_id{email_basic_id} parsed_args: {parsed_args}")
-                    # 提取message字段
-                    message_content = parsed_args.get("message", "")
+                    # 查找 send_message 工具调用
+                    send_message_tool_call = None
+                    for msg in response.messages:
+                        if hasattr(msg, 'tool_call') and msg.tool_call and msg.tool_call.name == 'send_message':
+                            send_message_tool_call = msg.tool_call
+                            logger.info(f"email_basic_id{email_basic_id} 找到 send_message 工具调用")
+                            break
                     
-                    logger.info(f"email_basic_id{email_basic_id} email_reply message_content: {message_content}")
-                    print(f"email_basic_id{email_basic_id} email_reply message_content: {message_content}")
-                    # 如果message是JSON字符串，尝试解析提取email_reply.body
-                    if message_content and isinstance(message_content, str):
-                        try:
-                            message_json = json.loads(message_content)
-                            if isinstance(message_json, dict) and "email_reply" in message_json:
-                                email_reply = message_json["email_reply"]
-                                if isinstance(email_reply, dict) and "body" in email_reply:
-                                    message_content = email_reply["body"]
-                        except (json.JSONDecodeError, KeyError, TypeError):
-                            pass  # 保持原始message_content
-                    
-                    if not message_content:
+                    if not send_message_tool_call:
                         actual_processing_time = time.time() - processing_start_time
                         total_time = time.time() - created_at.timestamp()
-                        logger.info(
-                            f"任务 {task_id} 缺少消息内容 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
-
+                        logger.error(
+                            f"任务 {task_id} 未找到 send_message 工具调用 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
+                        
                         result = {
                             "status": "error",
-                            "error": "缺少消息内容",
+                            "error": "未找到 send_message 工具调用",
                             "task_id": task_id,
                             "email_basic_id": email_basic_id,
                             "category_list": category_list,
@@ -810,25 +798,64 @@ Now write YOUR reply as the RECIPIENT to address what the sender is asking YOU t
                             }
                         }
                     else:
-                        # 计算处理时间
-                        actual_processing_time = time.time() - processing_start_time
-                        total_time = time.time() - created_at.timestamp()
+                        tool_call = send_message_tool_call
+                        parsed_args = parse_json(tool_call.arguments)
+                        logger.info(f"email_basic_id{email_basic_id} parsed_args: {parsed_args}")
+                        print(f"email_basic_id{email_basic_id} parsed_args: {parsed_args}")
+                        # 提取message字段
+                        message_content = parsed_args.get("message", "")
+                        
+                        logger.info(f"email_basic_id{email_basic_id} email_reply message_content: {message_content}")
+                        print(f"email_basic_id{email_basic_id} email_reply message_content: {message_content}")
+                        # 如果message是JSON字符串，尝试解析提取email_reply.body
+                        if message_content and isinstance(message_content, str):
+                            try:
+                                message_json = json.loads(message_content)
+                                if isinstance(message_json, dict) and "email_reply" in message_json:
+                                    email_reply = message_json["email_reply"]
+                                    if isinstance(email_reply, dict) and "body" in email_reply:
+                                        message_content = email_reply["body"]
+                            except (json.JSONDecodeError, KeyError, TypeError):
+                                pass  # 保持原始message_content
+                        
+                        if not message_content:
+                            actual_processing_time = time.time() - processing_start_time
+                            total_time = time.time() - created_at.timestamp()
+                            logger.info(
+                                f"任务 {task_id} 缺少消息内容 - 实际处理时间: {actual_processing_time:.2f}秒, 总时间: {total_time:.2f}秒")
 
-                        logger.info(f"任务 {task_id} 实际处理时间: {actual_processing_time:.2f}秒")
-                        logger.info(f"任务 {task_id} 总处理时间: {total_time:.2f}秒")
-
-                        result = {
-                            "status": "completed",
-                            "reply_content": parsed_args["message"],
-                            "task_id": task_id,
-                            "email_basic_id": email_basic_id,
-                            "category_list": category_list,
-                            "timing": {
-                                "wait_time": round(wait_time, 2),
-                                "processing_time": round(actual_processing_time, 2),
-                                "total_time": round(total_time, 2)
+                            result = {
+                                "status": "error",
+                                "error": "缺少消息内容",
+                                "task_id": task_id,
+                                "email_basic_id": email_basic_id,
+                                "category_list": category_list,
+                                "timing": {
+                                    "wait_time": round(wait_time, 2),
+                                    "processing_time": round(actual_processing_time, 2),
+                                    "total_time": round(total_time, 2)
+                                }
                             }
-                        }
+                        else:
+                            # 计算处理时间
+                            actual_processing_time = time.time() - processing_start_time
+                            total_time = time.time() - created_at.timestamp()
+
+                            logger.info(f"任务 {task_id} 实际处理时间: {actual_processing_time:.2f}秒")
+                            logger.info(f"任务 {task_id} 总处理时间: {total_time:.2f}秒")
+
+                            result = {
+                                "status": "completed",
+                                "reply_content": parsed_args["message"],
+                                "task_id": task_id,
+                                "email_basic_id": email_basic_id,
+                                "category_list": category_list,
+                                "timing": {
+                                    "wait_time": round(wait_time, 2),
+                                    "processing_time": round(actual_processing_time, 2),
+                                    "total_time": round(total_time, 2)
+                                }
+                            }
             except Exception as e:
                 actual_processing_time = time.time() - processing_start_time
                 total_time = time.time() - created_at.timestamp()
@@ -4055,43 +4082,65 @@ Now write YOUR reply as the RECIPIENT to address what the sender is asking YOU t
                     }
                     
                 else:
-                    tool_call = response.messages[-(num_tools_called * 2 + 1)].tool_call
-                    parsed_args = parse_json(tool_call.arguments)
-
-                    # 提取message字段
-                    message_content = parsed_args.get("message", "")
+                    # 查找 send_message 工具调用
+                    send_message_tool_call = None
+                    for msg in response.messages:
+                        if hasattr(msg, 'tool_call') and msg.tool_call and msg.tool_call.name == 'send_message':
+                            send_message_tool_call = msg.tool_call
+                            logger.info(f"找到 send_message 工具调用")
+                            break
                     
-                    # 如果message是JSON字符串，尝试解析提取email_reply.body
-                    if message_content and isinstance(message_content, str):
-                        try:
-                            message_json = json.loads(message_content)
-                            if isinstance(message_json, dict) and "email_reply" in message_json:
-                                email_reply = message_json["email_reply"]
-                                if isinstance(email_reply, dict) and "body" in email_reply:
-                                    message_content = email_reply["body"]
-                        except (json.JSONDecodeError, KeyError, TypeError):
-                            pass  # 保持原始message_content
-                    
-                    if not message_content:
+                    if not send_message_tool_call:
                         actual_processing_time = time.time() - processing_start_time
+                        logger.error(
+                            f"未找到 send_message 工具调用 - 实际处理时间: {actual_processing_time:.2f}秒")
+                        
                         result = {
                             "status": "error",
-                            "error": "缺少消息内容",
+                            "error": "未找到 send_message 工具调用",
                             "category_list": category_list,
                             "timing": {
                                 "processing_time": round(actual_processing_time, 2),
                             }
                         }
                     else:
-                        actual_processing_time = time.time() - processing_start_time
-                        result = {
-                            "status": "completed",
-                            "reply_content": parsed_args["message"],
-                            "category_list": category_list,
-                            "timing": {
-                                "processing_time": round(actual_processing_time, 2),
+                        tool_call = send_message_tool_call
+                        parsed_args = parse_json(tool_call.arguments)
+
+                        # 提取message字段
+                        message_content = parsed_args.get("message", "")
+                        
+                        # 如果message是JSON字符串，尝试解析提取email_reply.body
+                        if message_content and isinstance(message_content, str):
+                            try:
+                                message_json = json.loads(message_content)
+                                if isinstance(message_json, dict) and "email_reply" in message_json:
+                                    email_reply = message_json["email_reply"]
+                                    if isinstance(email_reply, dict) and "body" in email_reply:
+                                        message_content = email_reply["body"]
+                            except (json.JSONDecodeError, KeyError, TypeError):
+                                pass  # 保持原始message_content
+                        
+                        if not message_content:
+                            actual_processing_time = time.time() - processing_start_time
+                            result = {
+                                "status": "error",
+                                "error": "缺少消息内容",
+                                "category_list": category_list,
+                                "timing": {
+                                    "processing_time": round(actual_processing_time, 2),
+                                }
                             }
-                        }
+                        else:
+                            actual_processing_time = time.time() - processing_start_time
+                            result = {
+                                "status": "completed",
+                                "reply_content": parsed_args["message"],
+                                "category_list": category_list,
+                                "timing": {
+                                    "processing_time": round(actual_processing_time, 2),
+                                }
+                            }
             except Exception as e:
                 actual_processing_time = time.time() - processing_start_time
                 result = {
