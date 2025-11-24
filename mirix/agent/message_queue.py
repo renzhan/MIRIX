@@ -38,10 +38,8 @@ class MessageQueue:
             }
 
         # Wait for earlier requests of the same type to finish
-        # EXCEPTION: workflow agents are stateless workers and can run in parallel
-        if agent_type != "workflow":
-            while not self._check_if_earlier_requests_are_finished(message_uuid):
-                time.sleep(0.1)
+        while not self._check_if_earlier_requests_are_finished(message_uuid):
+            time.sleep(0.1)
 
         with self._message_queue_lock:
             self.message_queue[message_uuid]["started"] = True

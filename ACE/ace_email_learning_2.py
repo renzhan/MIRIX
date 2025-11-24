@@ -1002,18 +1002,17 @@ async def test_multi_turn_email_learning_serial(conversations_list: list):
     return global_playbook
 
 
-async def main_with_database(user_id: int = 1952974833739087873, limit: int = 10, offset: int = 0, max_concurrent: int = 3):
+async def main_with_database(user_id: int = 1952974833739087873, limit: int = 10, offset: int = 0):
     """
-    从数据库读取邮件会话并进行ACE训练（并行版本）
+    从数据库读取邮件会话并进行ACE训练（串行版本）
     
     Args:
         user_id: 用户ID
         limit: 查询的会话数量限制
         offset: 查询的偏移量
-        max_concurrent: 最大并发数（默认3）
     """
     print("\n" + "=" * 80)
-    print("ACE 批量邮件学习脚本（从数据库读取，并行模式）")
+    print("ACE 批量邮件学习脚本（从数据库读取，串行模式）")
     print("=" * 80)
     
     # 1. 从数据库查询邮件会话
@@ -1021,7 +1020,6 @@ async def main_with_database(user_id: int = 1952974833739087873, limit: int = 10
     print(f"  用户ID: {user_id}")
     print(f"  会话数量: {limit}")
     print(f"  偏移量: {offset}")
-    print(f"  并发数: {max_concurrent}")
     try:
         conversations_list = fetch_email_conversations_from_db(user_id=user_id, limit=limit, offset=offset)
         
@@ -1035,14 +1033,12 @@ async def main_with_database(user_id: int = 1952974833739087873, limit: int = 10
         print(f"✗ 数据库查询失败: {str(e)}")
         return
     
-    # 2. 调用ACE训练（并行）
-    print("\n[步骤2] 开始ACE并行训练...")
+    # 2. 调用ACE训练（串行）
+    print("\n[步骤2] 开始ACE串行训练...")
     try:
-        result = await test_multi_turn_email_learning(conversations_list, max_concurrent=max_concurrent)
+        playbook = await test_multi_turn_email_learning_serial(conversations_list)
         print(f"\n✓ 训练完成！")
-        print(f"  成功: {result['success_count']} 个")
-        print(f"  失败: {result['fail_count']} 个")
-        print(f"  总策略: {result['total_strategies']} 条")
+        print(f"  最终策略总数: {len(playbook._bullets)} 条")
         
     except Exception as e:
         print(f"✗ 训练失败: {str(e)}")
@@ -1053,22 +1049,19 @@ async def main_with_database(user_id: int = 1952974833739087873, limit: int = 10
 if __name__ == "__main__":
     # 配置训练参数
     USER_ID = 1952974833739087873
-    LIMIT = 102  # 训练全部会话
+    LIMIT = 102
     OFFSET = 0
-    MAX_CONCURRENT = 1  # 最大并发数（降低到1避免Workflow API超时，因为API服务器可能无法处理并发请求）
     
     print("=" * 80)
-    print("开始 ACE 邮件学习训练（并行模式）")
+    print("开始 ACE 邮件学习训练（串行模式）")
     print("=" * 80)
     print(f"用户ID: {USER_ID}")
     print(f"会话数量: {LIMIT}")
     print(f"偏移量: {OFFSET}")
-    print(f"并发数: {MAX_CONCURRENT}")
     print("=" * 80)
     
     asyncio.run(main_with_database(
         user_id=USER_ID,
         limit=LIMIT,
-        offset=OFFSET,
-        max_concurrent=MAX_CONCURRENT
+        offset=OFFSET
     ))
