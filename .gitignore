@@ -33,6 +33,7 @@ mirix.egg-info
 .local
 .venv/
 .idea/
+.vscode/
 agentic-context-engine-main/
 user_data_export/
 .env
