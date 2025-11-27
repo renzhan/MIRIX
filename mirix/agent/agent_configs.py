@@ -73,5 +73,11 @@ AGENT_CONFIGS = [
         'agent_type': AgentType.workflow_agent,
         'attr_name': 'workflow_agent_state',
         'include_base_tools': True
+    },
+    {
+        'name': 'ace_memory_agent',
+        'agent_type': AgentType.ace_memory_agent,
+        'attr_name': 'ace_memory_agent_state',
+        'include_base_tools': True
     }
 ]

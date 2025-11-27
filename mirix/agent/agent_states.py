@@ -17,6 +17,7 @@ class AgentStates:
         self.background_agent_state = None
         self.email_reply_agent_state = None
         self.workflow_agent_state = None
+        self.ace_memory_agent_state = None
 
     def set_agent_state(self, name, state):
         """Set an agent state by name."""
@@ -45,4 +46,5 @@ class AgentStates:
             "resource_memory_agent_state": self.resource_memory_agent_state,
             "email_reply_agent_state": self.email_reply_agent_state,
             "workflow_agent_state": self.workflow_agent_state,
+            "ace_memory_agent_state": self.ace_memory_agent_state,
         }

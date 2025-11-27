@@ -1,17 +1,20 @@
 """
-ACE多轮邮件学习测试脚本
+ACE 邮件学习脚本（串行版本）
 
-数据处理逻辑（简化版）：
+数据处理逻辑：
 1. 从数据库查询邮件会话（每个会话包含多封邮件）
 2. 对每个会话：
-   - ground_truth = 最后一封sent邮件（专家回复，作为学习目标）
-   - history = 除ground_truth外的所有邮件（作为训练输入context）
-   - topic = 从所有邮件中提取（包括ground_truth，用于生成question）
-   - workflow = 基于所有邮件提取（包括ground_truth）
+   - 直接传入账户所有者邮箱给 LLM
+   - LLM 自动识别并提取：
+     * ground_truth = 账户所有者发出的最新邮件
+     * history = 账户所有者参与的历史对话
+     * topic = 核心业务主题
+   - 使用 topic 调用 ACE Memory Agent API 获取记忆（core、knowledge_vault、semantic）
 3. 训练样本构造：
-   - question = 基于topic生成的问题
-   - context = {"workflow_result": workflow, "history": history}  # 不包含ground_truth
-   - ground_truth = 预处理后的专家回复
+   - question = 基于 topic 生成的问题
+   - context = {"ace_memory": ace_memory_result, "history": history}
+   - ground_truth = 预处理后的专家回复（步骤化格式）
+4. 串行训练，每个样本训练5轮，保存最高分结果
 """
 
 import asyncio
@@ -64,7 +67,7 @@ def get_source_db_connection():
         raise
 
 
-# 全局变量：复用数据库引擎（避免重复创建）
+# 全局变量：复用数据库引擎
 _target_db_engine = None
 
 def get_target_db_engine():
@@ -85,12 +88,12 @@ def get_target_db_engine():
     logger.info(f"连接目标数据库(PG): ...@{safe_uri}")
     
     try:
-        # 使用SQLAlchemy创建引擎（带连接池配置，支持并发）
+        # 使用SQLAlchemy创建引擎（带连接池配置）
         _target_db_engine = create_engine(
             pg_uri, 
             echo=False,
-            pool_size=10,  # 连接池大小
-            max_overflow=20,  # 最大溢出连接数
+            pool_size=5,  # 连接池大小
+            max_overflow=10,  # 最大溢出连接数
             pool_pre_ping=True,  # 连接前ping测试
             pool_recycle=3600  # 1小时后回收连接
         )
@@ -130,35 +133,33 @@ def init_learning_db():
 def save_learning_record(record_data: dict):
     """
     保存单条学习记录到目标数据库 (PostgreSQL)
-    注意：此函数是线程安全的，支持并发调用
     """
     engine = get_target_db_engine()
     try:
         # 构造SQL (使用SQLAlchemy的text和参数绑定)
         sql = text("""
             INSERT INTO ace_email_learning_records (
-                email_id, conversation_id, topic, workflow_data, 
+                email_id, conversation_id, topic, mirix_data, 
                 ground_truth, learned_strategies, final_score
-            ) VALUES (:email_id, :conversation_id, :topic, :workflow_data, 
+            ) VALUES (:email_id, :conversation_id, :topic, :mirix_data, 
                       :ground_truth, :learned_strategies, :final_score)
         """)
         
         # 准备参数
         params = {
-            'email_id': str(record_data['email_id']),  # 确保是字符串
+            'email_id': str(record_data['email_id']),
             'conversation_id': record_data.get('conversation_id'),
             'topic': record_data.get('topic'),
-            'workflow_data': json.dumps(record_data.get('workflow_data', {}), ensure_ascii=False), 
+            'mirix_data': json.dumps(record_data.get('mirix_data', {}), ensure_ascii=False), 
             'ground_truth': record_data.get('ground_truth'),
             'learned_strategies': json.dumps(record_data.get('learned_strategies', []), ensure_ascii=False),
             'final_score': float(record_data.get('final_score', 0.0))
         }
         
-        # 使用独立的连接（连接池会自动管理）
-        # 每个并发任务都会从连接池获取独立连接，互不干扰
+        # 使用数据库连接
         with engine.connect() as conn:
             conn.execute(sql, params)
-            conn.commit()  # 显式提交事务
+            conn.commit()
         
         logger.info(f"✓ 已保存学习记录到 PG (Email ID: {record_data['email_id']})")
         
@@ -325,19 +326,19 @@ class EmailTaskEnvironment(TaskEnvironment):
         return result
 
 
-async def call_workflow_extract_api(email_content: str, email_account: str = "test@example.com") -> dict:
-    """调用真实的 /workflow/extract 接口获取workflow"""
-    url = "https://aiop-dev.item.pub/pams/workflow/extract"
+async def call_ace_memory_extract_api(topic: str, email_account: str = "test@example.com") -> dict:
+    """调用新的 /ace/memory/extract 接口获取记忆提取结果（core、knowledge_vault、semantic）"""
+    url = "https://aiop-dev.item.pub/pams/ace/memory/extract"
     
     payload = {
-        "content": email_content,
+        "content": topic,
         "email_account": email_account
     }
     
     try:
         # 超时设置为180秒（3分钟）
         async with httpx.AsyncClient(timeout=180.0) as client:
-            logger.info(f"调用workflow提取API: {url}")
+            logger.info(f"调用 ACE 记忆提取API: {url}")
             
             response = await client.post(
                 url,
@@ -348,20 +349,20 @@ async def call_workflow_extract_api(email_content: str, email_account: str = "te
             response.raise_for_status()
             result = response.json()
             
-            logger.info(f"✓ workflow提取成功")
-            return result.get("workflow_result", result)
+            logger.info(f"✓ ACE 记忆提取成功")
+            return result.get("ace_memory_result", result)
     
     except httpx.TimeoutException as e:
-        logger.warning(f"  workflow提取超时（180秒），跳过")
-        return {"workflow_type": "unknown", "reasoning": "API调用超时"}
+        logger.warning(f"  ACE 记忆提取超时（180秒），返回空结果")
+        return {"core_memory": "", "knowledge_memory": [], "semantic_memory": [], "reasoning": "API调用超时"}
     
     except httpx.HTTPError as e:
-        logger.warning(f"  workflow提取失败: {str(e)}，跳过")
-        return {"workflow_type": "unknown", "reasoning": f"API调用失败: {str(e)}"}
+        logger.warning(f"  ACE 记忆提取失败: {str(e)}，返回空结果")
+        return {"core_memory": "", "knowledge_memory": [], "semantic_memory": [], "reasoning": f"API调用失败: {str(e)}"}
     
     except Exception as e:
-        logger.warning(f"  workflow提取异常: {str(e)}，跳过")
-        return {"workflow_type": "unknown", "reasoning": f"API调用异常: {str(e)}"}
+        logger.warning(f"  ACE 记忆提取异常: {str(e)}，返回空结果")
+        return {"core_memory": "", "knowledge_memory": [], "semantic_memory": [], "reasoning": f"API调用异常: {str(e)}"}
 
 
 async def preprocess_ground_truth_to_steps(natural_text: str, llm_client) -> str:
@@ -434,72 +435,61 @@ def summarize_long_email(raw_emails: str, llm_client) -> str:
         return raw_emails[:30000]
 
 
-def process_conversation_with_llm(emails_data: list, llm_client, retry_count: int = 0) -> dict:
-    """使用LLM智能处理邮件会话"""
-    if not emails_data:
-        raise ValueError("邮件数据为空")
+def extract_ground_truth_and_history(raw_emails: str, llm_client, email_account: str, retry_count: int = 0) -> dict:
+    """
+    简化版：直接告诉LLM账户所有者邮箱，让它提取ground_truth和history
     
-    raw_emails = emails_data[0] if emails_data else ""
+    Args:
+        raw_emails: 完整邮件内容
+        llm_client: LLM客户端
+        email_account: 账户所有者邮箱
+        retry_count: 重试次数
+    """
+    if not raw_emails:
+        raise ValueError("邮件内容为空")
     
-    logger.info(f"\n[LLM处理会话] 邮件内容长度: {len(raw_emails)} 字符")
+    logger.info(f"\n[提取 Ground Truth] 邮件内容长度: {len(raw_emails)} 字符")
     
     if len(raw_emails) > 30000:
         raw_emails = summarize_long_email(raw_emails, llm_client)
     
-    processing_prompt = f"""你是专业的邮件分析助手。请从这封已发送的邮件中提取训练所需的信息。
+    processing_prompt = f"""你是专业的邮件分析助手。账户所有者的邮箱是: {email_account}
+
+请从以下邮件线程中提取信息：
 
 【邮件内容】
 {raw_emails}
 
-【任务说明】
-这封邮件包含：
-- 最新回复内容（开头到第一个"发件人:"/"From:"之前）
-- 历史邮件对话（从"发件人:"/"From:"开始的部分）
+【提取规则】
+1. ground_truth = 账户所有者（{email_account}）发出的最新一封邮件的正文内容
+   - 只提取正文，去除签名、免责声明等
+   - 保留所有技术细节：人名、系统名、订单号、配置值等
+   
+2. history = 账户所有者参与的所有历史对话
+   - 包括：她收到的邮件 + 她之前发出的邮件（不包括最新的那封）
+   - 按时间顺序排列
+   - 如果没有历史对话，填"无历史对话"
+   
+3. topic = 从整体对话中提取的核心业务主题
+   - 10-20字，描述具体场景
+   - 禁止使用"邮件处理"、"邮件回复"等泛化词
 
-【输出要求 - 必须严格遵守】
-你必须输出完整的XML格式，包含全部三个标签，每个标签都必须有实际内容：
+【输出格式】
+你必须输出完整的XML格式：
 
 <output>
 <ground_truth>
-[提取最新回复内容，去除签名但保留所有技术细节：人名、系统名、订单号、配置值等]
+[账户所有者最新邮件的正文内容]
 </ground_truth>
 <history>
-[提取历史邮件对话。如果找不到"发件人:"/"From:"分隔符，则填写"无历史对话"]
+[历史对话内容，或"无历史对话"]
 </history>
 <topic>
-[从邮件内容中提取核心主题，10-20字，必须描述具体业务场景。禁止使用"邮件处理"、"邮件回复"等泛化词]
+[核心业务主题]
 </topic>
 </output>
 
-【示例】
-邮件：Hi team, I've resolved the ARN issue. Testing can begin.
-
-发件人: John <john@example.com>
-主题: ARN Issue
-Can you check the ARN mapping?
-
-正确输出：
-<output>
-<ground_truth>
-Hi team, I've resolved the ARN issue. Testing can begin.
-</ground_truth>
-<history>
-发件人: John <john@example.com>
-主题: ARN Issue
-Can you check the ARN mapping?
-</history>
-<topic>
-ARN映射问题解决通知
-</topic>
-</output>
-
-【处理步骤】
-1. 识别"发件人:"/"From:"分隔符位置
-2. 分隔符之前 → ground_truth（去除签名）
-3. 分隔符之后 → history（去除冗余声明）
-4. 从整体内容提取具体的业务主题 → topic
-
-现在开始处理上述邮件，必须输出完整的三个XML标签："""
+现在请分析上述邮件，输出完整的三个XML标签："""
     
     try:
         response = llm_client.complete(processing_prompt)
@@ -519,7 +509,7 @@ ARN映射问题解决通知
         
         if missing_fields and retry_count == 0:
             logger.warning(f"  缺少必填字段: {missing_fields}，重试一次...")
-            return process_conversation_with_llm(emails_data, llm_client, retry_count=1)
+            return extract_ground_truth_and_history(raw_emails, llm_client, email_account, retry_count=1)
         
         if missing_fields:
             logger.error(f"LLM返回内容:\n{result_text}")
@@ -532,17 +522,15 @@ ARN映射问题解决通知
         if not ground_truth:
             raise ValueError("ground_truth不能为空")
         
-        if not history:
-            logger.warning("  history为空，要求LLM填充...")
-            if retry_count == 0:
-                return process_conversation_with_llm(emails_data, llm_client, retry_count=1)
+        if not history or history.lower() in ["无", "无历史", "无历史对话"]:
+            logger.warning("  history为空，设置为默认值")
             history = "无历史对话"
         
         generic_topics = ["邮件处理", "邮件回复", "邮件", "处理", "回复"]
         if topic in generic_topics:
             logger.warning(f"  topic '{topic}' 是泛化词，要求重新生成...")
             if retry_count == 0:
-                return process_conversation_with_llm(emails_data, llm_client, retry_count=1)
+                return extract_ground_truth_and_history(raw_emails, llm_client, email_account, retry_count=1)
         
         logger.info(f"  ✓ 提取成功")
         logger.info(f"  主题: {topic}")
@@ -557,265 +545,21 @@ ARN映射问题解决通知
         logger.error(f"✗ LLM处理失败: {str(e)}")
         if retry_count < 1:
             logger.info("  尝试重试一次...")
-            return process_conversation_with_llm(emails_data, llm_client, retry_count=1)
+            return extract_ground_truth_and_history(raw_emails, llm_client, email_account, retry_count=1)
         raise
 
 
-        raise
-
-
-async def process_single_email(
-    conv_data: dict,
-    idx: int,
-    total: int,
-    llm_client,
-    eval_agent,
-    semaphore: asyncio.Semaphore
-):
+async def test_multi_turn_email_learning(conversations_list: list, email_account: str = "shelia.sun@item.com"): 
     """
-    处理单个邮件的完整流程（并行版本）
-    
-    Args:
-        conv_data: 包含 email_id, conversation_id, content
-        idx: 当前索引
-        total: 总数
-        llm_client: LLM客户端
-        eval_agent: 评估Agent
-        semaphore: 并发控制信号量
-    
-    Returns:
-        dict: 处理结果 {'success': bool, 'strategies': list, 'error': str}
-    """
-    async with semaphore:  # 控制并发数
-        email_id = conv_data['email_id']
-        conversation_id = conv_data['conversation_id']
-        email_content = conv_data['content']
-        
-        logger.info(f"\n{'='*60}")
-        logger.info(f"正在处理会话 {idx}/{total} (Email ID: {email_id})")
-        logger.info(f"{'='*60}")
-        
-        try:
-            # --- 步骤 A: 预处理 ---
-            processed = process_conversation_with_llm([email_content], llm_client)
-            
-            topic = processed['topic']
-            history = processed['history']
-            ground_truth_raw = processed['ground_truth']
-            
-            logger.info(f"  [{idx}] 主题: {topic}")
-            
-            # 调用workflow API
-            workflow_result = await call_workflow_extract_api(topic, "shelia.sun@item.com")
-            
-            # 构造question
-            specific_question = f"{topic}需要联系哪些人？需要检查哪些系统？需要执行哪些操作？"
-            
-            # 预处理ground_truth
-            ground_truth_processed = await preprocess_ground_truth_to_steps(
-                ground_truth_raw, 
-                llm_client
-            )
-            
-            # 构造单个样本
-            sample = Sample(
-                question=specific_question,
-                context=json.dumps({
-                    "workflow_result": workflow_result,
-                    "history": history
-                }, ensure_ascii=False),
-                ground_truth=ground_truth_processed
-            )
-            
-            # --- 步骤 B: 单样本微调 (5轮) ---
-            logger.info(f"  [{idx}] >> 开始训练 5 轮...")
-            
-            # 每个任务使用独立的Playbook（避免并发冲突）
-            local_playbook = Playbook()
-            generator = Generator(llm_client)
-            reflector = Reflector(llm_client)
-            curator = Curator(llm_client)
-            task_env = EmailTaskEnvironment(eval_agent)
-            
-            adapter = OfflineAdapter(
-                playbook=local_playbook,
-                generator=generator,
-                reflector=reflector,
-                curator=curator
-            )
-            
-            # 运行训练
-            results = adapter.run(
-                samples=[sample],
-                environment=task_env,
-                epochs=5
-            )
-            
-            # 获取最后一次评估的得分
-            last_result = results[-1]
-            final_score = last_result.environment_result.metrics.get('score', 0)
-            logger.info(f"  [{idx}] >> 训练完成，得分: {final_score:.2f}")
-            
-            # --- 步骤 C: 提取策略 ---
-            new_bullets = []
-            if local_playbook._bullets:
-                logger.info(f"  [{idx}] >> 本次产生 {len(local_playbook._bullets)} 条策略")
-                for bullet in local_playbook._bullets.values():
-                    bullet_dict = {
-                        "id": bullet.id,
-                        "section": bullet.section,
-                        "content": bullet.content,
-                        "helpful": bullet.helpful,
-                        "harmful": bullet.harmful
-                    }
-                    new_bullets.append(bullet_dict)
-            
-            # --- 步骤 D: 保存到数据库 ---
-            record_data = {
-                'email_id': email_id,
-                'conversation_id': conversation_id,
-                'topic': topic,
-                'workflow_data': workflow_result,
-                'ground_truth': ground_truth_processed,
-                'learned_strategies': new_bullets,
-                'final_score': final_score
-            }
-            
-            save_learning_record(record_data)
-            logger.info(f"  [{idx}] ✓ 处理完成并已保存")
-            
-            return {
-                'success': True,
-                'strategies': new_bullets,
-                'email_id': email_id,
-                'score': final_score
-            }
-            
-        except Exception as e:
-            logger.error(f"  [{idx}] ✗ 处理失败: {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return {
-                'success': False,
-                'strategies': [],
-                'email_id': email_id,
-                'error': str(e)
-            }
-
-
-async def test_multi_turn_email_learning(conversations_list: list, max_concurrent: int = 3): 
-    """
-    并行处理邮件学习
+    串行处理邮件学习，保存5轮中得分最高的结果
     
     Args:
         conversations_list: 邮件会话列表
-        max_concurrent: 最大并发数（默认3，可根据API限制调整）
+        email_account: 账户所有者邮箱
     """
     logger.info("=" * 60)
-    logger.info(f"开始 ACE 并行邮件学习（实时入库模式，并发数={max_concurrent}）")
-    logger.info("=" * 60)
-    
-    # 初始化数据库表
-    init_learning_db()
-    
-    # 验证输入数据
-    if not conversations_list:
-        raise ValueError("conversations_list 不能为空，请提供邮件会话列表")
-    
-    logger.info(f"收到 {len(conversations_list)} 个邮件会话")
-    
-    # 1. 检查环境配置
-    logger.info("\n[1/5] 检查环境配置...")
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        logger.error("未找到 OPENAI_API_KEY，请在 .env 文件中设置")
-        return
-    logger.info("✓ API Key 已配置")
-    
-    # 2. 初始化 LLM 客户端
-    logger.info("\n[2/5] 初始化 LLM 客户端...")
-    llm_client = LiteLLMClient(
-        model="gpt-4o",
-        temperature=0.3,
-        max_tokens=2048
-    )
-    logger.info("✓ LLM 客户端初始化完成")
-    
-    # 🔧 Monkey patch ACE的JSON解析
-    import ace.roles
-    original_safe_json_loads = ace.roles._safe_json_loads
-    def patched_safe_json_loads(text: str):
-        cleaned = text.strip()
-        if cleaned.startswith("```json"):
-            cleaned = cleaned[7:]
-        if cleaned.startswith("```"):
-            cleaned = cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
-        return original_safe_json_loads(cleaned)
-    
-    ace.roles._safe_json_loads = patched_safe_json_loads
-    logger.info("✓ 已应用JSON解析补丁")
-    
-    # 3. 创建评估环境
-    logger.info("\n[3/5] 创建训练环境...")
-    eval_agent = EmailEvaluationAgent(llm_client=llm_client)
-    logger.info("✓ 训练环境创建完成")
-    
-    # 4. 并行处理邮件会话
-    logger.info(f"\n[4/5] 开始并行处理 {len(conversations_list)} 个邮件会话（并发数={max_concurrent}）...")
-    
-    # 创建并发控制信号量
-    semaphore = asyncio.Semaphore(max_concurrent)
-    
-    # 创建所有任务
-    tasks = [
-        process_single_email(conv_data, idx, len(conversations_list), llm_client, eval_agent, semaphore)
-        for idx, conv_data in enumerate(conversations_list, 1)
-    ]
-    
-    # 并发执行所有任务
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    
-    # 5. 统计结果并合并策略
-    success_count = 0
-    fail_count = 0
-    all_strategies = []
-    
-    for i, result in enumerate(results):
-        if isinstance(result, Exception):
-            logger.error(f"任务 {i+1} 异常: {result}")
-            fail_count += 1
-        elif result.get('success'):
-            success_count += 1
-            all_strategies.extend(result.get('strategies', []))
-        else:
-            fail_count += 1
-    
-    # 6. 结束处理
-    logger.info(f"\n{'='*60}")
-    logger.info(f"所有会话处理完成")
-    logger.info(f"{'='*60}")
-    logger.info(f"✓ 成功: {success_count}")
-    logger.info(f"✗ 失败: {fail_count}")
-    logger.info(f"✓ 总共产生策略: {len(all_strategies)} 条")
-    
-    # 7. 保存最终合并的Playbook（可选）
-    if all_strategies:
-        logger.info("\n保存最终策略汇总...")
-        final_playbook = Playbook()
-        # 注意：这里只是汇总，实际的策略已经存在数据库中了
-        logger.info(f"✓ 策略已汇总（实际策略已保存在数据库中）")
-    
-    return {'success_count': success_count, 'fail_count': fail_count, 'total_strategies': len(all_strategies)}
-
-
-# 保留旧的串行版本作为备用（如果需要的话）
-async def test_multi_turn_email_learning_serial(conversations_list: list): 
-    """串行版本（旧版本，保留作为备用）"""
-    logger.info("=" * 60)
-    logger.info("开始 ACE 逐个邮件学习（串行模式）")
+    logger.info("开始 ACE 邮件学习（串行模式）")
+    logger.info(f"账户所有者: {email_account}")
     logger.info("=" * 60)
     
     # 初始化数据库表
@@ -892,8 +636,8 @@ async def test_multi_turn_email_learning_serial(conversations_list: list):
         logger.info(f"{'='*60}")
         
         try:
-            # --- 步骤 A: 预处理 ---
-            processed = process_conversation_with_llm([email_content], llm_client)
+            # --- 步骤 A: 提取 ground_truth 和 history ---
+            processed = extract_ground_truth_and_history(email_content, llm_client, email_account)
             
             topic = processed['topic']
             history = processed['history']
@@ -901,13 +645,13 @@ async def test_multi_turn_email_learning_serial(conversations_list: list):
             
             logger.info(f"  主题: {topic}")
             
-            # 调用workflow API
-            workflow_result = await call_workflow_extract_api(topic, "shelia.sun@item.com")
+            # 调用新的 ACE 记忆提取API（core_memory、knowledge_memory、semantic_memory）
+            ace_memory_result = await call_ace_memory_extract_api(topic, email_account)
             
             # 构造question
             specific_question = f"{topic}需要联系哪些人？需要检查哪些系统？需要执行哪些操作？"
             
-            # 预处理ground_truth
+            # 预处理ground_truth（转为步骤化格式）
             ground_truth_processed = await preprocess_ground_truth_to_steps(
                 ground_truth_raw, 
                 llm_client
@@ -917,7 +661,7 @@ async def test_multi_turn_email_learning_serial(conversations_list: list):
             sample = Sample(
                 question=specific_question,
                 context=json.dumps({
-                    "workflow_result": workflow_result,
+                    "ace_memory": ace_memory_result,
                     "history": history
                 }, ensure_ascii=False),
                 ground_truth=ground_truth_processed
@@ -941,9 +685,20 @@ async def test_multi_turn_email_learning_serial(conversations_list: list):
                 epochs=5
             )
             
-            last_result = results[-1]
-            final_score = last_result.environment_result.metrics.get('score', 0)
-            logger.info(f"  >> 训练完成，最终得分: {final_score:.2f}")
+            # 找出5轮中得分最高的结果
+            best_result = None
+            best_score = -1
+            best_epoch = 0
+            for epoch_idx, result in enumerate(results, 1):
+                score = result.environment_result.metrics.get('score', 0)
+                logger.info(f"    第 {epoch_idx} 轮得分: {score:.2f}")
+                if score > best_score:
+                    best_score = score
+                    best_result = result
+                    best_epoch = epoch_idx
+            
+            final_score = best_score
+            logger.info(f"  >> 训练完成，最高得分: {final_score:.2f} (第 {best_epoch} 轮)")
             
             # --- 步骤 C: 计算增量策略并入库 ---
             current_strategies = set(global_playbook._bullets.keys())
@@ -971,7 +726,7 @@ async def test_multi_turn_email_learning_serial(conversations_list: list):
                 'email_id': email_id,
                 'conversation_id': conversation_id,
                 'topic': topic,
-                'workflow_data': workflow_result,
+                'mirix_data': ace_memory_result,
                 'ground_truth': ground_truth_processed,
                 'learned_strategies': new_bullets,
                 'final_score': final_score
@@ -1002,22 +757,29 @@ async def test_multi_turn_email_learning_serial(conversations_list: list):
     return global_playbook
 
 
-async def main_with_database(user_id: int = 1952974833739087873, limit: int = 10, offset: int = 0):
+async def main_with_database(
+    user_id: int = 1952974833739087873, 
+    email_account: str = "shelia.sun@item.com",
+    limit: int = 10, 
+    offset: int = 0
+):
     """
-    从数据库读取邮件会话并进行ACE训练（串行版本）
+    从数据库读取邮件会话并进行ACE训练
     
     Args:
         user_id: 用户ID
+        email_account: 账户所有者邮箱
         limit: 查询的会话数量限制
         offset: 查询的偏移量
     """
     print("\n" + "=" * 80)
-    print("ACE 批量邮件学习脚本（从数据库读取，串行模式）")
+    print("ACE 邮件学习脚本（从数据库读取）")
     print("=" * 80)
     
     # 1. 从数据库查询邮件会话
     print("\n[步骤1] 从数据库查询邮件会话...")
     print(f"  用户ID: {user_id}")
+    print(f"  账户邮箱: {email_account}")
     print(f"  会话数量: {limit}")
     print(f"  偏移量: {offset}")
     try:
@@ -1033,10 +795,10 @@ async def main_with_database(user_id: int = 1952974833739087873, limit: int = 10
         print(f"✗ 数据库查询失败: {str(e)}")
         return
     
-    # 2. 调用ACE训练（串行）
-    print("\n[步骤2] 开始ACE串行训练...")
+    # 2. 调用ACE训练
+    print("\n[步骤2] 开始ACE训练...")
     try:
-        playbook = await test_multi_turn_email_learning_serial(conversations_list)
+        playbook = await test_multi_turn_email_learning(conversations_list, email_account=email_account)
         print(f"\n✓ 训练完成！")
         print(f"  最终策略总数: {len(playbook._bullets)} 条")
         
@@ -1049,19 +811,22 @@ async def main_with_database(user_id: int = 1952974833739087873, limit: int = 10
 if __name__ == "__main__":
     # 配置训练参数
     USER_ID = 1952974833739087873
+    EMAIL_ACCOUNT = "shelia.sun@item.com"  # 账户所有者邮箱
     LIMIT = 102
     OFFSET = 0
     
     print("=" * 80)
-    print("开始 ACE 邮件学习训练（串行模式）")
+    print("开始 ACE 邮件学习训练")
     print("=" * 80)
     print(f"用户ID: {USER_ID}")
+    print(f"账户邮箱: {EMAIL_ACCOUNT}")
     print(f"会话数量: {LIMIT}")
     print(f"偏移量: {OFFSET}")
     print("=" * 80)
     
     asyncio.run(main_with_database(
         user_id=USER_ID,
+        email_account=EMAIL_ACCOUNT,
         limit=LIMIT,
         offset=OFFSET
     ))

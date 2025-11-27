@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from mirix.constants import DEFAULT_EMBEDDING_CHUNK_SIZE
+from mirix.constants import DEFAULT_EMBEDDING_CHUNK_SIZE, CORE_MEMORY_LINE_NUMBER_WARNING
 from mirix.helpers import ToolRulesSolver
 from mirix.schemas.block import CreateBlock
 from mirix.schemas.embedding_config import EmbeddingConfig
@@ -36,6 +36,7 @@ class AgentType(str, Enum):
     core_memory_agent = "core_memory_agent"
     email_reply_agent = "email_reply_agent"
     workflow_agent = "workflow_agent"
+    ace_memory_agent = "ace_memory_agent"
 
 
 class AgentState(OrmMetadataBase, validate_assignment=True):

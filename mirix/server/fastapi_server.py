@@ -1140,6 +1140,15 @@ class WorkflowExtractionResponse(BaseModel):
     workflow_result: Any  # 可以是字典或字符串
 
 
+class AceMemoryExtractionRequest(BaseModel):
+    content: str
+    email_account: str
+
+
+class AceMemoryExtractionResponse(BaseModel):
+    ace_memory_result: Any  # JSON结构包含 core_memory, knowledge_memory, semantic_memory
+
+
 class EmailSummaryRequest(BaseModel):
     email_content: str
     email_account: str
@@ -1883,6 +1892,7 @@ async def extract_workflow(request: WorkflowExtractionRequest):
     3. 从 procedural_memory 查询匹配的工作流程
     4. 返回结构化的完整工作流程
     """
+    user = None
     try:
         # 参数验证
         if not request.email_account.strip():
@@ -1893,13 +1903,14 @@ async def extract_workflow(request: WorkflowExtractionRequest):
         logger.info(
             f"[WORKFLOW_API] 开始处理工作流程提取 - email_account: {request.email_account}, content_length: {len(request.content)}")
 
+        # 检查 agent 是否已初始化
         if agent is None:
             raise HTTPException(status_code=500, detail="Agent未初始化")
 
+        # 解析/创建用户并在后台线程中调用 workflow_agent
         user = agent.client.server.user_manager.get_or_create_user_by_email(request.email_account)
         resolved_user_id = user.id
 
-        # 在后台线程中调用 workflow_agent 提取工作流
         loop = asyncio.get_event_loop()
         workflow_result = await loop.run_in_executor(
             None,
@@ -1920,9 +1931,18 @@ async def extract_workflow(request: WorkflowExtractionRequest):
 
         logger.info(f"[WORKFLOW_API] 工作流程提取成功 - 类型: {type(workflow_result).__name__}")
 
-        # 清理 workflow_agent 的历史消息，只保留 system prompt（在 agent 工作完毕后清理）
-        try:
-            if agent.agent_states.workflow_agent_state:
+        return WorkflowExtractionResponse(workflow_result=workflow_result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[WORKFLOW_API] 处理失败: {str(e)}")
+        logger.error(f"[WORKFLOW_API] 错误堆栈: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"工作流程提取失败: {str(e)}")
+    finally:
+        # 清理 workflow_agent 的历史消息，只保留 system prompt（无论成功或失败）
+        if user and agent and agent.agent_states.workflow_agent_state:
+            try:
                 workflow_agent_id = agent.agent_states.workflow_agent_state.id
                 workflow_agent = agent.client.server.agent_manager.get_agent_by_id(
                     agent_id=workflow_agent_id,
@@ -1941,18 +1961,94 @@ async def extract_workflow(request: WorkflowExtractionRequest):
                     )
                     
                     logger.info(f"[WORKFLOW_API] 已清理 workflow_agent 历史消息: {original_count} -> 1")
-        except Exception as cleanup_error:
-            # 清理失败不影响主流程，只记录日志
-            logger.warning(f"[WORKFLOW_API] 清理 workflow_agent 历史失败: {cleanup_error}")
+            except Exception as cleanup_error:
+                # 清理失败不影响主流程，只记录日志
+                logger.warning(f"[WORKFLOW_API] 清理 workflow_agent 历史失败: {cleanup_error}")
 
-        return WorkflowExtractionResponse(workflow_result=workflow_result)
+
+@app.post("/ace/memory/extract", response_model=AceMemoryExtractionResponse)
+async def extract_ace_memory_endpoint(request: AceMemoryExtractionRequest):
+    """
+    ACE 记忆体提取接口
+
+    一次性完成：
+    1. 分析请求内容
+    2. 提取关键问题和信息
+    3. 从 Core, Knowledge Vault, Semantic Memory 查询匹配的记忆体
+    4. 返回结构化的记忆体内容
+    """
+    user = None
+    try:
+        # 参数验证
+        if not request.email_account.strip():
+            raise HTTPException(status_code=400, detail="email_account不能为空")
+        if not request.content.strip():
+            raise HTTPException(status_code=400, detail="content不能为空")
+
+        logger.info(
+            f"[ACE_MEMORY_API] 开始处理ACE记忆体提取 - email_account: {request.email_account}, content_length: {len(request.content)}")
+
+        # 检查 agent 是否已初始化
+        if agent is None:
+            raise HTTPException(status_code=500, detail="Agent未初始化")
+
+        # 解析/创建用户并在后台线程中调用 ace_memory_agent
+        user = agent.client.server.user_manager.get_or_create_user_by_email(request.email_account)
+        resolved_user_id = user.id
+
+        loop = asyncio.get_event_loop()
+        ace_memory_result = await loop.run_in_executor(
+            None,
+            lambda: agent.extract_ace_memory(
+                content=request.content,
+                user_id=resolved_user_id
+            )
+        )
+
+        # 处理响应
+        if ace_memory_result is None or (isinstance(ace_memory_result, str) and ace_memory_result.strip() == ""):
+            logger.error("[ACE_MEMORY_API] 返回空响应")
+            raise HTTPException(status_code=500, detail="ACE记忆体提取失败：返回空内容")
+
+        if isinstance(ace_memory_result, dict) and ace_memory_result.get("error"):
+            logger.error(f"[ACE_MEMORY_API] 返回错误: {ace_memory_result['error']}")
+            raise HTTPException(status_code=500, detail=f"ACE记忆体提取失败: {ace_memory_result['error']}")
+
+        logger.info(f"[ACE_MEMORY_API] ACE记忆体提取成功 - 类型: {type(ace_memory_result).__name__}")
+
+        return AceMemoryExtractionResponse(ace_memory_result=ace_memory_result)
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[WORKFLOW_API] 处理失败: {str(e)}")
-        logger.error(f"[WORKFLOW_API] 错误堆栈: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"工作流程提取失败: {str(e)}")
+        logger.error(f"[ACE_MEMORY_API] 处理失败: {str(e)}")
+        logger.error(f"[ACE_MEMORY_API] 错误堆栈: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"ACE记忆体提取失败: {str(e)}")
+    finally:
+        # 清理 ace_memory_agent 的历史消息，只保留 system prompt（无论成功或失败）
+        if user and agent and agent.agent_states.ace_memory_agent_state:
+            try:
+                ace_memory_agent_id = agent.agent_states.ace_memory_agent_state.id
+                ace_memory_agent = agent.client.server.agent_manager.get_agent_by_id(
+                    agent_id=ace_memory_agent_id,
+                    actor=user
+                )
+                
+                # 只保留 message_ids 的第一个元素（system prompt）
+                if len(ace_memory_agent.message_ids) > 1:
+                    original_count = len(ace_memory_agent.message_ids)
+                    new_message_ids = [ace_memory_agent.message_ids[0]]
+                    
+                    agent.client.server.agent_manager.set_in_context_messages(
+                        agent_id=ace_memory_agent_id,
+                        message_ids=new_message_ids,
+                        actor=user
+                    )
+                    
+                    logger.info(f"[ACE_MEMORY_API] 已清理 ace_memory_agent 历史消息: {original_count} -> 1")
+            except Exception as cleanup_error:
+                # 清理失败不影响主流程，只记录日志
+                logger.warning(f"[ACE_MEMORY_API] 清理 ace_memory_agent 历史失败: {cleanup_error}")
 
 
 @app.post("/send_streaming_message")
@@ -3608,6 +3704,7 @@ async def update_system_prompt(request: UpdateSystemPromptRequest):
             "email_reply": "base/email_reply_agent", 
             "meta_memory": "base/meta_memory_agent",
             "workflow": "base/workflow_agent",
+            "ace_memory": "base/ace_memory_agent", 
             "episodic_memory": "base/episodic_memory_agent",
             "semantic_memory": "base/semantic_memory_agent",
             "procedural_memory": "base/procedural_memory_agent",
@@ -3639,6 +3736,7 @@ async def update_system_prompt(request: UpdateSystemPromptRequest):
             "email_reply": agent.agent_states.email_reply_agent_state,
             "meta_memory": agent.agent_states.meta_memory_agent_state,
             "workflow": agent.agent_states.workflow_agent_state,
+            "ace_memory": agent.agent_states.ace_memory_agent_state,
             "episodic_memory": agent.agent_states.episodic_memory_agent_state,
             "semantic_memory": agent.agent_states.semantic_memory_agent_state,
             "procedural_memory": agent.agent_states.procedural_memory_agent_state,
