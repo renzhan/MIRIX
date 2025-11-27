@@ -34,6 +34,7 @@ from ..services.mcp_tool_registry import get_mcp_tool_registry
 from ..utils import parse_json
 from ..schemas.mirix_message import MessageType
 from prepdocslib.attachment_utils import build_download_url, parse_attachment_from_url
+from email_graph_extraction import extract_and_store_graph
 
 
 def _load_system_prompt(prompt_name: str) -> str:
@@ -613,6 +614,47 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
         else:
             logger.warning("Absorb线程池未初始化，跳过记忆吸收")
 
+
+        # 增加异步线程对关系图谱进行抽取和存储
+        if _graph_extraction_executor:
+            try:
+                logger.info(f"[GRAPH_EXTRACTION] 提交图谱抽取任务 - user_id: {user_id}, email_account: {email_account}")
+                
+                def graph_extraction_task():
+                    """图谱抽取任务包装函数"""
+                    try:
+                        logger.info(f"[GRAPH_EXTRACTION] 开始处理图谱抽取 - user_id: {user_id}")
+                        result = extract_and_store_graph(
+                            email_content=full_email_content,
+                            user_id=user_id,
+                            email_account=email_account,
+                            enable_deduplication=True,
+                            similarity_threshold=0.85
+                        )
+                        
+                        # 记录抽取结果统计
+                        nodes_count = result.get('nodes_count', 0)
+                        relationships_count = result.get('relationships_count', 0)
+                        dedup_stats = result.get('deduplication_stats', {})
+                        
+                        logger.info(
+                            f"[GRAPH_EXTRACTION] ✅ 图谱抽取完成 - user_id: {user_id}, "
+                            f"节点: {nodes_count}, 关系: {relationships_count}, "
+                            f"去重: {dedup_stats}"
+                        )
+                        
+                    except Exception as e:
+                        logger.error(f"[GRAPH_EXTRACTION] ❌ 图谱抽取失败 - user_id: {user_id}, 错误: {str(e)}")
+                        logger.error(f"[GRAPH_EXTRACTION] 错误堆栈: {traceback.format_exc()}")
+                
+                # 提交任务到线程池
+                _graph_extraction_executor.submit(graph_extraction_task)
+                
+            except Exception as e:
+                logger.error(f"[GRAPH_EXTRACTION] ❌ 提交图谱抽取任务失败: {str(e)}")
+        else:
+            logger.warning("[GRAPH_EXTRACTION] ⚠️ 图谱抽取线程池未初始化，跳过图谱抽取和存储")
+
         # 执行前清理 email_reply_agent 消息历史
         try:
             user = agent.client.server.user_manager.get_user_by_id(user_id)
@@ -1105,6 +1147,18 @@ class EmailSummaryResponse(BaseModel):
     status: str = "success"
 
 
+class EmailTranslateRequest(BaseModel):
+    content: str
+    target_lang: str
+
+
+class EmailTranslateResponse(BaseModel):
+    translated_content: str
+    source_lang: Optional[str] = None
+    target_lang: str
+    status: str = "success"
+
+
 # API Key validation functionality
 def get_required_api_keys_for_model(model_endpoint_type: str) -> List[str]:
     """Get required API keys for a given model endpoint type"""
@@ -1281,6 +1335,9 @@ worker_shutdown_event = threading.Event()
 # Absorb线程池 - 用于异步记忆吸收,避免线程累积
 _absorb_executor: Optional[ThreadPoolExecutor] = None
 
+# 图谱抽取线程池 - 用于异步图谱抽取和存储
+_graph_extraction_executor: Optional[ThreadPoolExecutor] = None
+
 
 def generate_task_id(user_id: str, email_basic_id: str, email_content: str) -> str:
     """根据用户ID和邮件内容生成MD5任务ID"""
@@ -1345,7 +1402,7 @@ def email_reply_worker():
 
 def start_email_reply_workers():
     """启动邮件回复工作线程池"""
-    global worker_threads, _absorb_executor
+    global worker_threads, _absorb_executor, _graph_extraction_executor
 
     # 计算线程数：CPU核数的2倍，最少2个
     cpu_count = multiprocessing.cpu_count()
@@ -1368,6 +1425,10 @@ def start_email_reply_workers():
     _absorb_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="AbsorbWorker")
     logger.info(f"[Absorb线程池] ✅ 初始化完成，最大工作线程: 4")
 
+    # 初始化图谱抽取线程池 - 最多2个线程用于图谱抽取和存储
+    _graph_extraction_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="GraphExtractor")
+    logger.info(f"[图谱抽取线程池] ✅ 初始化完成，最大工作线程: 2")
+
     logger.info(f"[工作线程池] ✅ 启动完成，共 {len(worker_threads)} 个线程")
     print(f"[工作线程池] ✅ 启动完成，共 {len(worker_threads)} 个线程")
     logger.info(f"="*80)
@@ -1375,7 +1436,7 @@ def start_email_reply_workers():
 
 def stop_email_reply_workers():
     """停止邮件回复工作线程池"""
-    global worker_threads, _absorb_executor
+    global worker_threads, _absorb_executor, _graph_extraction_executor
 
     logger.info("正在停止邮件回复工作线程池...")
     worker_shutdown_event.set()
@@ -1392,6 +1453,13 @@ def stop_email_reply_workers():
         _absorb_executor.shutdown(wait=True, cancel_futures=False)
         _absorb_executor = None
         logger.info("Absorb线程池已关闭")
+
+    # 关闭图谱抽取线程池
+    if _graph_extraction_executor:
+        logger.info("正在关闭图谱抽取线程池...")
+        _graph_extraction_executor.shutdown(wait=True, cancel_futures=False)
+        _graph_extraction_executor = None
+        logger.info("图谱抽取线程池已关闭")
 
     logger.info("邮件回复工作线程池已停止")
 
@@ -1711,6 +1779,94 @@ async def summarize_email(request: EmailSummaryRequest):
         logger.error(f"[EMAIL_SUMMARY] 处理失败: {str(e)}")
         logger.error(f"[EMAIL_SUMMARY] 错误堆栈: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"邮件总结失败: {str(e)}")
+
+
+@app.post("/email/translate", response_model=EmailTranslateResponse)
+async def translate_email(request: EmailTranslateRequest):
+    """
+    邮件翻译接口
+    
+    输入:
+    - content: 需要翻译的内容
+    - target_lang: 目标语言（如：中文、英文、日文等）
+    
+    输出:
+    - translated_content: 翻译后的内容
+    - source_lang: 源语言（自动检测）
+    - target_lang: 目标语言
+    - status: 处理状态
+    """
+    try:
+        if not request.content.strip():
+            raise HTTPException(status_code=400, detail="content不能为空")
+        if not request.target_lang.strip():
+            raise HTTPException(status_code=400, detail="target_lang不能为空")
+
+        # 构建系统提示词 - 明确翻译要求
+        system_prompt = """你是一个专业的邮件翻译助手。
+
+翻译要求：
+1. 逐句翻译，不增加、不省略、不润色
+2. 不改变语序超过必要程度
+3. 专有名词保留原文
+4. 保持原文的格式和段落结构
+5. 如果内容已经是目标语言，直接返回原文
+
+翻译风格：
+- 准确、忠实于原文
+- 专业、正式的商务语气
+- 保留邮件中的所有关键信息
+
+输出内容：
+1.如果输入是HTML完整结构邮件：
+  - 输出必须是 HTML结构；
+  - 结构、标签、属性保持不变，只翻译其中的可见文本。
+2.如果输入没有HTML结构，只有普通邮件内容：
+  - 输出必须是纯文本字符串；
+  - 不要额外添加 HTML 标签、Markdown 标记或解释说明。
+
+禁止行为：
+- 不要在输出前后添加任何解释、注释或额外说明；
+- 不要输出 JSON、Markdown，只输出“翻译后的正文”，只对内容做翻译。保持原样式(HTML或纯文本)。；
+- 不要润色、重写或总结，只做语义等价的翻译。
+"""
+
+
+        
+        # 构建用户提示词
+        user_prompt = f"""请将以下内容翻译成{request.target_lang}：
+
+{request.content}"""
+
+        client = OpenAI(
+            api_key=os.getenv('OPENAI_API_KEY'),
+        )
+        
+        response = client.chat.completions.create(
+            model="gpt-5.1-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.3  # 较低的温度以保证翻译一致性
+        )
+
+        translated_content = response.choices[0].message.content
+
+        logger.info(f"[EMAIL_TRANSLATE] 翻译完成 - target_lang: {request.target_lang}, content_length: {len(request.content)}")
+        
+        return EmailTranslateResponse(
+            translated_content=translated_content,
+            target_lang=request.target_lang,
+            status="success"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[EMAIL_TRANSLATE] 处理失败: {str(e)}")
+        logger.error(f"[EMAIL_TRANSLATE] 错误堆栈: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"邮件翻译失败: {str(e)}")
 
 
 @app.post("/workflow/extract", response_model=WorkflowExtractionResponse)
