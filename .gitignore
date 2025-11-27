@@ -1,39 +1,61 @@
-test
+# Operating System
+.DS_Store
+
+# IDE & Editor
+.idea/
+.vscode/
+.claude/
+
+# Python
 __pycache__
+.venv/
+mirix_env/
+mirix.egg-info
+
+# Node.js & Frontend
+node_modules/
+frontend/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build & Distribution
+dist/
+build/
+frontend/dist
+frontend/backend
+
+# Frontend Framework Cache
+.next/
+.nuxt/
+.vite/
+.parcel-cache/
+.eslintcache
+coverage/
+
+# Project Specific - Test & Debug
+test
+debug
+local_test
+local_evaluations
+
+# Project Specific - Temporary & Cache
 tmp
 storage
 responses
 collected_images
 google_file*
-debug
-node_modules/
-frontend/node_modules
-frontend/dist
-frontend/backend
-dist/
-build/
-.DS_Store
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-coverage/
-.parcel-cache/
-.next/
-.nuxt/
-.vite/
-.eslintcache
-local_test
-results/
-data/
-mirix_env/
-local_evaluations
-.claude/
-mirix.egg-info
 .local
-.venv/
-.idea/
-agentic-context-engine-main/
+
+# Project Specific - Data & Results
+data/
+results/
 user_data_export/
+
+# Third Party
+agentic-context-engine-main/
+
+# Environment & Logs
 .env
 api_backend.log

@@ -526,6 +526,9 @@ async def shutdown_event():
 
 # Global agent instance
 agent = None
+
+# 工作流提取接口的并发锁，保护 workflow_agent 的消息清理操作
+_workflow_agent_cleanup_lock = threading.Lock()
 # Global storage for confirmation queues keyed by confirmation_id
 confirmation_queues = {}
 # Flag to track if MCP tools have been registered for restored connections
@@ -1890,14 +1893,13 @@ async def extract_workflow(request: WorkflowExtractionRequest):
         logger.info(
             f"[WORKFLOW_API] 开始处理工作流程提取 - email_account: {request.email_account}, content_length: {len(request.content)}")
 
-        # 检查 agent 是否已初始化
         if agent is None:
             raise HTTPException(status_code=500, detail="Agent未初始化")
 
-        # 解析/创建用户并在后台线程中调用 workflow_agent
         user = agent.client.server.user_manager.get_or_create_user_by_email(request.email_account)
         resolved_user_id = user.id
 
+        # 在后台线程中调用 workflow_agent 提取工作流
         loop = asyncio.get_event_loop()
         workflow_result = await loop.run_in_executor(
             None,
@@ -1918,7 +1920,7 @@ async def extract_workflow(request: WorkflowExtractionRequest):
 
         logger.info(f"[WORKFLOW_API] 工作流程提取成功 - 类型: {type(workflow_result).__name__}")
 
-        # 清理 workflow_agent 的历史消息，只保留 system prompt
+        # 清理 workflow_agent 的历史消息，只保留 system prompt（在 agent 工作完毕后清理）
         try:
             if agent.agent_states.workflow_agent_state:
                 workflow_agent_id = agent.agent_states.workflow_agent_state.id
