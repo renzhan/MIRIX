@@ -9,7 +9,7 @@ ACE 邮件学习脚本（串行版本）
      * ground_truth = 账户所有者发出的最新邮件
      * history = 账户所有者参与的历史对话
      * topic = 核心业务主题
-   - 调用新的 ACE Memory Agent API 获取记忆（core、knowledge_vault、semantic）
+   - 使用 topic 调用 ACE Memory Agent API 获取记忆（core、knowledge_vault、semantic）
 3. 训练样本构造：
    - question = 基于 topic 生成的问题
    - context = {"ace_memory": ace_memory_result, "history": history}
@@ -326,12 +326,12 @@ class EmailTaskEnvironment(TaskEnvironment):
         return result
 
 
-async def call_ace_memory_extract_api(email_content: str, email_account: str = "test@example.com") -> dict:
+async def call_ace_memory_extract_api(topic: str, email_account: str = "test@example.com") -> dict:
     """调用新的 /ace/memory/extract 接口获取记忆提取结果（core、knowledge_vault、semantic）"""
     url = "https://aiop-dev.item.pub/pams/ace/memory/extract"
     
     payload = {
-        "content": email_content,
+        "content": topic,
         "email_account": email_account
     }
     
@@ -646,7 +646,7 @@ async def test_multi_turn_email_learning(conversations_list: list, email_account
             logger.info(f"  主题: {topic}")
             
             # 调用新的 ACE 记忆提取API（core_memory、knowledge_memory、semantic_memory）
-            ace_memory_result = await call_ace_memory_extract_api(email_content, email_account)
+            ace_memory_result = await call_ace_memory_extract_api(topic, email_account)
             
             # 构造question
             specific_question = f"{topic}需要联系哪些人？需要检查哪些系统？需要执行哪些操作？"
