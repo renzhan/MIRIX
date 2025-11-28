@@ -622,6 +622,10 @@ class SyncServer(Server):
                 agent = Agent(
                     agent_state=agent_state, interface=interface, user=actor
                 )
+            elif agent_state.agent_type == AgentType.ace_memory_agent:
+                agent = Agent(
+                    agent_state=agent_state, interface=interface, user=actor
+                )
             else:
                 raise ValueError(f"Invalid agent type {agent_state.agent_type}")
 

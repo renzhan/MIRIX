@@ -222,6 +222,10 @@ class AgentManager:
             # Workflow agent only needs two tools: search_in_memory and send_message
             tool_names.extend(["search_in_memory", "send_message"])
 
+        if agent_state.agent_type == AgentType.ace_memory_agent:
+            # ACE memory agent needs search_in_memory and send_message
+            tool_names.extend(["search_in_memory", "send_message"])
+
         ## extract the existing tool names for the agent
         existing_tools = agent_state.tools
         existing_tool_names = set([tool.name for tool in existing_tools])

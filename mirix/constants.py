@@ -208,6 +208,9 @@ CORE_MEMORY_PERSONA_CHAR_LIMIT: int = 5000
 CORE_MEMORY_HUMAN_CHAR_LIMIT: int = 5000
 CORE_MEMORY_BLOCK_CHAR_LIMIT: int = 5000
 
+# Warning message for core memory line numbers (used in templates)
+CORE_MEMORY_LINE_NUMBER_WARNING = 'Note: "Line n:" is only for your visualization of the memory, and you should not include it in the content.\n'
+
 # Function return limits
 FUNCTION_RETURN_CHAR_LIMIT = 60000  # ~300 words
 

@@ -151,6 +151,8 @@ class AgentWrapper:
                     self.agent_states.email_reply_agent_state = agent_state
                 elif agent_state.name == "workflow_agent":
                     self.agent_states.workflow_agent_state = agent_state
+                elif agent_state.name == "ace_memory_agent":
+                    self.agent_states.ace_memory_agent_state = agent_state
 
                 if self.system_prompt_folder is not None and os.path.exists(os.path.join(self.system_prompt_folder, agent_state.name + ".txt")):
                     system_prompt = gpt_system.get_system_text(os.path.join(self.system_prompt_folder, agent_state.name))
@@ -240,6 +242,23 @@ class AgentWrapper:
                     self.agent_states, "workflow_agent_state", workflow_agent_state
                 )
 
+            if self.agent_states.ace_memory_agent_state is None:
+                if self.system_prompt_folder is not None and os.path.exists(os.path.join(self.system_prompt_folder, "ace_memory_agent.txt")):
+                    ace_memory_system_prompt = gpt_system.get_system_text(
+                        os.path.join(self.system_prompt_folder, "ace_memory_agent")
+                    )
+                else:
+                    ace_memory_system_prompt = gpt_system.get_system_text("base/ace_memory_agent")
+                ace_memory_agent_state = self.client.create_agent(
+                    name="ace_memory_agent",
+                    agent_type=AgentType.ace_memory_agent,
+                    memory=self.agent_states.agent_state.memory,
+                    system=ace_memory_system_prompt,
+                    include_base_tools=True,
+                )
+                setattr(
+                    self.agent_states, "ace_memory_agent_state", ace_memory_agent_state
+                )
 
         else:
             core_memory = ChatMemory(
@@ -2295,6 +2314,79 @@ Please perform this analysis and create new memories as appropriate. Provide a d
             
         except (AttributeError, KeyError, IndexError, json.JSONDecodeError) as e:
             return f"ERROR_PARSING_EXCEPTION: {str(e)}"
+
+    def extract_ace_memory(self, content: str, user_id: Optional[str] = None):
+        """
+        使用 ace_memory_agent 提取 ACE 学习所需的记忆体数据
+        
+        Args:
+            content: 需要分析的内容
+            user_id: 用户ID
+            
+        Returns:
+            dict: 结构化的记忆体提取响应
+        """
+        response, _ = self.message_queue.send_message_in_queue(
+            self.client,
+            self.agent_states.ace_memory_agent_state.id,
+            {
+                "user_id": user_id,
+                "message": content,
+                "display_intermediate_message": None,
+                "request_user_confirmation": None,
+                "force_response": True,
+                "existing_file_uris": set(),
+                "extra_messages": None,
+            },
+            agent_type="ace_memory",
+        )
+        
+        if response == "ERROR":
+            return {"error": "ERROR_RESPONSE_FAILED", "core_memory": "", "knowledge_memory": [], "semantic_memory": [], "reasoning": "Failed to get response from agent"}
+        
+        if not hasattr(response, "messages") or len(response.messages) < 2:
+            return {"error": "ERROR_INVALID_RESPONSE_STRUCTURE", "core_memory": "", "knowledge_memory": [], "semantic_memory": [], "reasoning": "Invalid response structure"}
+        
+        try:
+            num_tools_called = 0
+            for message in response.messages[::-1]:
+                if message.message_type == MessageType.tool_return_message:
+                    num_tools_called += 1
+                else:
+                    break
+            
+            if not hasattr(response.messages[-(num_tools_called * 2 + 1)], "tool_call"):
+                return {"error": "ERROR_NO_TOOL_CALL", "core_memory": "", "knowledge_memory": [], "semantic_memory": [], "reasoning": "No tool call found"}
+            
+            tool_call = response.messages[-(num_tools_called * 2 + 1)].tool_call
+            parsed_args = parse_json(tool_call.arguments)
+            
+            if "message" not in parsed_args:
+                return {"error": "ERROR_NO_MESSAGE_IN_ARGS", "core_memory": "", "knowledge_memory": [], "semantic_memory": [], "reasoning": "No message in arguments"}
+            
+            response_text = parsed_args["message"]
+            
+            try:
+                ace_memory_result = json.loads(response_text)
+                return ace_memory_result
+            except json.JSONDecodeError:
+                return {
+                    "error": "JSON_DECODE_ERROR",
+                    "raw_response": response_text,
+                    "core_memory": "",
+                    "knowledge_memory": [],
+                    "semantic_memory": [],
+                    "reasoning": "Failed to decode JSON response"
+                }
+            
+        except (AttributeError, KeyError, IndexError, json.JSONDecodeError) as e:
+            return {
+                "error": f"ERROR_PARSING_EXCEPTION: {str(e)}",
+                "core_memory": "",
+                "knowledge_memory": [],
+                "semantic_memory": [],
+                "reasoning": str(e)
+            }
 
     def cleanup_upload_workers(self):
         """Delegate to UploadManager for cleanup."""
