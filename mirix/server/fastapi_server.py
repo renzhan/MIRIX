@@ -623,38 +623,77 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
             try:
                 logger.info(f"[GRAPH_EXTRACTION] 提交图谱抽取任务 - user_id: {user_id}, email_account: {email_account}")
                 
-                def graph_extraction_task():
-                    """图谱抽取任务包装函数"""
-                    try:
-                        logger.info(f"[GRAPH_EXTRACTION] 开始处理图谱抽取 - user_id: {user_id}")
-                        result = extract_and_store_graph(
-                            email_content=full_email_content,
-                            user_id=user_id,
-                            email_account=email_account,
-                            enable_deduplication=True,
-                            similarity_threshold=0.85
-                        )
-                        
-                        # 记录抽取结果统计
-                        nodes_count = result.get('nodes_count', 0)
-                        relationships_count = result.get('relationships_count', 0)
-                        dedup_stats = result.get('deduplication_stats', {})
-                        
-                        logger.info(
-                            f"[GRAPH_EXTRACTION] ✅ 图谱抽取完成 - user_id: {user_id}, "
-                            f"节点: {nodes_count}, 关系: {relationships_count}, "
-                            f"去重: {dedup_stats}"
-                        )
-                        
-                    except Exception as e:
-                        logger.error(f"[GRAPH_EXTRACTION] ❌ 图谱抽取失败 - user_id: {user_id}, 错误: {str(e)}")
-                        logger.error(f"[GRAPH_EXTRACTION] 错误堆栈: {traceback.format_exc()}")
+                # 预先获取环境变量（避免子线程中获取失败）
+                neo4j_uri = os.getenv("NEO4J_URI")
+                neo4j_username = os.getenv("NEO4J_USERNAME")
+                neo4j_password = os.getenv("NEO4J_PASSWORD")
+                openai_api_key = os.getenv("OPENAI_API_KEY")
                 
-                # 提交任务到线程池
-                _graph_extraction_executor.submit(graph_extraction_task)
+                # 验证必要的环境变量
+                if not neo4j_uri or not neo4j_username or not neo4j_password:
+                    logger.warning(f"[GRAPH_EXTRACTION] ⚠️ Neo4j配置不完整，跳过图谱抽取")
+                    logger.warning(f"  NEO4J_URI: {'已设置' if neo4j_uri else '未设置'}")
+                    logger.warning(f"  NEO4J_USERNAME: {'已设置' if neo4j_username else '未设置'}")
+                    logger.warning(f"  NEO4J_PASSWORD: {'已设置' if neo4j_password else '未设置'}")
+                elif not openai_api_key:
+                    logger.warning(f"[GRAPH_EXTRACTION] ⚠️ OPENAI_API_KEY未设置，跳过图谱抽取")
+                else:
+                    def graph_extraction_task():
+                        """图谱抽取任务包装函数"""
+                        try:
+                            logger.info(f"[GRAPH_EXTRACTION] 开始处理图谱抽取 - user_id: {user_id}")
+                            logger.info(f"[GRAPH_EXTRACTION] 环境变量检查:")
+                            logger.info(f"  NEO4J_URI: {neo4j_uri[:30]}..." if neo4j_uri else "  NEO4J_URI: 未设置")
+                            logger.info(f"  NEO4J_USERNAME: {'已设置' if neo4j_username else '未设置'}")
+                            logger.info(f"  NEO4J_PASSWORD: {'已设置' if neo4j_password else '未设置'}")
+                            logger.info(f"  OPENAI_API_KEY: {'已设置' if openai_api_key else '未设置'}")
+                            logger.info(f"  邮件内容长度: {len(full_email_content)} 字符")
+
+                            # 显式传递环境变量参数
+                            result = extract_and_store_graph(
+                                email_content=full_email_content,
+                                user_id=user_id,
+                                email_account=email_account,
+                                neo4j_uri=neo4j_uri,
+                                neo4j_username=neo4j_username,
+                                neo4j_password=neo4j_password,
+                                openai_api_key=openai_api_key,
+                                enable_deduplication=True,
+                                similarity_threshold=0.85
+                            )
+
+                            # 修正：使用正确的返回值字段名
+                            nodes_extracted = result.get('nodes_extracted', 0)
+                            relationships_extracted = result.get('relationships_extracted', 0)
+                            nodes_stored = result.get('nodes_stored', 0)
+                            relationships_stored = result.get('relationships_stored', 0)
+                            dedup_stats = result.get('deduplication', {})
+
+                            logger.info(
+                                f"[GRAPH_EXTRACTION] ✅ 图谱抽取完成 - user_id: {user_id}")
+                            logger.info(
+                                f"  抽取: 节点{nodes_extracted}个, 关系{relationships_extracted}个")
+                            logger.info(
+                                f"  存储: 节点{nodes_stored}个, 关系{relationships_stored}个")
+                            logger.info(
+                                f"  去重: {dedup_stats}")
+                            return result
+                            
+                        except Exception as e:
+                            logger.error(f"[GRAPH_EXTRACTION] ❌ 图谱抽取执行失败: {str(e)}")
+                            logger.error(f"[GRAPH_EXTRACTION] 错误堆栈: {traceback.format_exc()}")
+                            print(f"[GRAPH_EXTRACTION] ❌ 图谱抽取执行失败: {str(e)}")
+                            print(f"[GRAPH_EXTRACTION] 错误堆栈: {traceback.format_exc()}")
+                            # 不重新抛出异常，避免影响主流程
+                            return None
+
+                    # 提交任务到线程池
+                    future = _graph_extraction_executor.submit(graph_extraction_task)
+                    logger.info(f"[GRAPH_EXTRACTION] ✅ 任务已提交到线程池")
                 
             except Exception as e:
                 logger.error(f"[GRAPH_EXTRACTION] ❌ 提交图谱抽取任务失败: {str(e)}")
+                logger.error(f"[GRAPH_EXTRACTION] 错误堆栈: {traceback.format_exc()}")
         else:
             logger.warning("[GRAPH_EXTRACTION] ⚠️ 图谱抽取线程池未初始化，跳过图谱抽取和存储")
 
@@ -1806,7 +1845,8 @@ async def translate_email(request: EmailTranslateRequest):
             raise HTTPException(status_code=400, detail="target_lang不能为空")
 
         # 构建系统提示词 - 明确翻译要求
-        system_prompt = """你是一个专业的邮件翻译助手。
+        system_prompt = """
+你是一个专业的邮件翻译助手。
 
 翻译要求：
 1. 逐句翻译，不增加、不省略、不润色
