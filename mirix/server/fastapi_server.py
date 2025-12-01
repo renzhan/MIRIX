@@ -693,7 +693,6 @@ def process_email_reply_task(task_id: str, email_content: str, category_list: st
                 
             except Exception as e:
                 logger.error(f"[GRAPH_EXTRACTION] ❌ 提交图谱抽取任务失败: {str(e)}")
-                logger.error(f"[GRAPH_EXTRACTION] 错误堆栈: {traceback.format_exc()}")
         else:
             logger.warning("[GRAPH_EXTRACTION] ⚠️ 图谱抽取线程池未初始化，跳过图谱抽取和存储")
 
@@ -1191,6 +1190,7 @@ class AceMemoryExtractionResponse(BaseModel):
 class EmailSummaryRequest(BaseModel):
     email_content: str
     email_account: str
+    language: str = "中文"  # 默认中文
 
 
 class EmailSummaryResponse(BaseModel):
@@ -1782,6 +1782,7 @@ async def summarize_email(request: EmailSummaryRequest):
     输入:
     - email_content: 完整的邮件内容（包含过往上下文）
     - email_account: 邮箱账号
+    - language: 返回结果的语言（默认：中文）
     
     输出:
     - summary: 邮件总结内容
@@ -1797,7 +1798,7 @@ async def summarize_email(request: EmailSummaryRequest):
         system_prompt = _load_system_prompt("email_summary")
         
         # 构建用户提示词
-        user_prompt = f"""我的邮箱账号是：{request.email_account}, 帮我对邮件做出总结
+        user_prompt = f"""我的邮箱账号是：{request.email_account}, 帮我对邮件做出总结，请使用{request.language}返回结果。
 
 === 邮件内容 ===
 {request.email_content}
