@@ -2,7 +2,7 @@ import datetime as dt
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import JSON, Column, DateTime, String
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 
 from mirix.constants import MAX_EMBEDDING_DIM
@@ -15,6 +15,7 @@ from mirix.schemas.semantic_memory import (
 from mirix.settings import settings
 
 if TYPE_CHECKING:
+    from mirix.orm.agent import Agent
     from mirix.orm.organization import Organization
     from mirix.orm.user import User
 
@@ -31,7 +32,6 @@ class SemanticMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
         summary: A concise summary of the concept or the object.
         details: A more detailed explanation or contextual description.
         source: The reference or origin of the information (e.g., book, article, movie).
-        metadata_: Arbitrary additional metadata as a JSON object.
         created_at: Timestamp indicating when the entry was created.
     """
 
@@ -41,6 +41,22 @@ class SemanticMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
     # Primary key
     id: Mapped[str] = mapped_column(
         String, primary_key=True, doc="Unique ID for this semantic memory entry"
+    )
+
+    # Foreign key to agent
+    agent_id: Mapped[Optional[str]] = mapped_column(
+        String,
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=True,
+        doc="ID of the agent this semantic memory item belongs to",
+    )
+
+    # Foreign key to client (for access control and filtering)
+    client_id: Mapped[Optional[str]] = mapped_column(
+        String,
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=True,
+        doc="ID of the client application that created this item",
     )
 
     # The name of the concept or the object
@@ -64,20 +80,12 @@ class SemanticMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
         doc="The reference or origin of this information (e.g., book, article, or movie)",
     )
 
-    # Hierarchical tree path for categorization (e.g., ["favorites", "pets", "dog"])
-    tree_path: Mapped[list] = mapped_column(
+    # NEW: Filter tags for flexible filtering and categorization
+    filter_tags: Mapped[Optional[dict]] = mapped_column(
         JSON,
-        default=list,
-        nullable=False,
-        doc="Hierarchical categorization path as an array of strings (e.g., ['favorites', 'pets', 'dog'])",
-    )
-
-    # Additional arbitrary metadata stored as a JSON object
-    metadata_: Mapped[dict] = mapped_column(
-        JSON,
-        default=dict,
         nullable=True,
-        doc="Additional arbitrary metadata as a JSON object",
+        default=None,
+        doc="Custom filter tags for filtering and categorization"
     )
 
     # When was this item last modified and what operation?
@@ -114,6 +122,13 @@ class SemanticMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
         details_embedding = Column(CommonVector, nullable=True)
         name_embedding = Column(CommonVector, nullable=True)
         summary_embedding = Column(CommonVector, nullable=True)
+
+    @declared_attr
+    def agent(cls) -> Mapped[Optional["Agent"]]:
+        """
+        Relationship to the Agent that owns this semantic memory item.
+        """
+        return relationship("Agent", lazy="selectin")
 
     @declared_attr
     def organization(cls) -> Mapped["Organization"]:

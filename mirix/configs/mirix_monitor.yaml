@@ -1,4 +1,0 @@
-agent_name: mirix
-model_name: gpt-4o-mini
-model_provider: openai
-is_screen_monitor: true

@@ -6,7 +6,7 @@ from pydantic import Field, field_validator
 from mirix.constants import MAX_EMBEDDING_DIM
 from mirix.schemas.embedding_config import EmbeddingConfig
 from mirix.schemas.mirix_base import MirixBase
-from mirix.utils import get_utc_time
+from mirix.client.utils import get_utc_time
 
 
 class SemanticMemoryItemBase(MirixBase):
@@ -28,10 +28,6 @@ class SemanticMemoryItemBase(MirixBase):
         ...,
         description="Reference or origin of this information (e.g., book, article, movie)",
     )
-    tree_path: List[str] = Field(
-        ...,
-        description="Hierarchical categorization path as an array of strings (e.g., ['favorites', 'pets', 'dog'])",
-    )
 
 
 class SemanticMemoryItem(SemanticMemoryItemBase):
@@ -41,6 +37,12 @@ class SemanticMemoryItem(SemanticMemoryItemBase):
 
     id: Optional[str] = Field(
         None, description="Unique identifier for the semantic memory item"
+    )
+    agent_id: Optional[str] = Field(
+        None, description="The id of the agent this semantic memory item belongs to"
+    )
+    client_id: Optional[str] = Field(
+        None, description="The id of the client application that created this item"
     )
     user_id: str = Field(
         ..., description="The id of the user who generated the semantic memory"
@@ -56,10 +58,6 @@ class SemanticMemoryItem(SemanticMemoryItemBase):
         },
         description="Last modification info including timestamp and operation type",
     )
-    metadata_: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional arbitrary metadata as a JSON object",
-    )
     organization_id: str = Field(
         ..., description="The unique identifier of the organization"
     )
@@ -74,6 +72,20 @@ class SemanticMemoryItem(SemanticMemoryItemBase):
     )
     embedding_config: Optional[EmbeddingConfig] = Field(
         None, description="The embedding configuration used by the event"
+    )
+    
+    # NEW: Filter tags for flexible filtering and categorization
+    filter_tags: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Custom filter tags for filtering and categorization",
+        examples=[
+            {
+                "project_id": "proj-abc",
+                "session_id": "sess-xyz",
+                "tags": ["important", "work"],
+                "priority": "high"
+            }
+        ]
     )
 
     # need to validate both details_embedding and summary_embedding to ensure they are the same size
@@ -100,6 +112,9 @@ class SemanticMemoryItemUpdate(MirixBase):
     """
 
     id: str = Field(..., description="Unique ID for this semantic memory entry")
+    agent_id: Optional[str] = Field(
+        None, description="The id of the agent this semantic memory item belongs to"
+    )
     name: Optional[str] = Field(
         None, description="The name or main concept for the knowledge entry"
     )
@@ -116,13 +131,6 @@ class SemanticMemoryItemUpdate(MirixBase):
     actor: Optional[str] = Field(
         None,
         description="The actor who generated the semantic memory (user or assistant)",
-    )
-    tree_path: Optional[List[str]] = Field(
-        None,
-        description="Hierarchical categorization path as an array of strings (e.g., ['favorites', 'pets', 'dog'])",
-    )
-    metadata_: Optional[Dict[str, Any]] = Field(
-        None, description="Additional arbitrary metadata as a JSON object"
     )
     organization_id: Optional[str] = Field(None, description="The organization ID")
     updated_at: datetime = Field(
@@ -143,6 +151,9 @@ class SemanticMemoryItemUpdate(MirixBase):
     )
     embedding_config: Optional[EmbeddingConfig] = Field(
         None, description="The embedding configuration used by the event"
+    )
+    filter_tags: Optional[Dict[str, Any]] = Field(
+        None, description="Custom filter tags for filtering and categorization"
     )
 
 

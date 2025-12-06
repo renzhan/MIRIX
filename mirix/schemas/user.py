@@ -1,14 +1,21 @@
+import uuid
 from datetime import datetime
 from typing import Optional
 
 from pydantic import Field
 
+from mirix.constants import DEFAULT_ORG_ID
+from mirix.helpers.datetime_helpers import get_utc_time
 from mirix.schemas.mirix_base import MirixBase
-from mirix.services.organization_manager import OrganizationManager
 
 
 class UserBase(MirixBase):
     __id_prefix__ = "user"
+
+
+def _generate_user_id() -> str:
+    """Generate a random user ID."""
+    return f"user-{uuid.uuid4().hex[:8]}"
 
 
 class User(UserBase):
@@ -19,13 +26,21 @@ class User(UserBase):
         id (str): The unique identifier of the user.
         name (str): The name of the user.
         status (str): Whether the user is active or not.
+        client_id (str): The client this user belongs to.
         created_at (datetime): The creation date of the user.
     """
 
-    id: str = UserBase.generate_id_field()
+    id: str = Field(
+        default_factory=_generate_user_id,
+        description="The unique identifier of the user.",
+    )
     organization_id: Optional[str] = Field(
-        OrganizationManager.DEFAULT_ORG_ID,
+        DEFAULT_ORG_ID,
         description="The organization id of the user",
+    )
+    client_id: Optional[str] = Field(
+        None,
+        description="The client this user belongs to.",
     )
     name: str = Field(..., description="The name of the user.")
     status: str = Field("active", description="Whether the user is active or not.")
@@ -33,16 +48,18 @@ class User(UserBase):
     email_account: Optional[str] = Field(
         default=None, description="The email account (address) of the user."
     )
+    is_admin: bool = Field(False, description="Whether this is an admin user for the client.")
     created_at: Optional[datetime] = Field(
-        default_factory=datetime.utcnow, description="The creation date of the user."
+        default_factory=get_utc_time, description="The creation date of the user."
     )
     updated_at: Optional[datetime] = Field(
-        default_factory=datetime.utcnow, description="The update date of the user."
+        default_factory=get_utc_time, description="The update date of the user."
     )
     is_deleted: bool = Field(False, description="Whether this user is deleted or not.")
 
 
 class UserCreate(UserBase):
+    id: Optional[str] = Field(None, description="The unique identifier of the user.")
     name: str = Field(..., description="The name of the user.")
     status: str = Field("active", description="Whether the user is active or not.")
     timezone: str = Field(..., description="The timezone of the user.")

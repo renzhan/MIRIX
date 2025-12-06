@@ -1,0 +1,156 @@
+"""
+Kafka queue implementation
+Requires kafka-python and protobuf libraries to be installed
+Uses Google Protocol Buffers for message serialization
+"""
+import logging
+from typing import Optional
+
+from mirix.queue.queue_interface import QueueInterface
+from mirix.queue.message_pb2 import QueueMessage
+
+logger = logging.getLogger(__name__)
+
+
+class KafkaQueue(QueueInterface):
+    """Kafka-based queue implementation using Protocol Buffers"""
+    
+    def __init__(self, bootstrap_servers: str, topic: str, group_id: str):
+        """
+        Initialize Kafka producer and consumer with Protobuf serialization
+        
+        Args:
+            bootstrap_servers: Kafka broker address(es)
+            topic: Kafka topic name
+            group_id: Consumer group ID
+        """
+        logger.debug("Initializing Kafka queue: servers=%s, topic=%s, group=%s", bootstrap_servers, topic, group_id)
+        
+        try:
+            from kafka import KafkaProducer, KafkaConsumer
+        except ImportError:
+            logger.error("kafka-python not installed")
+            raise ImportError(
+                "kafka-python is required for Kafka support. "
+                "Install it with: pip install queue-sample[kafka]"
+            )
+        
+        self.topic = topic
+        
+        # Protobuf serializer: Convert QueueMessage to bytes
+        def protobuf_serializer(message: QueueMessage) -> bytes:
+            """
+            Serialize QueueMessage to Protocol Buffer format
+            
+            Args:
+                message: QueueMessage protobuf to serialize
+                
+            Returns:
+                Serialized protobuf bytes
+            """
+            return message.SerializeToString()
+        
+        # Protobuf deserializer: Convert bytes to QueueMessage
+        def protobuf_deserializer(serialized_msg: bytes) -> QueueMessage:
+            """
+            Deserialize Protocol Buffer message to QueueMessage
+            
+            Args:
+                serialized_msg: Serialized protobuf bytes
+                
+            Returns:
+                QueueMessage protobuf object
+            """
+            msg = QueueMessage()
+            msg.ParseFromString(serialized_msg)
+            return msg
+        
+        # Initialize Kafka producer with Protobuf serializer and key serializer
+        # Key serializer enables partition key routing for consistent message ordering per user
+        self.producer = KafkaProducer(
+            bootstrap_servers=bootstrap_servers,
+            key_serializer=lambda k: k.encode('utf-8'),  # Encode partition key to bytes
+            value_serializer=protobuf_serializer
+        )
+        
+        # Initialize Kafka consumer with Protobuf deserializer
+        self.consumer = KafkaConsumer(
+            topic,
+            bootstrap_servers=bootstrap_servers,
+            group_id=group_id,
+            value_deserializer=protobuf_deserializer,
+            auto_offset_reset='earliest',  # Start from beginning if no offset exists
+            enable_auto_commit=True,
+            consumer_timeout_ms=1000  # Timeout for polling
+        )
+    
+    def put(self, message: QueueMessage) -> None:
+        """
+        Send a message to Kafka topic with user_id as partition key.
+        
+        This ensures all messages for the same user go to the same partition,
+        guaranteeing single-worker processing and message ordering per user.
+        
+        Implementation:
+        - Uses user_id (or actor.id as fallback) as partition key
+        - Kafka assigns partition via: hash(key) % num_partitions
+        - Consumer group ensures only one worker per partition
+        - Result: Same user always processed by same worker (no race conditions)
+        
+        Args:
+            message: QueueMessage protobuf message to send
+        """
+        # Extract user_id as partition key (fallback to actor.id if not present)
+        partition_key = message.user_id if message.user_id else message.actor.id
+        
+        logger.debug(
+            "Sending message to Kafka topic %s: agent_id=%s, partition_key=%s",
+            self.topic, message.agent_id, partition_key
+        )
+        
+        # Send message with partition key - ensures consistent partitioning
+        # Kafka will route this to: partition = hash(partition_key) % num_partitions
+        future = self.producer.send(
+            self.topic,
+            key=partition_key,  # Partition key for consistent routing
+            value=message
+        )
+        future.get(timeout=10)  # Wait up to 10 seconds for confirmation
+        
+        logger.debug("Message sent to Kafka successfully with partition key: %s", partition_key)
+    
+    def get(self, timeout: Optional[float] = None) -> QueueMessage:
+        """
+        Retrieve a message from Kafka
+        
+        Args:
+            timeout: Not used for Kafka (uses consumer_timeout_ms instead)
+            
+        Returns:
+            QueueMessage protobuf message from Kafka
+            
+        Raises:
+            StopIteration: If no message available
+        """
+        logger.debug("Polling Kafka topic %s for messages", self.topic)
+        
+        # Poll for messages
+        for message in self.consumer:
+            logger.debug("Retrieved message from Kafka: agent_id=%s", message.value.agent_id)
+            return message.value
+        
+        # If no message received, raise exception (similar to queue.Empty)
+        logger.debug("No message available from Kafka")
+        raise StopIteration("No message available")
+    
+    def close(self) -> None:
+        """Close Kafka producer and consumer connections"""
+        logger.info("Closing Kafka connections")
+        
+        if hasattr(self, 'producer'):
+            self.producer.close()
+            logger.debug("Kafka producer closed")
+        if hasattr(self, 'consumer'):
+            self.consumer.close()
+            logger.debug("Kafka consumer closed")
+

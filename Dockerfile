@@ -1,96 +1,79 @@
-# ========================================
-# Stage 1: Python 依赖构建
-# ========================================
-FROM python:3.11-slim AS python-builder
+# ============================================================================
+# Mirix Backend Dockerfile
+# ============================================================================
+# Multi-stage build for optimal image size and security
+# ============================================================================
 
-ENV DEBIAN_FRONTEND=noninteractive
+# Stage 1: Builder
+FROM python:3.11-slim as builder
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev pkg-config git \
- && rm -rf /var/lib/apt/lists/*
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-
-# 🔥 先复制依赖文件（缓存优化）
-COPY requirements.txt ./
+# Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
- && pip install --no-cache-dir -r requirements.txt
 
-# ========================================
-# Stage 2: 前端构建
-# ========================================
-FROM node:20-slim AS frontend-builder
+# Copy requirements and install dependencies
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
 
-WORKDIR /app/frontend
+# Stage 2: Runtime
+FROM python:3.11-slim as runtime
 
-# 🔥 先复制 package.json（缓存优化）
-COPY frontend/package*.json ./
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    # Default Mirix settings
+    MIRIX_DIR=/app/data \
+    MIRIX_IMAGES_DIR=/app/data/images \
+    MIRIX_LOG_LEVEL=INFO \
+    MIRIX_LOG_TO_CONSOLE=true
 
-ARG NPM_REGISTRY=https://registry.npmmirror.com/
-ENV NPM_CONFIG_PROGRESS=false \
-    NPM_CONFIG_LOGLEVEL=warn \
-    NPM_CONFIG_AUDIT=false \
-    NPM_CONFIG_FUND=false
-
-RUN npm config set registry ${NPM_REGISTRY} \
- && npm ci --only=production --ignore-scripts \
- && npm cache clean --force
-
-# 🔥 再复制源码并构建
-COPY frontend/ ./
-ENV PUBLIC_URL=/aiop-pams NODE_ENV=production
-RUN npm run build
-
-# ========================================
-# Stage 3: 最终运行镜像
-# ========================================
-FROM python:3.11-slim
-
-ENV DEBIAN_FRONTEND=noninteractive
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ffmpeg libpq5 ca-certificates unar \
- && rm -rf /var/lib/apt/lists/*
+    libpq5 \
+    ffmpeg \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --shell /bin/bash mirix
 
-# 🔥 安装 Node.js（运行前端服务需要）
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
- && apt-get update && apt-get install -y --no-install-recommends nodejs \
- && rm -rf /var/lib/apt/lists/* \
- && npm install -g serve
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
 
+# Set working directory
 WORKDIR /app
 
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app \
-    PATH="/opt/venv/bin:$PATH"
+# Copy application code
+COPY --chown=mirix:mirix mirix/ ./mirix/
+COPY --chown=mirix:mirix pyproject.toml ./
+COPY --chown=mirix:mirix README.md ./
 
-# 🔥 从构建阶段复制
-COPY --from=python-builder /opt/venv /opt/venv
-COPY --from=frontend-builder /app/frontend/build ./frontend/build
-COPY --from=frontend-builder /app/frontend/package*.json ./frontend/
+# Create data directories
+RUN mkdir -p /app/data/images && chown -R mirix:mirix /app/data
 
-# 复制应用源码
-COPY pyproject.toml setup.py MANIFEST.in ./
-COPY mirix/ ./mirix/
-COPY prepdocslib/ ./prepdocslib/
-COPY main.py ./
-COPY database/ ./database/
-COPY assets/ ./assets/
-COPY start.sh ./
+# Switch to non-root user
+USER mirix
 
-RUN chmod +x start.sh && mkdir -p /app/data /app/logs
+# Expose port
+EXPOSE 8531
 
-ENV BACKEND_PORT=47283 \
-    BACKEND_HOST=0.0.0.0 \
-    MIRIX_CONFIG_PATH=/app/data \
-    MIRIX_DATA_PATH=/app/data \
-    PUBLIC_URL=/aiop-pams \
-    PRODUCTION_BACKEND_URL=https://aiop-dev.item.pub/api
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8531/health || exit 1
 
-EXPOSE 47283 3000
+# Default command - run the FastAPI server
+CMD ["uvicorn", "mirix.server.rest_api:app", "--host", "0.0.0.0", "--port", "8531"]
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:47283/pams/health || exit 1
-
-CMD ["./start.sh"]

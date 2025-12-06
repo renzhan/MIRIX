@@ -3,10 +3,10 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field, field_validator
 
+from mirix.client.utils import get_utc_time
 from mirix.constants import MAX_EMBEDDING_DIM
 from mirix.schemas.embedding_config import EmbeddingConfig
 from mirix.schemas.mirix_base import MirixBase
-from mirix.utils import get_utc_time
 
 
 class EpisodicEventBase(MirixBase):
@@ -23,10 +23,6 @@ class EpisodicEventBase(MirixBase):
     details: str = Field(..., description="Detailed description or text for the event")
     actor: str = Field(
         ..., description="The actor who generated the event (user or assistant)"
-    )
-    tree_path: List[str] = Field(
-        ...,
-        description="Hierarchical categorization path as an array of strings (e.g., ['work', 'projects', 'ai-research'])",
     )
 
 
@@ -57,6 +53,14 @@ class EpisodicEvent(EpisodicEventBase):
         None, description="Unique identifier for the episodic event"
     )
 
+    agent_id: Optional[str] = Field(
+        None, description="The id of the agent this episodic event belongs to"
+    )
+
+    client_id: Optional[str] = Field(
+        None, description="The id of the client application that created this event"
+    )
+
     user_id: str = Field(
         ..., description="The id of the user who generated the episodic event"
     )
@@ -79,9 +83,6 @@ class EpisodicEvent(EpisodicEventBase):
         },
         description="Last modification info including timestamp and operation type",
     )
-    metadata_: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional structured metadata for the event"
-    )
     organization_id: str = Field(
         ..., description="Unique identifier of the organization"
     )
@@ -93,6 +94,20 @@ class EpisodicEvent(EpisodicEventBase):
     )
     embedding_config: Optional[EmbeddingConfig] = Field(
         None, description="The embedding configuration used by the event"
+    )
+    
+    # NEW: Filter tags for flexible filtering and categorization
+    filter_tags: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Custom filter tags for filtering and categorization",
+        examples=[
+            {
+                "project_id": "proj-abc",
+                "session_id": "sess-xyz",
+                "tags": ["important", "work"],
+                "priority": "high"
+            }
+        ]
     )
 
     # need to validate both details_embedding and summary_embedding to ensure they are the same size
@@ -121,19 +136,15 @@ class EpisodicEventUpdate(MirixBase):
     """
 
     id: str = Field(..., description="Unique ID for this episodic memory record")
+    agent_id: Optional[str] = Field(
+        None, description="The id of the agent this episodic event belongs to"
+    )
     event_type: Optional[str] = Field(None, description="Type/category of the event")
     summary: Optional[str] = Field(
         None, description="Short textual summary of the event"
     )
     details: Optional[str] = Field(
         None, description="Detailed text describing the event"
-    )
-    tree_path: Optional[List[str]] = Field(
-        None,
-        description="Hierarchical categorization path as an array of strings (e.g., ['work', 'projects', 'ai-research'])",
-    )
-    metadata_: Optional[Dict[str, Any]] = Field(
-        None, description="Any additional metadata"
     )
     organization_id: Optional[str] = Field(
         None, description="Unique identifier of the organization"
@@ -157,4 +168,7 @@ class EpisodicEventUpdate(MirixBase):
     )
     embedding_config: Optional[EmbeddingConfig] = Field(
         None, description="The embedding configuration used by the event"
+    )
+    filter_tags: Optional[Dict[str, Any]] = Field(
+        None, description="Custom filter tags for filtering and categorization"
     )

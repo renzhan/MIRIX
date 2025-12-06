@@ -2,7 +2,6 @@ import uuid
 from typing import List, Optional, Tuple
 
 import requests
-import tiktoken
 
 from mirix.constants import MAX_IMAGES_TO_PROCESS, NON_USER_MSG_PREFIX
 from mirix.llm_api.helpers import make_post_request
@@ -15,6 +14,7 @@ from mirix.schemas.openai.chat_completion_response import (
     ToolCall,
     UsageStatistics,
 )
+from mirix.log import get_logger
 from mirix.utils import (
     clean_json_string_extra_backslash,
     count_tokens,
@@ -23,6 +23,7 @@ from mirix.utils import (
     json_dumps,
 )
 
+logger = get_logger(__name__)
 
 def get_gemini_endpoint_and_headers(
     base_url: str,
@@ -54,7 +55,6 @@ def get_gemini_endpoint_and_headers(
 
     return url, headers
 
-
 def google_ai_get_model_details(
     base_url: str, api_key: str, model: str, key_in_header: bool = True
 ) -> List[dict]:
@@ -78,9 +78,9 @@ def google_ai_get_model_details(
         # Handle HTTP errors (e.g., response 4XX, 5XX)
         printd(f"Got HTTPError, exception={http_err}")
         # Print the HTTP status code
-        print(f"HTTP Error: {http_err.response.status_code}")
+        logger.debug("HTTP Error: %s", http_err.response.status_code)
         # Print the response content (error message from server)
-        print(f"Message: {http_err.response.text}")
+        logger.debug("Message: %s", http_err.response.text)
         raise http_err
 
     except requests.exceptions.RequestException as req_err:
@@ -93,7 +93,6 @@ def google_ai_get_model_details(
         printd(f"Got unknown Exception, exception={e}")
         raise e
 
-
 def google_ai_get_model_context_window(
     base_url: str, api_key: str, model: str, key_in_header: bool = True
 ) -> int:
@@ -103,7 +102,6 @@ def google_ai_get_model_context_window(
     # TODO should this be:
     # return model_details["inputTokenLimit"] + model_details["outputTokenLimit"]
     return int(model_details["inputTokenLimit"])
-
 
 def google_ai_get_model_list(
     base_url: str, api_key: str, key_in_header: bool = True
@@ -127,9 +125,9 @@ def google_ai_get_model_list(
         # Handle HTTP errors (e.g., response 4XX, 5XX)
         printd(f"Got HTTPError, exception={http_err}")
         # Print the HTTP status code
-        print(f"HTTP Error: {http_err.response.status_code}")
+        logger.debug("HTTP Error: %s", http_err.response.status_code)
         # Print the response content (error message from server)
-        print(f"Message: {http_err.response.text}")
+        logger.debug("Message: %s", http_err.response.text)
         raise http_err
 
     except requests.exceptions.RequestException as req_err:
@@ -141,7 +139,6 @@ def google_ai_get_model_list(
         # Handle other potential errors
         printd(f"Got unknown Exception, exception={e}")
         raise e
-
 
 def add_dummy_model_messages(messages: List[dict]) -> List[dict]:
     """Google AI API requires all function call returns are immediately followed by a 'model' role message.
@@ -172,7 +169,6 @@ def add_dummy_model_messages(messages: List[dict]) -> List[dict]:
 
     return messages_with_padding
 
-
 # TODO use pydantic model as input
 def to_google_ai(openai_message_dict: dict) -> dict:
     # TODO supports "parts" as part of multimodal support
@@ -198,7 +194,7 @@ def to_google_ai(openai_message_dict: dict) -> dict:
         raise ValueError(
             f"Unsupported conversion (OpenAI -> Google AI) from role {openai_message_dict['role']}"
         )
-
+    return google_ai_message_dict
 
 # TODO convert return type to pydantic
 def convert_tools_to_google_ai_format(
@@ -263,22 +259,7 @@ def convert_tools_to_google_ai_format(
         func["parameters"]["type"] = "OBJECT"
         for param_name, param_fields in func["parameters"]["properties"].items():
             param_fields["type"] = param_fields["type"].upper()
-        # Add inner thoughts
-        if inner_thoughts_in_kwargs:
-            from mirix.constants import (
-                INNER_THOUGHTS_KWARG,
-                INNER_THOUGHTS_KWARG_DESCRIPTION,
-            )
-
-            func["parameters"]["properties"][INNER_THOUGHTS_KWARG] = {
-                "type": "STRING",
-                "description": INNER_THOUGHTS_KWARG_DESCRIPTION,
-            }
-            if INNER_THOUGHTS_KWARG not in func["parameters"]["required"]:
-                func["parameters"]["required"].append(INNER_THOUGHTS_KWARG)
-
     return [{"functionDeclarations": function_list}]
-
 
 def convert_google_ai_response_to_chatcompletion(
     response_json: dict,  # REST response from Google AI API
@@ -286,7 +267,6 @@ def convert_google_ai_response_to_chatcompletion(
     input_messages: Optional[
         List[dict]
     ] = None,  # Required if the API doesn't return UsageMetadata
-    pull_inner_thoughts_from_args: Optional[bool] = True,
 ) -> ChatCompletionResponse:
     """Google AI API response format is not the same as ChatCompletion, requires unpacking
 
@@ -303,7 +283,7 @@ def convert_google_ai_response_to_chatcompletion(
                 "text": " OK. Barbie is showing in two theaters in Mountain View, CA: AMC Mountain View 16 and Regal Edwards 14."
               },
               {
-                'functionCall': {'name': 'update_topic', 'args': {'topic': 'greeting', 'inner_thoughts': 'The user initiated the conversation with a greeting. I should respond with a greeting and set the topic to greeting.'}}
+                'functionCall': {'name': 'update_topic', 'args': {'topic': 'greeting'}}
               }
             ]
           }
@@ -342,24 +322,10 @@ def convert_google_ai_response_to_chatcompletion(
                     function_args = function_call["args"]
                     assert isinstance(function_args, dict), function_args
 
-                    # NOTE: this also involves stripping the inner monologue out of the function
-                    if pull_inner_thoughts_from_args:
-                        from mirix.constants import INNER_THOUGHTS_KWARG
-
-                        assert INNER_THOUGHTS_KWARG in function_args, (
-                            f"Couldn't find inner thoughts in function args:\n{function_call}"
-                        )
-                        inner_thoughts = function_args.pop(INNER_THOUGHTS_KWARG)
-                        assert inner_thoughts is not None, (
-                            f"Expected non-null inner thoughts function arg:\n{function_call}"
-                        )
-                    else:
-                        inner_thoughts = None
-
                     # Google AI API doesn't generate tool call IDs
                     openai_response_message = Message(
                         role="assistant",  # NOTE: "model" -> "assistant"
-                        content=inner_thoughts,
+                        content=None,
                         tool_calls=[
                             ToolCall(
                                 id=get_tool_call_id(),
@@ -378,13 +344,10 @@ def convert_google_ai_response_to_chatcompletion(
                     continue
 
                 else:
-                    # Inner thoughts are the content by default
-                    inner_thoughts = response_message["text"]
-
                     # Google AI API doesn't generate tool call IDs
                     openai_response_message = Message(
                         role="assistant",  # NOTE: "model" -> "assistant"
-                        content=inner_thoughts,
+                        content=response_message["text"],
                     )
 
                 # Google AI API uses different finish reason strings than OpenAI
@@ -466,7 +429,6 @@ def convert_google_ai_response_to_chatcompletion(
     except KeyError as e:
         raise e
 
-
 def extract_content(content):
     import re
 
@@ -481,7 +443,6 @@ def extract_content(content):
             result.append({"type": "image_url", "image_url": image.strip()})
 
     return result
-
 
 # TODO convert 'data' type to pydantic
 def google_ai_chat_completions_request(
@@ -566,7 +527,7 @@ def google_ai_chat_completions_request(
     s1 = time.time()
     response_json = make_post_request(url, headers, data)
     s2 = time.time()
-    print("Query Takes time:", s2 - s1)
+    logger.debug("Query Takes time:", s2 - s1)
 
     if len(response_json["candidates"][0]["content"]) == 0:
         raise ValueError("Empty response from Google AI API")
@@ -575,10 +536,4 @@ def google_ai_chat_completions_request(
         response_json=response_json,
         model=data.get("model"),
         input_messages=data["contents"],
-        pull_inner_thoughts_from_args=inner_thoughts_in_kwargs,
     )
-
-
-def count_tokens(s: str, model: str = "gpt-4") -> int:
-    encoding = tiktoken.encoding_for_model(model)
-    return len(encoding.encode(s))

@@ -10,7 +10,6 @@ from anthropic.types.beta.message_create_params import MessageCreateParamsNonStr
 from anthropic.types.beta.messages import BetaMessageBatch
 from anthropic.types.beta.messages.batch_create_params import Request
 
-from mirix.constants import INNER_THOUGHTS_KWARG, INNER_THOUGHTS_KWARG_DESCRIPTION
 from mirix.errors import (
     ContextWindowExceededError,
     ErrorCode,
@@ -24,10 +23,6 @@ from mirix.errors import (
     LLMUnprocessableEntityError,
 )
 from mirix.helpers.datetime_helpers import get_utc_time
-from mirix.llm_api.helpers import (
-    add_inner_thoughts_to_functions,
-    unpack_all_inner_thoughts_from_kwargs,
-)
 from mirix.llm_api.llm_client_base import LLMClientBase
 from mirix.log import get_logger
 from mirix.schemas.llm_config import LLMConfig
@@ -37,10 +32,9 @@ from mirix.schemas.openai.chat_completion_response import (
     ChatCompletionResponse,
     Choice,
     FunctionCall,
-    ToolCall,
-    UsageStatistics,
 )
 from mirix.schemas.openai.chat_completion_response import Message as ChoiceMessage
+from mirix.schemas.openai.chat_completion_response import ToolCall, UsageStatistics
 from mirix.services.provider_manager import ProviderManager
 from mirix.tracing import trace_method
 
@@ -224,20 +218,6 @@ class AnthropicClient(LLMClientBase):
         if tool_choice:
             data["tool_choice"] = tool_choice
 
-        # Add inner thoughts kwarg
-        # TODO: Can probably make this more efficient
-        if (
-            tools_for_request
-            and len(tools_for_request) > 0
-            and llm_config.put_inner_thoughts_in_kwargs
-        ):
-            tools_with_inner_thoughts = add_inner_thoughts_to_functions(
-                functions=[t.function.model_dump() for t in tools_for_request],
-                inner_thoughts_key=INNER_THOUGHTS_KWARG,
-                inner_thoughts_description=INNER_THOUGHTS_KWARG_DESCRIPTION,
-            )
-            tools_for_request = [Tool(function=f) for f in tools_with_inner_thoughts]
-
         if tools_for_request and len(tools_for_request) > 0:
             # TODO eventually enable parallel tool use
             data["tools"] = convert_tools_to_anthropic_format(tools_for_request)
@@ -415,7 +395,7 @@ class AnthropicClient(LLMClientBase):
 
     def handle_llm_error(self, e: Exception) -> Exception:
         if isinstance(e, anthropic.APIConnectionError):
-            logger.warning(f"[Anthropic] API connection error: {e.__cause__}")
+            logger.warning("[Anthropic] API connection error: %s", e.__cause__)
             return LLMConnectionError(
                 message=f"Failed to connect to Anthropic: {str(e)}",
                 code=ErrorCode.INTERNAL_SERVER_ERROR,
@@ -430,7 +410,7 @@ class AnthropicClient(LLMClientBase):
             )
 
         if isinstance(e, anthropic.BadRequestError):
-            logger.warning(f"[Anthropic] Bad request: {str(e)}")
+            logger.warning("[Anthropic] Bad request: %s", str(e))
             if "prompt is too long" in str(e).lower():
                 # If the context window is too large, we expect to receive:
                 # 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'prompt is too long: 200758 tokens > 200000 maximum'}}
@@ -444,35 +424,35 @@ class AnthropicClient(LLMClientBase):
                 )
 
         if isinstance(e, anthropic.AuthenticationError):
-            logger.warning(f"[Anthropic] Authentication error: {str(e)}")
+            logger.warning("[Anthropic] Authentication error: %s", str(e))
             return LLMAuthenticationError(
                 message=f"Authentication failed with Anthropic: {str(e)}",
                 code=ErrorCode.INTERNAL_SERVER_ERROR,
             )
 
         if isinstance(e, anthropic.PermissionDeniedError):
-            logger.warning(f"[Anthropic] Permission denied: {str(e)}")
+            logger.warning("[Anthropic] Permission denied: %s", str(e))
             return LLMPermissionDeniedError(
                 message=f"Permission denied by Anthropic: {str(e)}",
                 code=ErrorCode.INTERNAL_SERVER_ERROR,
             )
 
         if isinstance(e, anthropic.NotFoundError):
-            logger.warning(f"[Anthropic] Resource not found: {str(e)}")
+            logger.warning("[Anthropic] Resource not found: %s", str(e))
             return LLMNotFoundError(
                 message=f"Resource not found in Anthropic: {str(e)}",
                 code=ErrorCode.INTERNAL_SERVER_ERROR,
             )
 
         if isinstance(e, anthropic.UnprocessableEntityError):
-            logger.warning(f"[Anthropic] Unprocessable entity: {str(e)}")
+            logger.warning("[Anthropic] Unprocessable entity: %s", str(e))
             return LLMUnprocessableEntityError(
                 message=f"Invalid request content for Anthropic: {str(e)}",
                 code=ErrorCode.INTERNAL_SERVER_ERROR,
             )
 
         if isinstance(e, anthropic.APIStatusError):
-            logger.warning(f"[Anthropic] API status error: {str(e)}")
+            logger.warning("[Anthropic] API status error: %s", str(e))
             return LLMServerError(
                 message=f"Anthropic API error: {str(e)}",
                 code=ErrorCode.INTERNAL_SERVER_ERROR,
@@ -595,11 +575,6 @@ class AnthropicClient(LLMClientBase):
                 total_tokens=prompt_tokens + completion_tokens,
             ),
         )
-        if self.llm_config.put_inner_thoughts_in_kwargs:
-            chat_completion_response = unpack_all_inner_thoughts_from_kwargs(
-                response=chat_completion_response,
-                inner_thoughts_key=INNER_THOUGHTS_KWARG,
-            )
 
         return chat_completion_response
 

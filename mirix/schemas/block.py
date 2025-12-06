@@ -15,18 +15,9 @@ class BaseBlock(MirixBase, validate_assignment=True):
     __id_prefix__ = "block"
 
     # data value
-    value: str = Field(..., description="Value of the block.")
+    value: Optional[str] = Field(None, description="Value of the block.")
     limit: int = Field(
         CORE_MEMORY_BLOCK_CHAR_LIMIT, description="Character limit of the block."
-    )
-
-    # template data (optional)
-    template_name: Optional[str] = Field(
-        None, description="Name of the block if it is a template.", alias="name"
-    )
-    is_template: bool = Field(
-        False,
-        description="Whether the block is a template (e.g. saved human/persona options).",
     )
 
     # context window label
@@ -34,13 +25,6 @@ class BaseBlock(MirixBase, validate_assignment=True):
         None,
         description="Label of the block (e.g. 'human', 'persona') in the context window.",
     )
-
-    # metadata
-    description: Optional[str] = Field(None, description="Description of the block.")
-    metadata_: Optional[dict] = Field({}, description="Metadata of the block.")
-
-    # def __len__(self):
-    #     return len(self.value)
 
     class Config:
         extra = "ignore"  # Ignores extra fields
@@ -69,19 +53,18 @@ class Block(BaseBlock):
         label (str): The label of the block (e.g. 'human', 'persona'). This defines a category for the block.
         value (str): The value of the block. This is the string that is represented in the context window.
         limit (int): The character limit of the block.
-        is_template (bool): Whether the block is a template (e.g. saved human/persona options). Non-template blocks are not stored in the database and are ephemeral, while templated blocks are stored in the database.
-        label (str): The label of the block (e.g. 'human', 'persona'). This defines a category for the block.
-        template_name (str): The name of the block template (if it is a template).
-        description (str): Description of the block.
-        metadata_ (Dict): Metadata of the block.
         user_id (str): The unique identifier of the user associated with the block.
+        agent_id (str): The unique identifier of the agent associated with the block.
     """
 
     id: str = BaseBlock.generate_id_field()
 
-    # associated user/agent
+    # associated user/agent/organization
     user_id: Optional[str] = Field(
         None, description="The unique identifier of the user associated with the block."
+    )
+    agent_id: Optional[str] = Field(
+        None, description="The unique identifier of the agent associated with the block."
     )
     organization_id: Optional[str] = Field(
         None,
@@ -112,7 +95,6 @@ class Persona(Block):
 # class CreateBlock(BaseBlock):
 #    """Create a block"""
 #
-#    is_template: bool = True
 #    label: str = Field(..., description="Label of the block.")
 
 
@@ -175,12 +157,6 @@ class CreateBlock(BaseBlock):
     )
     value: str = Field(..., description="Value of the block.")
 
-    # block templates
-    is_template: bool = False
-    template_name: Optional[str] = Field(
-        None, description="Name of the block if it is a template.", alias="name"
-    )
-
 
 class CreateHuman(CreateBlock):
     """Create a human block"""
@@ -197,18 +173,16 @@ class CreatePersona(CreateBlock):
 class CreateBlockTemplate(CreateBlock):
     """Create a block template"""
 
-    is_template: bool = True
+    pass
 
 
 class CreateHumanBlockTemplate(CreateHuman):
     """Create a human block template"""
 
-    is_template: bool = True
     label: str = "human"
 
 
 class CreatePersonaBlockTemplate(CreatePersona):
     """Create a persona block template"""
 
-    is_template: bool = True
     label: str = "persona"

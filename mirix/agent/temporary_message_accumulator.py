@@ -333,9 +333,9 @@ class TemporaryMessageAccumulator:
         # ✅ TASK 3 - Modification 9: Validate user_id and get recent messages from Redis
         if user_id is None:
             raise ValueError("user_id is required for get_recent_images_for_chat")
-        
+
         all_messages = get_messages_from_redis(user_id)
-        
+
         # Get the most recent content
         recent_limit = min(
             self.temporary_message_limit, len(all_messages)
@@ -504,7 +504,7 @@ class TemporaryMessageAccumulator:
                                         continue
                                     elif upload_status["status"] == "unknown":
                                         # Upload was cleaned up, treat as failed
-                                        print(
+                                        self.logger.debug(
                                             "Skipping unknown/cleaned upload in absorb_content_into_memory"
                                         )
                                         # Only clean up local tracking since upload manager already cleaned up
@@ -843,7 +843,6 @@ class TemporaryMessageAccumulator:
         self, message, existing_file_uris, agent_states, user_id=None
     ):
         """Send the processed content to all memory agents in parallel."""
-        import time
 
         payloads = {
             "message": message,

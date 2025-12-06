@@ -6,7 +6,7 @@ from pydantic import Field, field_validator
 from mirix.constants import MAX_EMBEDDING_DIM
 from mirix.schemas.embedding_config import EmbeddingConfig
 from mirix.schemas.mirix_base import MirixBase
-from mirix.utils import get_utc_time
+from mirix.client.utils import get_utc_time
 
 
 class ResourceMemoryItemBase(MirixBase):
@@ -25,10 +25,6 @@ class ResourceMemoryItemBase(MirixBase):
     content: str = Field(
         ..., description="Full or partial text content of the resource"
     )
-    tree_path: List[str] = Field(
-        ...,
-        description="Hierarchical categorization path as an array of strings (e.g., ['documents', 'work', 'projects'])",
-    )
 
 
 class ResourceMemoryItem(ResourceMemoryItemBase):
@@ -38,6 +34,12 @@ class ResourceMemoryItem(ResourceMemoryItemBase):
 
     id: Optional[str] = Field(
         None, description="Unique identifier for the resource memory item"
+    )
+    agent_id: Optional[str] = Field(
+        None, description="The id of the agent this resource memory item belongs to"
+    )
+    client_id: Optional[str] = Field(
+        None, description="The id of the client application that created this item"
     )
     user_id: str = Field(
         ..., description="The id of the user who generated the resource"
@@ -62,9 +64,19 @@ class ResourceMemoryItem(ResourceMemoryItemBase):
     embedding_config: Optional[EmbeddingConfig] = Field(
         None, description="The embedding configuration used by the event"
     )
-    metadata_: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Arbitrary additional metadata (tags, creation date, etc.)",
+    
+    # NEW: Filter tags for flexible filtering and categorization
+    filter_tags: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Custom filter tags for filtering and categorization",
+        examples=[
+            {
+                "project_id": "proj-abc",
+                "session_id": "sess-xyz",
+                "tags": ["important", "work"],
+                "priority": "high"
+            }
+        ]
     )
 
     @field_validator("summary_embedding")
@@ -88,6 +100,9 @@ class ResourceMemoryItemUpdate(MirixBase):
     """Schema for updating an existing resource memory item."""
 
     id: str = Field(..., description="Unique ID for this resource memory entry")
+    agent_id: Optional[str] = Field(
+        None, description="The id of the agent this resource memory item belongs to"
+    )
     title: Optional[str] = Field(None, description="Short name/title of the resource")
     summary: Optional[str] = Field(
         None, description="Short description or summary of the resource"
@@ -96,10 +111,6 @@ class ResourceMemoryItemUpdate(MirixBase):
         None, description="File type/format (e.g. 'doc', 'markdown')"
     )
     content: Optional[str] = Field(None, description="Full or partial text content")
-    tree_path: Optional[List[str]] = Field(
-        None,
-        description="Hierarchical categorization path as an array of strings (e.g., ['documents', 'work', 'projects'])",
-    )
     organization_id: Optional[str] = Field(None, description="The organization ID")
     updated_at: datetime = Field(
         default_factory=get_utc_time, description="Update timestamp"
@@ -114,10 +125,11 @@ class ResourceMemoryItemUpdate(MirixBase):
     embedding_config: Optional[EmbeddingConfig] = Field(
         None, description="The embedding configuration used by the event"
     )
-    metadata_: Optional[Dict[str, Any]] = Field(
-        None, description="Arbitrary additional metadata"
-    )
 
+
+    filter_tags: Optional[Dict[str, Any]] = Field(
+        None, description="Custom filter tags for filtering and categorization"
+    )
 
 class ResourceMemoryItemResponse(ResourceMemoryItem):
     """Response schema for resource memory item with additional fields if needed."""

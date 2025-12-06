@@ -1,5 +1,6 @@
 import copy
 import json
+import logging
 import warnings
 from collections import OrderedDict
 from typing import Any, List, Union
@@ -12,6 +13,8 @@ from mirix.schemas.message import Message
 from mirix.schemas.openai.chat_completion_response import ChatCompletionResponse, Choice
 from mirix.settings import summarizer_settings
 from mirix.utils import count_tokens, json_dumps, printd
+
+logger = logging.getLogger(__name__)
 
 
 def _convert_to_structured_output_helper(property: dict) -> dict:
@@ -177,7 +180,6 @@ def make_post_request(
             error_message = f"Unexpected content type returned: {response.headers.get('Content-Type')}"
             printd(error_message)
             raise ValueError(error_message)
-
         # Process the response using the callback function
         return response_data
 
@@ -213,132 +215,6 @@ def make_post_request(
         printd(error_message)
         raise Exception(error_message) from e
 
-
-# TODO update to use better types
-def add_inner_thoughts_to_functions(
-    functions: List[dict],
-    inner_thoughts_key: str,
-    inner_thoughts_description: str,
-    inner_thoughts_required: bool = True,
-    put_inner_thoughts_first: bool = True,
-) -> List[dict]:
-    """Add an inner_thoughts kwarg to every function in the provided list, ensuring it's the first parameter"""
-    new_functions = []
-    for function_object in functions:
-        new_function_object = copy.deepcopy(function_object)
-        new_properties = OrderedDict()
-
-        # For chat completions, we want inner thoughts to come later
-        if put_inner_thoughts_first:
-            # Create with inner_thoughts as the first item
-            new_properties[inner_thoughts_key] = {
-                "type": "string",
-                "description": inner_thoughts_description,
-            }
-            # Add the rest of the properties
-            new_properties.update(function_object["parameters"]["properties"])
-        else:
-            new_properties.update(function_object["parameters"]["properties"])
-            new_properties[inner_thoughts_key] = {
-                "type": "string",
-                "description": inner_thoughts_description,
-            }
-
-        # Cast OrderedDict back to a regular dict
-        new_function_object["parameters"]["properties"] = dict(new_properties)
-
-        # Update required parameters if necessary
-        if inner_thoughts_required:
-            required_params = new_function_object["parameters"].get("required", [])
-            if inner_thoughts_key not in required_params:
-                if put_inner_thoughts_first:
-                    required_params.insert(0, inner_thoughts_key)
-                else:
-                    required_params.append(inner_thoughts_key)
-                new_function_object["parameters"]["required"] = required_params
-        new_functions.append(new_function_object)
-
-    return new_functions
-
-
-def unpack_all_inner_thoughts_from_kwargs(
-    response: ChatCompletionResponse,
-    inner_thoughts_key: str,
-) -> ChatCompletionResponse:
-    """Strip the inner thoughts out of the tool call and put it in the message content"""
-
-    if len(response.choices) == 0:
-        raise ValueError("Unpacking inner thoughts from empty response not supported")
-
-    new_choices = []
-    for choice in response.choices:
-        new_choices.append(
-            unpack_inner_thoughts_from_kwargs(choice, inner_thoughts_key)
-        )
-
-    # return an updated copy
-    new_response = response.model_copy(deep=True)
-    new_response.choices = new_choices
-    return new_response
-
-
-def unpack_inner_thoughts_from_kwargs(
-    choice: Choice, inner_thoughts_key: str
-) -> Choice:
-    message = choice.message
-    rewritten_choice = choice  # inner thoughts unpacked out of the function
-
-    if (
-        message.role == "assistant"
-        and message.tool_calls
-        and len(message.tool_calls) >= 1
-    ):
-        # Handle multiple tool calls by extracting inner thoughts from the first one that has it
-        new_choice = choice.model_copy(deep=True)
-        inner_thoughts_found = False
-        
-        for idx, tool_call in enumerate(message.tool_calls):
-            try:
-                # Parse the JSON since args are in string format
-                func_args = dict(json.loads(tool_call.function.arguments))
-                
-                if inner_thoughts_key in func_args:
-                    # Extract the inner thoughts from the first tool call that has it
-                    if not inner_thoughts_found:
-                        inner_thoughts = func_args.pop(inner_thoughts_key)
-                        inner_thoughts_found = True
-                        
-                        # Set the message content with inner thoughts
-                        if new_choice.message.content is not None:
-                            warnings.warn(
-                                f"Overwriting existing inner monologue ({new_choice.message.content}) with kwarg ({inner_thoughts})"
-                            )
-                        new_choice.message.content = inner_thoughts
-                    else:
-                        # Remove inner thoughts from subsequent tool calls
-                        func_args.pop(inner_thoughts_key)
-                    
-                    # Update the tool call arguments
-                    new_choice.message.tool_calls[idx].function.arguments = json_dumps(
-                        func_args
-                    )
-                    
-            except json.JSONDecodeError as e:
-                warnings.warn(f"Failed to strip inner thoughts from tool call {idx}: {e}")
-                raise e
-        
-        if inner_thoughts_found:
-            rewritten_choice = new_choice
-        else:
-            warnings.warn(
-                f"Did not find inner thoughts in any of the {len(message.tool_calls)} tool calls"
-            )
-    else:
-        warnings.warn(f"Did not find tool call in message: {str(message)}")
-
-    return rewritten_choice
-
-
 def calculate_summarizer_cutoff(
     in_context_messages: List[Message],
     token_counts: List[int],
@@ -352,7 +228,7 @@ def calculate_summarizer_cutoff(
     in_context_messages_openai = [m.to_openai_dict() for m in in_context_messages]
 
     if summarizer_settings.evict_all_messages:
-        logger.info("Evicting all messages...")
+        logger.debug("Evicting all messages...")
         return len(in_context_messages)
     else:
         # Start at index 1 (past the system message),
@@ -361,7 +237,7 @@ def calculate_summarizer_cutoff(
         desired_token_count_to_summarize = int(
             sum(token_counts) * (1 - summarizer_settings.desired_memory_token_pressure)
         )
-        logger.info(
+        logger.debug(
             f"desired_token_count_to_summarize={desired_token_count_to_summarize}"
         )
 
@@ -391,10 +267,10 @@ def calculate_summarizer_cutoff(
                 )
                 break
 
-        while cutoff + 1 < len(in_context_messages_openai) and in_context_messages_openai[cutoff + 1]["role"] == MessageRole.tool:
+        while in_context_messages_openai[cutoff + 1]["role"] == MessageRole.tool:
             cutoff += 1
 
-        logger.info(f"Evicting {cutoff}/{len(in_context_messages)} messages...")
+        logger.debug("Evicting %s/%s messages...", cutoff, len(in_context_messages))
         return cutoff + 1
 
 

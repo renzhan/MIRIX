@@ -3,10 +3,10 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field, field_validator
 
+from mirix.client.utils import get_utc_time
 from mirix.constants import MAX_EMBEDDING_DIM
 from mirix.schemas.embedding_config import EmbeddingConfig
 from mirix.schemas.mirix_base import MirixBase
-from mirix.utils import get_utc_time
 
 
 class KnowledgeVaultItemBase(MirixBase):
@@ -42,6 +42,12 @@ class KnowledgeVaultItem(KnowledgeVaultItemBase):
     id: Optional[str] = Field(
         None, description="Unique identifier for the knowledge vault item"
     )
+    agent_id: Optional[str] = Field(
+        None, description="The id of the agent this knowledge vault item belongs to"
+    )
+    client_id: Optional[str] = Field(
+        None, description="The id of the client application that created this item"
+    )
     user_id: str = Field(
         ..., description="The id of the user who generated the knowledge vault item"
     )
@@ -59,9 +65,6 @@ class KnowledgeVaultItem(KnowledgeVaultItemBase):
         },
         description="Last modification info including timestamp and operation type",
     )
-    metadata_: Dict[str, Any] = Field(
-        default_factory=dict, description="Arbitrary additional metadata"
-    )
     organization_id: str = Field(
         ..., description="The unique identifier of the organization"
     )
@@ -71,8 +74,36 @@ class KnowledgeVaultItem(KnowledgeVaultItemBase):
     embedding_config: Optional[EmbeddingConfig] = Field(
         None, description="The embedding configuration used by the event"
     )
+    
+    # NEW: Filter tags for flexible filtering and categorization
+    filter_tags: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Custom filter tags for filtering and categorization",
+        examples=[
+            {
+                "project_id": "proj-abc",
+                "session_id": "sess-xyz",
+                "tags": ["important", "work"],
+                "priority": "high"
+            }
+        ]
+    )
 
-    # need to validate both details_embedding and summary_embedding to ensure they are the same size
+    # need to validate both details_embedding and summary_embedding to ensure they are the same size    
+    # NEW: Filter tags for flexible filtering and categorization
+    filter_tags: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Custom filter tags for filtering and categorization",
+        examples=[
+            {
+                "project_id": "proj-abc",
+                "session_id": "sess-xyz",
+                "tags": ["important", "work"],
+                "priority": "high"
+            }
+        ]
+    )
+
     @field_validator("caption_embedding")
     @classmethod
     def pad_embeddings(cls, embedding: List[float]) -> List[float]:
@@ -108,6 +139,9 @@ class KnowledgeVaultItemUpdate(MirixBase):
     """
 
     id: str = Field(..., description="Unique ID for this knowledge vault entry")
+    agent_id: Optional[str] = Field(
+        None, description="The id of the agent this knowledge vault item belongs to"
+    )
     entry_type: Optional[str] = Field(
         None, description="Category (e.g., 'credential', 'bookmark', 'api_key')"
     )
@@ -119,9 +153,6 @@ class KnowledgeVaultItemUpdate(MirixBase):
     )
     secret_value: Optional[str] = Field(
         None, description="The actual credential or data value"
-    )
-    metadata_: Optional[Dict[str, Any]] = Field(
-        None, description="Arbitrary additional metadata"
     )
     organization_id: Optional[str] = Field(
         None, description="The unique identifier of the organization"
@@ -140,6 +171,10 @@ class KnowledgeVaultItemUpdate(MirixBase):
         None, description="The embedding configuration used by the event"
     )
 
+
+    filter_tags: Optional[Dict[str, Any]] = Field(
+        None, description="Custom filter tags for filtering and categorization"
+    )
 
 class KnowledgeVaultItemResponse(KnowledgeVaultItem):
     """

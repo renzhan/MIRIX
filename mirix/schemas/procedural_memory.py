@@ -3,10 +3,10 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field, field_validator
 
+from mirix.client.utils import get_utc_time
 from mirix.constants import MAX_EMBEDDING_DIM
 from mirix.schemas.embedding_config import EmbeddingConfig
 from mirix.schemas.mirix_base import MirixBase
-from mirix.utils import get_utc_time
 
 
 class ProceduralMemoryItemBase(MirixBase):
@@ -21,10 +21,6 @@ class ProceduralMemoryItemBase(MirixBase):
     summary: str = Field(..., description="Short descriptive text about the procedure")
     steps: List[str] = Field(
         ..., description="Step-by-step instructions as a list of strings"
-    )
-    tree_path: List[str] = Field(
-        ...,
-        description="Hierarchical categorization path as an array of strings (e.g., ['workflows', 'development', 'testing'])",
     )
     email_tag: Optional[List[str]] = Field(
         default_factory=list,
@@ -44,6 +40,12 @@ class ProceduralMemoryItem(ProceduralMemoryItemBase):
     id: Optional[str] = Field(
         None, description="Unique identifier for the procedural memory item"
     )
+    agent_id: Optional[str] = Field(
+        None, description="The id of the agent this procedural memory item belongs to"
+    )
+    client_id: Optional[str] = Field(
+        None, description="The id of the client application that created this item"
+    )
     user_id: str = Field(
         ..., description="The id of the user who generated the procedure"
     )
@@ -61,9 +63,6 @@ class ProceduralMemoryItem(ProceduralMemoryItemBase):
     organization_id: str = Field(
         ..., description="The unique identifier of the organization"
     )
-    metadata_: Dict[str, Any] = Field(
-        default_factory=dict, description="Arbitrary additional metadata"
-    )
     summary_embedding: Optional[List[float]] = Field(
         None, description="The embedding of the summary"
     )
@@ -74,7 +73,21 @@ class ProceduralMemoryItem(ProceduralMemoryItemBase):
         None, description="The embedding configuration used by the event"
     )
 
-    # need to validate both steps_embedding and summary_embedding to ensure they are the same size
+    # need to validate both steps_embedding and summary_embedding to ensure they are the same size    
+    # NEW: Filter tags for flexible filtering and categorization
+    filter_tags: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Custom filter tags for filtering and categorization",
+        examples=[
+            {
+                "project_id": "proj-abc",
+                "session_id": "sess-xyz",
+                "tags": ["important", "work"],
+                "priority": "high"
+            }
+        ]
+    )
+
     @field_validator("summary_embedding", "steps_embedding")
     @classmethod
     def pad_embeddings(cls, embedding: List[float]) -> List[float]:
@@ -96,16 +109,15 @@ class ProceduralMemoryItemUpdate(MirixBase):
     """Schema for updating an existing procedural memory item."""
 
     id: str = Field(..., description="Unique ID for this procedural memory entry")
+    agent_id: Optional[str] = Field(
+        None, description="The id of the agent this procedural memory item belongs to"
+    )
     entry_type: Optional[str] = Field(
         None, description="Category (e.g., 'workflow', 'guide', 'script')"
     )
     summary: Optional[str] = Field(None, description="Short descriptive text")
     steps: Optional[List[str]] = Field(
         None, description="Step-by-step instructions as a list of strings"
-    )
-    tree_path: Optional[List[str]] = Field(
-        None,
-        description="Hierarchical categorization path as an array of strings (e.g., ['workflows', 'development', 'testing'])",
     )
     email_tag: Optional[List[str]] = Field(
         None,
@@ -114,9 +126,6 @@ class ProceduralMemoryItemUpdate(MirixBase):
     flow_tag: Optional[List[str]] = Field(
         None,
         description="Array of workflow/flow-related tags for categorization",
-    )
-    metadata_: Optional[Dict[str, Any]] = Field(
-        None, description="Arbitrary additional metadata"
     )
     organization_id: Optional[str] = Field(None, description="The organization ID")
     updated_at: datetime = Field(
@@ -136,6 +145,10 @@ class ProceduralMemoryItemUpdate(MirixBase):
         None, description="The embedding configuration used by the event"
     )
 
+
+    filter_tags: Optional[Dict[str, Any]] = Field(
+        None, description="Custom filter tags for filtering and categorization"
+    )
 
 class ProceduralMemoryItemResponse(ProceduralMemoryItem):
     """Response schema for procedural memory item."""

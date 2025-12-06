@@ -18,62 +18,53 @@ Your personal AI that builds memory through screen observation and natural conve
 - **Multi-Modal Input:** Text, images, voice, and screen captures processed seamlessly
 
 ### Quick Start
-**End-Users**: For end-users who want to build your own memory using MIRIX, please checkout the quick installation guide [here](https://docs.mirix.io/getting-started/installation/#quick-installation-dmg).
-
-**Developers**: For users who want to apply our memory system as the backend, please check out our [Backend Usage](https://docs.mirix.io/user-guide/backend-usage/). Basically, you just need to run:
+**Step 1: Backend & Dashboard (Docker):**
 ```
-git clone git@github.com:Mirix-AI/MIRIX.git
-cd MIRIX
-
-# Create and activate virtual environment
-python -m venv mirix_env
-source mirix_env/bin/activate  # On Windows: mirix_env\Scripts\activate
-
-pip install -r requirements.txt
+docker compose up -d --pull always
 ```
-Then you can run the following python code:
+- Dashboard: http://localhost:5173  
+- API: http://localhost:8531  
+
+**Step 2: Create an API key in the dashboard (http://localhost:5173) and set as the environmental variable.**
+
+**Step 3: Client (Python, `mirix-client`, https://pypi.org/project/mirix-client/):**
+```
+pip install mirix-client
+```
+
+Now you are ready to go! See the example below:
 ```python
-from mirix.agent import AgentWrapper
+from mirix import MirixClient
 
-# Initialize agent with configuration
-agent = AgentWrapper("./mirix/configs/mirix.yaml")
-
-# Send basic text information
-agent.send_message(
-    message="The moon now has a president.",
-    memorizing=True,
-    force_absorb_content=True
+client = MirixClient(
+    api_key="your-api-key",
+    base_url="http://localhost:8531",
 )
+
+meta = client.initialize_meta_agent(
+    config={"llm_config": {"model": "gemini-2.0-flash"}}
+)
+
+resp = client.add(
+    user_id="demo-user",
+    messages=[
+        {"role": "user", "content": [{"type": "text", "text": "The moon now has a president."}]},
+        {"role": "assistant", "content": [{"type": "text", "text": "Noted."}]},
+    ],
+)
+print(resp)
+
+memories = client.retrieve_with_conversation(
+    user_id="demo-user",
+    messages=[
+        {"role": "user", "content": [{"type": "text", "text": "What did we discuss on MirixDB in last 4 days?"}]},
+    ],
+    limit=5,
+)
+print(memories)
 ```
-For more details, please refer to [Backend Usage](https://docs.mirix.io/user-guide/backend-usage/).
+For more API examples, see `samples/remote_client_example.py`.
 
-## Python SDK (NEW!) 🎉
-
-We've created a simple [Python SDK](https://pypi.org/project/mirix/0.1.5/) that makes it incredibly easy to integrate Mirix's memory capabilities into your applications:
-
-### Installationhttps://pypi.org/project/mirix/0.1.5/
-```bash
-pip install mirix
-```
-
-### Quick Start with SDK
-```python
-from mirix import Mirix
-
-# Initialize memory agent (defaults to Google Gemini 2.0 Flash)
-memory_agent = Mirix(api_key="your-google-api-key")
-
-# Add memories
-memory_agent.add("The moon now has a president")
-memory_agent.add("John loves Italian food and is allergic to peanuts")
-
-# Chat with memory context
-response = memory_agent.chat("Does the moon have a president?")
-print(response)  # "Yes, according to my memory, the moon has a president."
-
-response = memory_agent.chat("What does John like to eat?") 
-print(response)  # "John loves Italian food. However, he's allergic to peanuts."
-```
 
 ## License
 
@@ -81,7 +72,7 @@ Mirix is released under the Apache License 2.0. See the [LICENSE](LICENSE) file 
 
 ## Contact
 
-For questions, suggestions, or issues, please open an issue on the GitHub repository or contact us at `yuwang@mirix.io`
+For questions, suggestions, or issues, please open an issue on the GitHub repository or contact us at `founders@mirix.io`
 
 ## Join Our Community
 
@@ -102,14 +93,7 @@ We host weekly discussion sessions where you can:
 **🔗 Zoom Link:** [https://ucsd.zoom.us/j/96278791276](https://ucsd.zoom.us/j/96278791276)
 
 ### 📱 WeChat Group
-<div align="center">
-<img src="frontend/public/wechat-qr.jpg" alt="WeChat QR Code" width="200"/><br/>
-<strong>WeChat Group</strong>
-</div>
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Mirix-AI/MIRIX&type=Date)](https://star-history.com/#Mirix-AI/MIRIX.&Date)
+You can add the account `ari_asm` so that I can add you to the group chat.
 
 ## Acknowledgement
 We would like to thank [Letta](https://github.com/letta-ai/letta) for open-sourcing their framework, which served as the foundation for the memory system in this project.

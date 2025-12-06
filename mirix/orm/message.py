@@ -1,6 +1,6 @@
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import ForeignKey, Index
+from sqlalchemy import JSON, ForeignKey, Index
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 
 from mirix.orm.custom_columns import (
@@ -16,6 +16,12 @@ from mirix.schemas.mirix_message_content import MessageContent
 from mirix.schemas.mirix_message_content import TextContent as PydanticTextContent
 from mirix.schemas.openai.openai import ToolCall as OpenAIToolCall
 
+if TYPE_CHECKING:
+    from mirix.orm.agent import Agent
+    from mirix.orm.organization import Organization
+    from mirix.orm.step import Step
+    from mirix.orm.user import User
+
 
 class Message(SqlalchemyBase, OrganizationMixin, UserMixin, AgentMixin):
     """Defines data model for storing Message objects"""
@@ -24,6 +30,8 @@ class Message(SqlalchemyBase, OrganizationMixin, UserMixin, AgentMixin):
     __table_args__ = (
         Index("ix_messages_agent_created_at", "agent_id", "created_at"),
         Index("ix_messages_created_at", "created_at", "id"),
+        Index("ix_messages_client_user", "client_id", "user_id"),
+        Index("ix_messages_agent_client_user", "agent_id", "client_id", "user_id"),
     )
     __pydantic_model__ = PydanticMessage
 
@@ -43,6 +51,22 @@ class Message(SqlalchemyBase, OrganizationMixin, UserMixin, AgentMixin):
     tool_call_id: Mapped[Optional[str]] = mapped_column(
         nullable=True, doc="ID of the tool call"
     )
+    
+    # NEW: Filter tags for flexible filtering and categorization
+    filter_tags: Mapped[Optional[dict]] = mapped_column(
+        JSON,
+        nullable=True,
+        default=None,
+        doc="Custom filter tags for filtering and categorization"
+    )
+    
+    # Foreign key to client (for access control and filtering)
+    client_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=True,
+        doc="ID of the client application that created this message",
+    )
+    
     step_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("steps.id", ondelete="SET NULL"),
         nullable=True,

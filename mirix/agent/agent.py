@@ -40,13 +40,13 @@ from mirix.llm_api.helpers import (
 )
 from mirix.llm_api.llm_api_tools import create
 from mirix.llm_api.llm_client import LLMClient
+from mirix.log import get_logger
 from mirix.memory import summarize_messages
-from mirix.orm import User
-from mirix.orm.enums import ToolType
 from mirix.schemas.agent import AgentState, AgentStepResponse, UpdateAgent
 from mirix.schemas.block import BlockUpdate
+from mirix.schemas.client import Client
 from mirix.schemas.embedding_config import EmbeddingConfig
-from mirix.schemas.enums import MessageRole
+from mirix.schemas.enums import MessageRole, ToolType
 from mirix.schemas.memory import ContextWindowOverview, Memory
 from mirix.schemas.message import Message, MessageCreate
 from mirix.schemas.mirix_message_content import (
@@ -58,20 +58,18 @@ from mirix.schemas.mirix_message_content import (
 from mirix.schemas.openai.chat_completion_request import (
     Tool as ChatCompletionRequestTool,
 )
-from mirix.schemas.openai.chat_completion_response import (
-    ChatCompletionResponse,
-    UsageStatistics,
-)
+from mirix.schemas.openai.chat_completion_response import ChatCompletionResponse
 from mirix.schemas.openai.chat_completion_response import (
     Message as ChatCompletionMessage,
 )
+from mirix.schemas.openai.chat_completion_response import UsageStatistics
 from mirix.schemas.tool import Tool
 from mirix.schemas.tool_rule import TerminalToolRule
 from mirix.schemas.usage import MirixUsageStatistics
+from mirix.schemas.user import User
 from mirix.services.agent_manager import AgentManager
 from mirix.services.block_manager import BlockManager
 from mirix.services.episodic_memory_manager import EpisodicMemoryManager
-from mirix.services.file_manager import FileManager
 from mirix.services.helpers.agent_manager_helper import (
     check_supports_structured_output,
     compile_memory_metadata_block,
@@ -83,7 +81,6 @@ from mirix.services.resource_memory_manager import ResourceMemoryManager
 from mirix.services.semantic_memory_manager import SemanticMemoryManager
 from mirix.services.step_manager import StepManager
 from mirix.services.tool_execution_sandbox import ToolExecutionSandbox
-from mirix.services.user_manager import UserManager
 from mirix.settings import summarizer_settings
 from mirix.system import (
     get_contine_chaining,
@@ -105,8 +102,12 @@ from mirix.utils import (
     num_tokens_from_functions,
     num_tokens_from_messages,
     parse_json,
+    printv,
     validate_function_response,
 )
+
+# Initialize module-level logger
+logger = get_logger(__name__)
 
 
 class BaseAgent(ABC):
@@ -131,32 +132,57 @@ class Agent(BaseAgent):
         self,
         interface: Optional[AgentInterface],
         agent_state: AgentState,  # in-memory representation of the agent state (read from multiple tables)
-        user: User,
+        actor: Client,
         # extras
         first_message_verify_mono: bool = True,  # TODO move to config?
+        filter_tags: Optional[dict] = None,  # Filter tags for memory operations
+        use_cache: bool = True,  # Control Redis cache behavior for this request
+        user: Optional[User] = None,  # End-user user
     ):
-        assert isinstance(agent_state.memory, Memory), (
-            f"Memory object is not of type Memory: {type(agent_state.memory)}"
-        )
+        assert isinstance(
+            agent_state.memory, Memory
+        ), f"Memory object is not of type Memory: {type(agent_state.memory)}"
         # Hold a copy of the state that was used to init the agent
         self.agent_state = agent_state
-        assert isinstance(self.agent_state.memory, Memory), (
-            f"Memory object is not of type Memory: {type(self.agent_state.memory)}"
-        )
+        assert isinstance(
+            self.agent_state.memory, Memory
+        ), f"Memory object is not of type Memory: {type(self.agent_state.memory)}"
 
-        self.user = user
+        self.actor = actor
+        # Store filter_tags as a COPY to prevent mutation across agent instances
+        from copy import deepcopy
+
+        # Keep None as None, don't convert to empty dict - they have different meanings
+        self.filter_tags = deepcopy(filter_tags) if filter_tags is not None else None
+        self.use_cache = use_cache  # Store use_cache for memory operations
+        self.user = user  # Store user for end-user tracking
+        self.occurred_at = None  # Optional timestamp for episodic memory, set by server if provided
 
         # Initialize logger early in constructor
-        self.logger = logging.getLogger(f"Mirix.Agent.{agent_state.name}")
+        self.logger = logging.getLogger(f"Mirix.Agent.{self.agent_state.name}")
         self.logger.setLevel(logging.INFO)
+
+        if user:
+            self.user_id = user.id
+        else:
+            from mirix.services.user_manager import UserManager
+
+            self.user_id = UserManager().ADMIN_USER_ID
+
+        if actor:
+            self.client_id = actor.id
+        else:
+            from mirix.services.client_manager import ClientManager
+
+            self.client_id = ClientManager().DEFAULT_CLIENT_ID
 
         # initialize a tool rules solver
         if agent_state.tool_rules:
             # if there are tool rules, log a warning
             for rule in agent_state.tool_rules:
                 if not isinstance(rule, TerminalToolRule):
-                    self.logger.warning(
-                        "Tool rules only work reliably for the latest OpenAI models that support structured outputs."
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] WARNING: Tool rules only work reliably for the latest OpenAI models that support structured outputs."
                     )
                     break
         # add default rule for having send_message be a terminal tool
@@ -173,6 +199,7 @@ class Agent(BaseAgent):
 
         # state managers
         self.block_manager = BlockManager()
+        self.agent_manager = AgentManager()
 
         # Interface must implement:
         # - internal_monologue
@@ -187,7 +214,6 @@ class Agent(BaseAgent):
         self.message_manager = MessageManager()
         self.agent_manager = AgentManager()
         self.step_manager = StepManager()
-        self.user_manager = UserManager()
 
         # Create the memory managers
         self.episodic_memory_manager = EpisodicMemoryManager()
@@ -213,8 +239,12 @@ class Agent(BaseAgent):
 
     def load_last_function_response(self):
         """Load the last function response from message history"""
+        # Skip if actor not set yet (during __init__)
+        if self.actor is None:
+            return None
+
         in_context_messages = self.agent_manager.get_in_context_messages(
-            agent_id=self.agent_state.id, actor=self.user
+            agent_state=self.agent_state, actor=self.actor
         )
         for i in range(len(in_context_messages) - 1, -1, -1):
             msg = in_context_messages[i]
@@ -228,26 +258,6 @@ class Agent(BaseAgent):
                         f"Invalid JSON format in message: {msg.content[0].text}"
                     )
         return None
-
-    def update_topic_if_changed(self, topic: str) -> bool:
-        """
-        Update the agent's topic if it has changed.
-
-        Args:
-            topic (str): the new topic
-
-        Returns:
-            modified (bool): whether the topic was updated
-        """
-        if self.agent_state.topic != topic:
-            self.agent_manager.update_topic(
-                agent_id=self.agent_state.id,
-                topic=topic,
-                actor=self.user,
-            )
-            self.agent_state.topic = topic
-            return True
-        return False
 
     def update_memory_if_changed(self, new_memory: Memory) -> bool:
         """
@@ -269,18 +279,19 @@ class Agent(BaseAgent):
                     block = self.block_manager.update_block(
                         block_id=block_id,
                         block_update=BlockUpdate(value=updated_value),
-                        actor=self.user,
+                        actor=self.actor,
+                        user=self.user,
                     )
                     assert block.user_id == self.user.id
-                    self.logger.info(
-                        f"Updated block {label} with value {updated_value} and user {self.user.id}"
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] INFO: Updated block {label} with value {updated_value} and user {self.user.id}"
                     )
 
             # refresh memory from DB (using block ids)
             self.agent_state.memory = Memory(
                 blocks=[
-                    self.block_manager.get_block_by_id(block.id, actor=self.user)
-                    for block in self.block_manager.get_blocks(actor=self.user)
+                    self.block_manager.get_block_by_id(block.id, user=self.user)
+                    for block in self.block_manager.get_blocks(user=self.user)
                 ]
             )
 
@@ -355,7 +366,7 @@ class Agent(BaseAgent):
 
         except Exception as e:
             error_msg = f"Error executing MCP tool '{function_name}': {str(e)}"
-            self.logger.error(error_msg)
+            printv(f"[Mirix.Agent.{self.agent_state.name}] ERROR: {error_msg}")
             return error_msg
 
     def execute_tool_and_persist_state(
@@ -373,8 +384,10 @@ class Agent(BaseAgent):
 
         self.agent_state.memory = Memory(
             blocks=[
-                self.block_manager.get_block_by_id(block.id, actor=self.user)
-                for block in self.block_manager.get_blocks(actor=self.user)
+                self.block_manager.get_block_by_id(block.id, user=self.user)
+                for block in self.block_manager.get_blocks(
+                    user=self.user, agent_id=self.agent_state.id
+                )
             ]
         )
 
@@ -397,13 +410,11 @@ class Agent(BaseAgent):
                         if "occurred_at" in item:
                             item["occurred_at"] = convert_timezone_to_utc(
                                 item["occurred_at"],
-                                self.user_manager.get_user_by_id(self.user.id).timezone,
+                                self.user.timezone,
                             )
 
             if function_name in ["search_in_memory", "list_memory_within_timerange"]:
-                function_args["timezone_str"] = self.user_manager.get_user_by_id(
-                    self.user.id
-                ).timezone
+                function_args["timezone_str"] = self.user.timezone
 
             if target_mirix_tool.tool_type == ToolType.MIRIX_CORE:
                 # base tools are allowed to access the `Agent` object and run on the database
@@ -419,8 +430,8 @@ class Agent(BaseAgent):
                         agent_state_copy  # need to attach self to arg since it's dynamically linked
                     )
                 function_response = callable_func(**function_args)
-                if function_name in ["send_message", "send_intermediate_message"]:
-                    self.update_topic_if_changed(agent_state_copy.topic)
+                # if function_name in ["send_message", "send_intermediate_message"]:
+                #     self.update_topic_if_changed(agent_state_copy.topic)
                 if function_name == "send_intermediate_message":
                     # send intermediate message to the user
                     if display_intermediate_message:
@@ -438,10 +449,14 @@ class Agent(BaseAgent):
                         agent_state_copy  # need to attach self to arg since it's dynamically linked
                     )
                 if function_name in ["check_episodic_memory", "check_semantic_memory"]:
-                    function_args["timezone_str"] = self.user_manager.get_user_by_id(
-                        self.user.id
-                    ).timezone
+                    function_args["timezone_str"] = self.user.timezone
                 function_args["self"] = self
+
+                # Defensive: finish_memory_update takes no parameters (except self)
+                # Remove any unexpected parameters that LLM might hallucinate
+                if function_name == "finish_memory_update":
+                    function_args = {"self": self}
+
                 function_response = callable_func(**function_args)
                 if function_name in ["core_memory_append", "core_memory_rewrite"]:
                     self.update_memory_if_changed(agent_state_copy.memory)
@@ -505,10 +520,10 @@ class Agent(BaseAgent):
         max_delay: float = 10.0,  # max delay between retries
         step_count: Optional[int] = None,
         last_function_failed: bool = False,
-        put_inner_thoughts_first: bool = True,
         get_input_data_for_debugging: bool = False,
         existing_file_uris: Optional[List[str]] = None,
         second_try: bool = False,
+        llm_client: Optional[LLMClient] = None,
     ) -> ChatCompletionResponse:
         """Get response from LLM API with robust retry mechanism."""
         log_telemetry(self.logger, "_get_ai_reply start")
@@ -554,18 +569,17 @@ class Agent(BaseAgent):
         elif step_count is not None and step_count > 0 and len(allowed_tool_names) == 1:
             force_tool_call = allowed_tool_names[0]
 
+        active_llm_client = llm_client or LLMClient.create(
+            llm_config=self.agent_state.llm_config,
+        )
+
         for attempt in range(1, empty_response_retry_limit + 1):
             try:
                 log_telemetry(self.logger, "_get_ai_reply create start")
 
                 # New LLM client flow
-                llm_client = LLMClient.create(
-                    llm_config=self.agent_state.llm_config,
-                    put_inner_thoughts_first=put_inner_thoughts_first,
-                )
-
-                if llm_client and not stream:
-                    response = llm_client.send_llm_request(
+                if active_llm_client and not stream:
+                    response = active_llm_client.send_llm_request(
                         messages=message_sequence,
                         tools=allowed_functions,
                         stream=stream,
@@ -590,7 +604,6 @@ class Agent(BaseAgent):
                         force_tool_call=force_tool_call,
                         stream=stream,
                         stream_interface=self.interface,
-                        put_inner_thoughts_first=put_inner_thoughts_first,
                         name=self.agent_state.name,
                     )
                 log_telemetry(self.logger, "_get_ai_reply create finish")
@@ -622,8 +635,8 @@ class Agent(BaseAgent):
                             delay = min(
                                 backoff_factor * (2 ** (attempt - 1)), max_delay
                             )
-                            self.logger.warning(
-                                f"Attempt {attempt} failed: {response.choices[0].finish_reason}. Retrying in {delay} seconds..."
+                            printv(
+                                f"[Mirix.Agent.{self.agent_state.name}] WARNING: Attempt {attempt} failed: {response.choices[0].finish_reason}. Retrying in {delay} seconds..."
                             )
                             time.sleep(delay)
                             continue
@@ -635,15 +648,17 @@ class Agent(BaseAgent):
 
             except ValueError as ve:
                 if attempt >= empty_response_retry_limit:
-                    self.logger.error(f"Retry limit reached. Final error: {ve}")
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] ERROR: Retry limit reached. Final error: {ve}"
+                    )
                     log_telemetry(self.logger, "_handle_ai_response finish ValueError")
                     raise Exception(
                         f"Retries exhausted and no valid response received. Final error: {ve}"
                     )
                 else:
                     delay = min(backoff_factor * (2 ** (attempt - 1)), max_delay)
-                    self.logger.warning(
-                        f"Attempt {attempt} failed: {ve}. Retrying in {delay} seconds..."
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] WARNING: Attempt {attempt} failed: {ve}. Retrying in {delay} seconds..."
                     )
                     time.sleep(delay)
                     continue
@@ -652,22 +667,26 @@ class Agent(BaseAgent):
                 # Gemini api sometimes can yield empty response
                 # This is a retryable error
                 if attempt >= empty_response_retry_limit:
-                    self.logger.error(f"Retry limit reached. Final error: {ke}")
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] ERROR: Retry limit reached. Final error: {ke}"
+                    )
                     log_telemetry(self.logger, "_handle_ai_response finish KeyError")
                     raise Exception(
                         f"Retries exhausted and no valid response received. Final error: {ke}"
                     )
                 else:
                     delay = min(backoff_factor * (2 ** (attempt - 1)), max_delay)
-                    self.logger.warning(
-                        f"Attempt {attempt} failed: {ke}. Retrying in {delay} seconds..."
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] WARNING: Attempt {attempt} failed: {ke}. Retrying in {delay} seconds..."
                     )
                     time.sleep(delay)
                     continue
 
             except LLMError as llm_error:
                 if attempt >= empty_response_retry_limit:
-                    self.logger.error(f"Retry limit reached. Final error: {llm_error}")
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] ERROR: Retry limit reached. Final error: {llm_error}"
+                    )
                     log_telemetry(self.logger, "_handle_ai_response finish LLMError")
                     log_telemetry(
                         self.logger, "_get_ai_reply_last_message_hacking start"
@@ -686,43 +705,47 @@ class Agent(BaseAgent):
                         max_delay,
                         step_count,
                         last_function_failed,
-                        put_inner_thoughts_first,
                         get_input_data_for_debugging,
                         second_try=True,
+                        llm_client=active_llm_client,
                     )
 
                 else:
                     delay = min(backoff_factor * (2 ** (attempt - 1)), max_delay)
-                    self.logger.warning(
-                        f"Attempt {attempt} failed: {llm_error}. Retrying in {delay} seconds..."
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] WARNING: Attempt {attempt} failed: {llm_error}. Retrying in {delay} seconds..."
                     )
                     time.sleep(delay)
                     continue
 
             except AssertionError as ae:
                 if attempt >= empty_response_retry_limit:
-                    self.logger.error(f"Retry limit reached. Final error: {ae}")
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] ERROR: Retry limit reached. Final error: {ae}"
+                    )
                     raise Exception(
                         f"Retries exhausted and no valid response received. Final error: {ae}"
                     )
                 else:
                     delay = min(backoff_factor * (2 ** (attempt - 1)), max_delay)
-                    self.logger.warning(
-                        f"Attempt {attempt} failed: {ae}. Retrying in {delay} seconds..."
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] WARNING: Attempt {attempt} failed: {ae}. Retrying in {delay} seconds..."
                     )
                     time.sleep(delay)
                     continue
 
             except requests.exceptions.HTTPError as he:
                 if attempt >= empty_response_retry_limit:
-                    self.logger.error(f"Retry limit reached. Final error: {he}")
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] ERROR: Retry limit reached. Final error: {he}"
+                    )
                     raise Exception(
                         f"Retries exhausted and no valid response received. Final error: {he}"
                     )
                 else:
                     delay = min(backoff_factor * (2 ** (attempt - 1)), max_delay)
-                    self.logger.warning(
-                        f"Attempt {attempt} failed: {he}. Retrying in {delay} seconds..."
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] WARNING: Attempt {attempt} failed: {he}. Retrying in {delay} seconds..."
                     )
                     time.sleep(delay)
 
@@ -774,7 +797,6 @@ class Agent(BaseAgent):
 
         messages = []  # append these to the history when done
         function_name = None
-        message_added = False
 
         # Step 2: check if LLM wanted to call a function
         if response_message.function_call or (
@@ -791,8 +813,8 @@ class Agent(BaseAgent):
 
             # Generate UUIDs for tool calls if needed
             if override_tool_call_id or response_message.function_call:
-                self.logger.warning(
-                    "Overriding the tool call can result in inconsistent tool call IDs during streaming"
+                printv(
+                    f"[Mirix.Agent.{self.agent_state.name}] WARNING: Overriding the tool call can result in inconsistent tool call IDs during streaming"
                 )
                 for tool_call in response_message.tool_calls:
                     tool_call.id = get_tool_call_id()  # needs to be a string for JSON
@@ -819,18 +841,19 @@ class Agent(BaseAgent):
                     response_message.content, msg_obj=messages[-1]
                 )
                 # Log inner thoughts for debugging and analysis
-                self.logger.info(f"Inner thoughts: {response_message.content}")
+                printv(
+                    f"[Mirix.Agent.{self.agent_state.name}] INFO: Inner thoughts: {response_message.content}"
+                )
                 # Flag to avoid printing a duplicate if inner thoughts get popped from the function call
                 nonnull_content = True
 
             # Step 3: Process each tool call
             continue_chaining = True
             overall_function_failed = False
-            any_message_added = False
             executed_function_names = []  # Track which functions were executed
 
-            self.logger.info(
-                f"Processing {len(response_message.tool_calls)} tool call(s)"
+            printv(
+                f"[Mirix.Agent.{self.agent_state.name}] INFO: Processing {len(response_message.tool_calls)} tool call(s)"
             )
 
             for tool_call_idx, tool_call in enumerate(response_message.tool_calls):
@@ -838,8 +861,8 @@ class Agent(BaseAgent):
                 function_call = tool_call.function
                 function_name = function_call.name
 
-                self.logger.info(
-                    f"Processing tool call {tool_call_idx + 1}/{len(response_message.tool_calls)}: {function_name} with tool_call_id: {tool_call_id}"
+                printv(
+                    f"[Mirix.Agent.{self.agent_state.name}] INFO: Processing tool call {tool_call_idx + 1}/{len(response_message.tool_calls)}: {function_name} with tool_call_id: {tool_call_id}"
                 )
 
                 # Failure case 1: function name is wrong (not in agent_state.tools)
@@ -896,7 +919,7 @@ class Agent(BaseAgent):
 
                 if function_name == "trigger_memory_update":
                     function_args["user_message"] = {
-                        "message": convert_message_to_input_message(input_message),
+                        "message": input_message,
                         "existing_file_uris": existing_file_uris,
                         "retrieved_memories": retrieved_memories,
                         "chaining": CHAINING_FOR_MEMORY_UPDATE,
@@ -910,19 +933,13 @@ class Agent(BaseAgent):
                         "retrieved_memories": retrieved_memories,
                     }
 
-                # Check if inner thoughts is in the function call arguments (possible apparently if you are using Azure)
-                if "inner_thoughts" in function_args:
-                    response_message.content = function_args.pop("inner_thoughts")
-                    self.logger.info(
-                        f"Inner thoughts extracted from function args: {response_message.content}"
-                    )
                 # The content if then internal monologue, not chat
                 if response_message.content and not nonnull_content:
                     self.interface.internal_monologue(
                         response_message.content, msg_obj=messages[-1]
                     )
-                    self.logger.info(
-                        f"Inner thoughts (from function call): {response_message.content}"
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] INFO: Inner thoughts (from function call): {response_message.content}"
                     )
 
                 continue_chaining = True
@@ -953,9 +970,9 @@ class Agent(BaseAgent):
                         function_name == "send_message"
                         or function_name == "finish_memory_update"
                     ):
-                        assert tool_call_idx == len(response_message.tool_calls) - 1, (
-                            f"{function_name} must be the last tool call"
-                        )
+                        assert (
+                            tool_call_idx == len(response_message.tool_calls) - 1
+                        ), f"{function_name} must be the last tool call"
 
                     if tool_call_idx == len(response_message.tool_calls) - 1:
                         if function_name == "send_message":
@@ -1002,7 +1019,9 @@ class Agent(BaseAgent):
                         exception_message=str(e),
                     )
                     error_msg_user = f"{error_msg}\n{traceback.format_exc()}"
-                    self.logger.error(error_msg_user)
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] ERROR: {error_msg_user}"
+                    )
                     function_response = package_function_response(False, error_msg)
                     self.last_function_response = function_response
                     # TODO: truncate error message somehow
@@ -1111,7 +1130,7 @@ class Agent(BaseAgent):
                     continue_chaining = False
 
                     in_context_messages = self.agent_manager.get_in_context_messages(
-                        agent_id=self.agent_state.id, actor=self.user
+                        agent_state=self.agent_state, actor=self.actor
                     )
                     message_ids = [message.id for message in in_context_messages]
                     message_ids = [message_ids[0]]
@@ -1123,9 +1142,7 @@ class Agent(BaseAgent):
                     if self.agent_state.name == "episodic_memory_agent":
                         memory_item = self.episodic_memory_manager.get_most_recently_updated_event(
                             actor=self.user,
-                            timezone_str=self.user_manager.get_user_by_id(
-                                self.user.id
-                            ).timezone,
+                            timezone_str=self.user.timezone,
                         )
                         if memory_item:
                             memory_item = memory_item[0]
@@ -1145,15 +1162,6 @@ class Agent(BaseAgent):
                                 "[Details]: " + memory_item.details + "\n"
                             )
                             memory_item_str += (
-                                "[Tree Path]: "
-                                + (
-                                    " > ".join(memory_item.tree_path)
-                                    if memory_item.tree_path
-                                    else "N/A"
-                                )
-                                + "\n"
-                            )
-                            memory_item_str += (
                                 "[Last Modified]: "
                                 + memory_item.last_modify["operation"]
                                 + " at "
@@ -1167,9 +1175,7 @@ class Agent(BaseAgent):
                     elif self.agent_state.name == "procedural_memory_agent":
                         memory_item = self.procedural_memory_manager.get_most_recently_updated_item(
                             actor=self.user,
-                            timezone_str=self.user_manager.get_user_by_id(
-                                self.user.id
-                            ).timezone,
+                            timezone_str=self.user.timezone,
                         )
                         if memory_item:
                             memory_item = memory_item[0]
@@ -1187,15 +1193,6 @@ class Agent(BaseAgent):
                                 "[Steps]: " + "; ".join(memory_item.steps) + "\n"
                             )
                             memory_item_str += (
-                                "[Tree Path]: "
-                                + (
-                                    " > ".join(memory_item.tree_path)
-                                    if memory_item.tree_path
-                                    else "N/A"
-                                )
-                                + "\n"
-                            )
-                            memory_item_str += (
                                 "[Last Modified]: "
                                 + memory_item.last_modify["operation"]
                                 + " at "
@@ -1210,9 +1207,7 @@ class Agent(BaseAgent):
                         memory_item = (
                             self.resource_memory_manager.get_most_recently_updated_item(
                                 actor=self.user,
-                                timezone_str=self.user_manager.get_user_by_id(
-                                    self.user.id
-                                ).timezone,
+                                timezone_str=self.user.timezone,
                             )
                         )
                         if memory_item:
@@ -1232,15 +1227,6 @@ class Agent(BaseAgent):
                                 "[Content]: " + memory_item.content + "\n"
                             )
                             memory_item_str += (
-                                "[Tree Path]: "
-                                + (
-                                    " > ".join(memory_item.tree_path)
-                                    if memory_item.tree_path
-                                    else "N/A"
-                                )
-                                + "\n"
-                            )
-                            memory_item_str += (
                                 "[Last Modified]: "
                                 + memory_item.last_modify["operation"]
                                 + " at "
@@ -1251,13 +1237,11 @@ class Agent(BaseAgent):
                             )
                             memory_item_str = memory_item_str.strip()
 
-                    elif self.agent_state.name == "knowledge_vault_agent":
+                    elif self.agent_state.name == "knowledge_vault_memory_agent":
                         memory_item = (
                             self.knowledge_vault_manager.get_most_recently_updated_item(
                                 actor=self.user,
-                                timezone_str=self.user_manager.get_user_by_id(
-                                    self.user.id
-                                ).timezone,
+                                timezone_str=self.user.timezone,
                             )
                         )
 
@@ -1302,9 +1286,7 @@ class Agent(BaseAgent):
                         memory_item = (
                             self.semantic_memory_manager.get_most_recently_updated_item(
                                 actor=self.user,
-                                timezone_str=self.user_manager.get_user_by_id(
-                                    self.user.id
-                                ).timezone,
+                                timezone_str=self.user.timezone,
                             )
                         )
                         if memory_item:
@@ -1322,15 +1304,6 @@ class Agent(BaseAgent):
                             )
                             memory_item_str += (
                                 "[Source]: " + (memory_item.source or "N/A") + "\n"
-                            )
-                            memory_item_str += (
-                                "[Tree Path]: "
-                                + (
-                                    " > ".join(memory_item.tree_path)
-                                    if memory_item.tree_path
-                                    else "N/A"
-                                )
-                                + "\n"
                             )
                             memory_item_str += (
                                 "[Last Modified]: "
@@ -1369,7 +1342,14 @@ class Agent(BaseAgent):
 
                         # persist the message to the database
                         persisted_message = self.message_manager.create_message(
-                            new_message, actor=self.user
+                            new_message,
+                            actor=self.actor,  # Client for write operations (audit trail)
+                            client_id=self.client_id,  # From actor (Client)
+                            user_id=(
+                                self.user_id
+                                if self.user_id
+                                else UserManager.ADMIN_USER_ID
+                            ),  # Fallback to default user
                         )
 
                         # append the persisted message ID to the message list
@@ -1377,26 +1357,22 @@ class Agent(BaseAgent):
                         self.agent_manager.set_in_context_messages(
                             agent_id=self.agent_state.id,
                             message_ids=message_ids,
-                            actor=self.user,
+                            actor=self.actor,
                         )
 
                         # delete the detached messages
-                        deleted_count = (
-                            self.message_manager.delete_detached_messages_for_agent(
-                                agent_id=self.agent_state.id, actor=self.user
-                            )
+                        self.message_manager.delete_detached_messages_for_agent(
+                            agent_id=self.agent_state.id, actor=self.actor
                         )
 
                     if self.agent_state.name == "meta_memory_agent":
                         self.agent_manager.set_in_context_messages(
                             agent_id=self.agent_state.id,
                             message_ids=message_ids,
-                            actor=self.user,
+                            actor=self.actor,
                         )
-                        deleted_count = (
-                            self.message_manager.delete_detached_messages_for_agent(
-                                agent_id=self.agent_state.id, actor=self.user
-                            )
+                        self.message_manager.delete_detached_messages_for_agent(
+                            agent_id=self.agent_state.id, actor=self.actor
                         )
 
                     if self.agent_state.name == "reflexion_agent":
@@ -1405,10 +1381,8 @@ class Agent(BaseAgent):
                             message_ids=message_ids,
                             actor=self.user,
                         )
-                        deleted_count = (
-                            self.message_manager.delete_detached_messages_for_agent(
-                                agent_id=self.agent_state.id, actor=self.user
-                            )
+                        self.message_manager.delete_detached_messages_for_agent(
+                            agent_id=self.agent_state.id, actor=self.user
                         )
 
                     # Clear all messages since they were manually added to the conversation history
@@ -1428,8 +1402,8 @@ class Agent(BaseAgent):
                 response_message.content, msg_obj=messages[-1]
             )
             # Log inner thoughts for debugging and analysis
-            self.logger.info(
-                f"Inner thoughts (no function call): {response_message.content}"
+            printv(
+                f"[Mirix.Agent.{self.agent_state.name}] INFO: Inner thoughts (no function call): {response_message.content}"
             )
             continue_chaining = True
             function_failed = False
@@ -1439,46 +1413,158 @@ class Agent(BaseAgent):
                 )
 
         # Update ToolRulesSolver state with last called function
-        self.tool_rules_solver.update_tool_usage(function_name)
-        # Update contine_chaining request according to provided tool rules
-        if self.tool_rules_solver.has_children_tools(function_name):
-            continue_chaining = True
-        elif self.tool_rules_solver.is_terminal_tool(function_name):
-            continue_chaining = False
+        if function_name is not None:
+            self.tool_rules_solver.update_tool_usage(function_name)
+            # Update contine_chaining request according to provided tool rules
+            if self.tool_rules_solver.has_children_tools(function_name):
+                continue_chaining = True
+            elif self.tool_rules_solver.is_terminal_tool(function_name):
+                continue_chaining = False
 
         return messages, continue_chaining, function_failed
 
     def step(
         self,
-        input_messages: Union[Message, List[Message]],
+        input_messages: Union[
+            Message, MessageCreate, List[Union[Message, MessageCreate]]
+        ],
         chaining: bool = True,
         max_chaining_steps: Optional[int] = None,
         extra_messages: Optional[List[dict]] = None,
-        user_id: Optional[str] = None,
+        actor: Optional["Client"] = None,  # Client for write operations (audit trail)
+        user: Optional[User] = None,  # User for read operations (data scope)
         **kwargs,
     ) -> MirixUsageStatistics:
-        """Run Agent.step in a loop, handling chaining via contine_chaining requests and function failures"""
+        """Run Agent.step in a loop, handling chaining via continue_chaining requests and function failures
 
-        if user_id:
-            self.user = self.user_manager.get_user_by_id(user_id)
+        Args:
+            actor: Client object for write operations (updating messages, agent state) - audit trail
+            user: User object for read operations (loading blocks, memory filtering) - data scope
+        """
+
+        # Store actor for write operations
+        if actor:
+            self.actor = actor
+
+        # Store user and load user's memory blocks
+        if user:
+            self.user = user
+
+            # Load existing blocks for this user
+            existing_blocks = self.block_manager.get_blocks(
+                user=self.user, agent_id=self.agent_state.id
+            )
+
+            # Special handling for core_memory_agent: ensure required blocks exist
+            # This automatically creates blocks on first use for each user
+            from mirix.schemas.agent import AgentType
+
+            if self.agent_state.agent_type == AgentType.core_memory_agent:
+                if not existing_blocks:
+                    # No blocks exist for this user - auto-create from ADMIN_USER_ID template
+                    logger.debug(
+                        "Core memory blocks missing for user '%s', auto-creating from template. Agent ID: %s",
+                        user.id,
+                        self.agent_state.id,
+                    )
+
+                    # Query template blocks from ADMIN_USER_ID
+                    # Get the admin user from the database (has all required fields)
+                    from mirix.services.user_manager import UserManager
+
+                    user_manager = UserManager()
+                    try:
+                        admin_user = user_manager.get_user_by_id(
+                            UserManager.ADMIN_USER_ID
+                        )
+                        # Override organization_id to match the current user's organization
+                        # This ensures we query blocks from the correct organization
+                        admin_user.organization_id = user.organization_id
+                    except Exception as e:
+                        logger.error(
+                            "Failed to get ADMIN_USER (id: %s): %s. Cannot auto-create blocks.",
+                            UserManager.ADMIN_USER_ID,
+                            e,
+                        )
+                        admin_user = None
+
+                    if admin_user:
+                        template_blocks = self.block_manager.get_blocks(
+                            user=admin_user, agent_id=self.agent_state.id
+                        )
+
+                        if template_blocks:
+                            # Create blocks for this user using template
+                            from mirix.schemas.block import Block
+
+                            for template_block in template_blocks:
+                                try:
+                                    self.block_manager.create_or_update_block(
+                                        block=Block(
+                                            label=template_block.label,
+                                            value=template_block.value,
+                                            limit=template_block.limit,
+                                        ),
+                                        actor=self.actor,
+                                        user=self.user,
+                                        agent_id=self.agent_state.id,
+                                    )
+                                    logger.info(
+                                        "✓ Auto-created '%s' block for user %s (template: %s)",
+                                        template_block.label,
+                                        user.id,
+                                        template_block.id,
+                                    )
+                                except Exception as e:
+                                    logger.error(
+                                        "Failed to auto-create '%s' block: %s",
+                                        template_block.label,
+                                        e,
+                                    )
+
+                            # Reload blocks after creation
+                            existing_blocks = self.block_manager.get_blocks(
+                                user=self.user, agent_id=self.agent_state.id
+                            )
+                        else:
+                            logger.warning(
+                                "No template blocks found for ADMIN_USER_ID (agent_id: %s). Cannot auto-create blocks.",
+                                self.agent_state.id,
+                            )
+
+            # Load blocks into memory
             self.agent_state.memory = Memory(
                 blocks=[
-                    self.block_manager.get_block_by_id(block.id, actor=self.user)
-                    for block in self.block_manager.get_blocks(actor=self.user)
+                    b
+                    for block in existing_blocks
+                    if (
+                        b := self.block_manager.get_block_by_id(
+                            block.id, user=self.user
+                        )
+                    )
+                    is not None
                 ]
             )
 
         max_chaining_steps = max_chaining_steps or MAX_CHAINING_STEPS
 
-        first_input_message = input_messages[0]
+        first_input_message = (
+            input_messages[0] if isinstance(input_messages, list) else input_messages
+        )
 
         # Convert MessageCreate objects to Message objects
+        if not isinstance(input_messages, list):
+            input_messages = [input_messages]
         message_objects = [
-            prepare_input_message_create(
-                m,
-                self.agent_state.id,
-                wrap_user_message=False,
-                wrap_system_message=True,
+            (
+                m
+                if isinstance(m, Message)
+                else prepare_input_message_create(
+                    m,
+                    self.agent_state.id,
+                    wrap_user_message=False,
+                    wrap_system_message=True,
+                )
             )
             for m in input_messages
         ]
@@ -1503,14 +1589,14 @@ class Agent(BaseAgent):
 
         initial_message_count = len(
             self.agent_manager.get_in_context_messages(
-                agent_id=self.agent_state.id, actor=self.user
+                agent_state=self.agent_state, actor=self.actor
             )
         )
 
         if self.agent_state.name == "reflexion_agent":
             # clear previous messages
             in_context_messages = self.agent_manager.get_in_context_messages(
-                agent_id=self.agent_state.id, actor=self.user
+                agent_state=self.agent_state, actor=self.actor
             )
             in_context_messages = in_context_messages[:1]
             self.agent_manager.set_in_context_messages(
@@ -1518,6 +1604,11 @@ class Agent(BaseAgent):
                 message_ids=[message.id for message in in_context_messages],
                 actor=self.user,
             )
+
+        # Initialize the LLM client once per step to reuse across retries.
+        llm_client = LLMClient.create(
+            llm_config=self.agent_state.llm_config,
+        )
 
         while True:
             kwargs["first_message"] = False
@@ -1533,13 +1624,14 @@ class Agent(BaseAgent):
 
                     if topics is not None:
                         kwargs["topics"] = topics
-                        self.update_topic_if_changed(topics)
                     else:
-                        self.logger.warning("No topics extracted from screenshots")
+                        printv(
+                            f"[Mirix.Agent.{self.agent_state.name}] WARNING: No topics extracted from screenshots"
+                        )
 
                 except Exception as e:
-                    self.logger.info(
-                        f"Error in extracting the topic from the screenshots: {e}"
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] INFO: Error in extracting the topic from the screenshots: {e}"
                     )
                     pass
 
@@ -1549,7 +1641,7 @@ class Agent(BaseAgent):
                 extra_messages=extra_message_objects,
                 initial_message_count=initial_message_count,
                 chaining=chaining,
-                **kwargs,
+                llm_client=llm_client,
             )
 
             continue_chaining = step_response.continue_chaining
@@ -1568,7 +1660,9 @@ class Agent(BaseAgent):
 
             # Chain stops
             if not chaining and (not function_failed):
-                self.logger.info("No chaining, stopping after one step")
+                printv(
+                    f"[Mirix.Agent.{self.agent_state.name}] INFO: No chaining, stopping after one step"
+                )
                 break
             elif max_chaining_steps is not None and counter == max_chaining_steps:
                 # Add warning message based on agent type
@@ -1586,8 +1680,8 @@ class Agent(BaseAgent):
                 )
                 continue  # give agent one more chance to respond
             elif max_chaining_steps is not None and counter > max_chaining_steps:
-                self.logger.info(
-                    f"Hit max chaining steps, stopping after {counter} steps"
+                printv(
+                    f"[Mirix.Agent.{self.agent_state.name}] INFO: Hit max chaining steps, stopping after {counter} steps"
                 )
                 break
             # Chain handlers
@@ -1628,6 +1722,9 @@ class Agent(BaseAgent):
             else:
                 break
 
+        # Save the message_ids
+        save_agent(self)
+
         return MirixUsageStatistics(**total_usage.model_dump(), step_count=step_count)
 
     def build_system_prompt_with_memories(
@@ -1647,16 +1744,17 @@ class Agent(BaseAgent):
         Returns:
             Tuple[str, dict]: The complete system prompt and the retrieved memories dict
         """
-        timezone_str = self.user_manager.get_user_by_id(self.user.id).timezone
+        from mirix.schemas.agent import AgentType
+
+        timezone_str = self.user.timezone
 
         if retrieved_memories is None:
             retrieved_memories = {}
 
-        key_words = topics if topics is not None else self.agent_state.topic
-
         if "key_words" in retrieved_memories:
             key_words = retrieved_memories["key_words"]
         else:
+            key_words = topics if topics is not None else ""
             retrieved_memories["key_words"] = key_words
 
         search_method = "bm25"
@@ -1677,29 +1775,35 @@ class Agent(BaseAgent):
 
         # Retrieve core memory
         if (
-            self.agent_state.name == "core_memory_agent"
+            self.agent_state.agent_type == AgentType.core_memory_agent
             or "core" not in retrieved_memories
         ):
             current_persisted_memory = Memory(
                 blocks=[
-                    self.block_manager.get_block_by_id(block.id, actor=self.user)
-                    for block in self.block_manager.get_blocks(actor=self.user)
+                    b
+                    for block in self.block_manager.get_blocks(user=self.user)
+                    if (
+                        b := self.block_manager.get_block_by_id(
+                            block.id, user=self.user
+                        )
+                    )
+                    is not None
                 ]
             )
             core_memory = current_persisted_memory.compile()
             retrieved_memories["core"] = core_memory
 
         if (
-            self.agent_state.name == "knowledge_vault"
+            self.agent_state.agent_type == AgentType.knowledge_vault_memory_agent
             or "knowledge_vault" not in retrieved_memories
         ):
             if (
-                self.agent_state.name == "knowledge_vault"
-                or self.agent_state.name == "reflexion_agent"
+                self.agent_state.agent_type == AgentType.knowledge_vault_memory_agent
+                or self.agent_state.agent_type == AgentType.reflexion_agent
             ):
                 current_knowledge_vault = self.knowledge_vault_manager.list_knowledge(
                     agent_state=self.agent_state,
-                    actor=self.user,
+                    user=self.user,
                     embedded_text=embedded_text,
                     query=key_words,
                     search_field="caption",
@@ -1710,7 +1814,7 @@ class Agent(BaseAgent):
             else:
                 current_knowledge_vault = self.knowledge_vault_manager.list_knowledge(
                     agent_state=self.agent_state,
-                    actor=self.user,
+                    user=self.user,
                     embedded_text=embedded_text,
                     query=key_words,
                     search_field="caption",
@@ -1726,7 +1830,7 @@ class Agent(BaseAgent):
                     knowledge_vault_memory += f"[{idx}] Knowledge Vault Item ID: {knowledge_vault_item.id}; Caption: {knowledge_vault_item.caption}\n"
             retrieved_memories["knowledge_vault"] = {
                 "total_number_of_items": self.knowledge_vault_manager.get_total_number_of_items(
-                    actor=self.user
+                    user=self.user
                 ),
                 "current_count": len(current_knowledge_vault),
                 "text": knowledge_vault_memory,
@@ -1739,32 +1843,30 @@ class Agent(BaseAgent):
         ):
             current_episodic_memory = self.episodic_memory_manager.list_episodic_memory(
                 agent_state=self.agent_state,
-                actor=self.user,
+                user=self.user,
                 limit=MAX_RETRIEVAL_LIMIT_IN_SYSTEM,
                 timezone_str=timezone_str,
             )
             episodic_memory = ""
             if len(current_episodic_memory) > 0:
                 for idx, event in enumerate(current_episodic_memory):
-                    tree_path_str = (
-                        f" - Path: {' > '.join(event.tree_path)}"
-                        if event.tree_path
-                        else ""
-                    )
+                    # Use agent_type instead of name to handle both standalone and meta-agent child agents
+                    from mirix.schemas.agent import AgentType
+
                     if (
-                        self.agent_state.name == "episodic_memory_agent"
-                        or self.agent_state.name == "reflexion_agent"
+                        self.agent_state.agent_type == AgentType.episodic_memory_agent
+                        or self.agent_state.agent_type == AgentType.reflexion_agent
                     ):
-                        episodic_memory += f"[Event ID: {event.id}] Timestamp: {event.occurred_at.strftime('%Y-%m-%d %H:%M:%S')} - {event.summary}{tree_path_str} (Details: {len(event.details)} Characters)\n"
+                        episodic_memory += f"[Event ID: {event.id}] Timestamp: {event.occurred_at.strftime('%Y-%m-%d %H:%M:%S')} - {event.summary} (Details: {len(event.details)} Characters)\n"
                     else:
-                        episodic_memory += f"[{idx}] Timestamp: {event.occurred_at.strftime('%Y-%m-%d %H:%M:%S')} - {event.summary}{tree_path_str} (Details: {len(event.details)} Characters)\n"
+                        episodic_memory += f"[{idx}] Timestamp: {event.occurred_at.strftime('%Y-%m-%d %H:%M:%S')} - {event.summary} (Details: {len(event.details)} Characters)\n"
 
             recent_episodic_memory = episodic_memory.strip()
 
             most_relevant_episodic_memory = (
                 self.episodic_memory_manager.list_episodic_memory(
                     agent_state=self.agent_state,
-                    actor=self.user,
+                    user=self.user,
                     embedded_text=embedded_text,
                     query=key_words,
                     search_field="details",
@@ -1776,22 +1878,20 @@ class Agent(BaseAgent):
             most_relevant_episodic_memory_str = ""
             if len(most_relevant_episodic_memory) > 0:
                 for idx, event in enumerate(most_relevant_episodic_memory):
-                    tree_path_str = (
-                        f" - Path: {' > '.join(event.tree_path)}"
-                        if event.tree_path
-                        else ""
-                    )
+                    # Use agent_type instead of name to handle both standalone and meta-agent child agents
+                    from mirix.schemas.agent import AgentType
+
                     if (
-                        self.agent_state.name == "episodic_memory_agent"
-                        or self.agent_state.name == "reflexion_agent"
+                        self.agent_state.agent_type == AgentType.episodic_memory_agent
+                        or self.agent_state.agent_type == AgentType.reflexion_agent
                     ):
-                        most_relevant_episodic_memory_str += f"[Event ID: {event.id}] Timestamp: {event.occurred_at.strftime('%Y-%m-%d %H:%M:%S')} - {event.summary}{tree_path_str}  (Details: {len(event.details)} Characters)\n"
+                        most_relevant_episodic_memory_str += f"[Event ID: {event.id}] Timestamp: {event.occurred_at.strftime('%Y-%m-%d %H:%M:%S')} - {event.summary}  (Details: {len(event.details)} Characters)\n"
                     else:
-                        most_relevant_episodic_memory_str += f"[{idx}] Timestamp: {event.occurred_at.strftime('%Y-%m-%d %H:%M:%S')} - {event.summary}{tree_path_str}  (Details: {len(event.details)} Characters)\n"
+                        most_relevant_episodic_memory_str += f"[{idx}] Timestamp: {event.occurred_at.strftime('%Y-%m-%d %H:%M:%S')} - {event.summary}  (Details: {len(event.details)} Characters)\n"
             relevant_episodic_memory = most_relevant_episodic_memory_str.strip()
             retrieved_memories["episodic"] = {
                 "total_number_of_items": self.episodic_memory_manager.get_total_number_of_items(
-                    actor=self.user
+                    user=self.user
                 ),
                 "recent_count": len(current_episodic_memory),
                 "relevant_count": len(most_relevant_episodic_memory),
@@ -1801,12 +1901,12 @@ class Agent(BaseAgent):
 
         # Retrieve resource memory
         if (
-            self.agent_state.name == "resource_memory_agent"
+            self.agent_state.agent_type == AgentType.resource_memory_agent
             or "resource" not in retrieved_memories
         ):
             current_resource_memory = self.resource_memory_manager.list_resources(
                 agent_state=self.agent_state,
-                actor=self.user,
+                user=self.user,
                 query=key_words,
                 embedded_text=embedded_text,
                 search_field="summary",
@@ -1817,22 +1917,17 @@ class Agent(BaseAgent):
             resource_memory = ""
             if len(current_resource_memory) > 0:
                 for idx, resource in enumerate(current_resource_memory):
-                    tree_path_str = (
-                        f"; Path: {' > '.join(resource.tree_path)}"
-                        if resource.tree_path
-                        else ""
-                    )
                     if (
-                        self.agent_state.name == "resource_memory_agent"
-                        or self.agent_state.name == "reflexion_agent"
+                        self.agent_state.agent_type == AgentType.resource_memory_agent
+                        or self.agent_state.agent_type == AgentType.reflexion_agent
                     ):
-                        resource_memory += f"[Resource ID: {resource.id}] Resource Title: {resource.title}; Resource Summary: {resource.summary} Resource Type: {resource.resource_type}{tree_path_str}\n"
+                        resource_memory += f"[Resource ID: {resource.id}] Resource Title: {resource.title}; Resource Summary: {resource.summary} Resource Type: {resource.resource_type}\n"
                     else:
-                        resource_memory += f"[{idx}] Resource Title: {resource.title}; Resource Summary: {resource.summary} Resource Type: {resource.resource_type}{tree_path_str}\n"
+                        resource_memory += f"[{idx}] Resource Title: {resource.title}; Resource Summary: {resource.summary} Resource Type: {resource.resource_type}\n"
             resource_memory = resource_memory.strip()
             retrieved_memories["resource"] = {
                 "total_number_of_items": self.resource_memory_manager.get_total_number_of_items(
-                    actor=self.user
+                    user=self.user
                 ),
                 "current_count": len(current_resource_memory),
                 "text": resource_memory,
@@ -1840,12 +1935,12 @@ class Agent(BaseAgent):
 
         # Retrieve procedural memory
         if (
-            self.agent_state.name == "procedural_memory_agent"
+            self.agent_state.agent_type == AgentType.procedural_memory_agent
             or "procedural" not in retrieved_memories
         ):
             current_procedural_memory = self.procedural_memory_manager.list_procedures(
                 agent_state=self.agent_state,
-                actor=self.user,
+                user=self.user,
                 query=key_words,
                 embedded_text=embedded_text,
                 search_field="summary",
@@ -1856,11 +1951,6 @@ class Agent(BaseAgent):
             procedural_memory = ""
             if len(current_procedural_memory) > 0:
                 for idx, procedure in enumerate(current_procedural_memory):
-                    tree_path_str = (
-                        f"; Path: {' > '.join(procedure.tree_path)}"
-                        if procedure.tree_path
-                        else ""
-                    )
                     email_tag_str = (
                         f"; Email Tags: {', '.join(procedure.email_tag)}"
                         if procedure.email_tag
@@ -1872,16 +1962,16 @@ class Agent(BaseAgent):
                         else ""
                     )
                     if (
-                        self.agent_state.name == "procedural_memory_agent"
-                        or self.agent_state.name == "reflexion_agent"
+                        self.agent_state.agent_type == AgentType.procedural_memory_agent
+                        or self.agent_state.agent_type == AgentType.reflexion_agent
                     ):
-                        procedural_memory += f"[Procedure ID: {procedure.id}] Entry Type: {procedure.entry_type}; Summary: {procedure.summary}{tree_path_str}{email_tag_str}{flow_tag_str}\n"
+                        procedural_memory += f"[Procedure ID: {procedure.id}] Entry Type: {procedure.entry_type}; Summary: {procedure.summary}\n"
                     else:
-                        procedural_memory += f"[{idx}] Entry Type: {procedure.entry_type}; Summary: {procedure.summary}{tree_path_str}\n"
+                        procedural_memory += f"[{idx}] Entry Type: {procedure.entry_type}; Summary: {procedure.summary}\n"
             procedural_memory = procedural_memory.strip()
             retrieved_memories["procedural"] = {
                 "total_number_of_items": self.procedural_memory_manager.get_total_number_of_items(
-                    actor=self.user
+                    user=self.user
                 ),
                 "current_count": len(current_procedural_memory),
                 "text": procedural_memory,
@@ -1889,12 +1979,12 @@ class Agent(BaseAgent):
 
         # Retrieve semantic memory
         if (
-            self.agent_state.name == "semantic_memory_agent"
+            self.agent_state.agent_type == AgentType.semantic_memory_agent
             or "semantic" not in retrieved_memories
         ):
             current_semantic_memory = self.semantic_memory_manager.list_semantic_items(
                 agent_state=self.agent_state,
-                actor=self.user,
+                user=self.user,
                 query=key_words,
                 embedded_text=embedded_text,
                 search_field="details",
@@ -1905,23 +1995,18 @@ class Agent(BaseAgent):
             semantic_memory = ""
             if len(current_semantic_memory) > 0:
                 for idx, semantic_memory_item in enumerate(current_semantic_memory):
-                    tree_path_str = (
-                        f"; Path: {' > '.join(semantic_memory_item.tree_path)}"
-                        if semantic_memory_item.tree_path
-                        else ""
-                    )
                     if (
-                        self.agent_state.name == "semantic_memory_agent"
-                        or self.agent_state.name == "reflexion_agent"
+                        self.agent_state.agent_type == AgentType.semantic_memory_agent
+                        or self.agent_state.agent_type == AgentType.reflexion_agent
                     ):
-                        semantic_memory += f"[Semantic Memory ID: {semantic_memory_item.id}] Name: {semantic_memory_item.name}; Summary: {semantic_memory_item.summary}{tree_path_str}\n"
+                        semantic_memory += f"[Semantic Memory ID: {semantic_memory_item.id}] Name: {semantic_memory_item.name}; Summary: {semantic_memory_item.summary}\n"
                     else:
-                        semantic_memory += f"[{idx}] Name: {semantic_memory_item.name}; Summary: {semantic_memory_item.summary}{tree_path_str}\n"
+                        semantic_memory += f"[{idx}] Name: {semantic_memory_item.name}; Summary: {semantic_memory_item.summary}\n"
 
             semantic_memory = semantic_memory.strip()
             retrieved_memories["semantic"] = {
                 "total_number_of_items": self.semantic_memory_manager.get_total_number_of_items(
-                    actor=self.user
+                    user=self.user
                 ),
                 "current_count": len(current_semantic_memory),
                 "text": semantic_memory,
@@ -1955,7 +2040,7 @@ These keywords have been used to retrieve relevant memories from the database.
 {episodic_memory}
 </episodic_memory>
 """
-        user_timezone_str = self.user_manager.get_user_by_id(self.user.id).timezone
+        user_timezone_str = self.user.timezone
         user_tz = pytz.timezone(user_timezone_str.split(" (")[0])
         current_time = datetime.now(user_tz).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -1971,9 +2056,11 @@ These keywords have been used to retrieve relevant memories from the database.
             current_time=current_time,
             keywords=keywords,
             core_memory=core_memory if core_memory else "Empty",
-            episodic_memory=episodic_memory["recent_episodic_memory"]
-            if episodic_memory
-            else "Empty",
+            episodic_memory=(
+                episodic_memory["recent_episodic_memory"]
+                if episodic_memory
+                else "Empty"
+            ),
         )
 
         if keywords is not None:
@@ -2149,7 +2236,6 @@ These keywords have been used to retrieve relevant memories from the database.
             # Use LLMClient to extract topics
             llm_client = LLMClient.create(
                 llm_config=self.agent_state.llm_config,
-                put_inner_thoughts_first=True,
             )
 
             if llm_client:
@@ -2180,16 +2266,20 @@ These keywords have been used to retrieve relevant memories from the database.
                             choice.message.tool_calls[0].function.arguments
                         )
                         topics = function_args.get("topic")
-                        self.logger.info(f"Extracted topics: {topics}")
+                        printv(
+                            f"[Mirix.Agent.{self.agent_state.name}] INFO: Extracted topics: {topics}"
+                        )
                         return topics
                     except (json.JSONDecodeError, KeyError) as parse_error:
-                        self.logger.warning(
-                            f"Failed to parse topic extraction response: {parse_error}"
+                        printv(
+                            f"[Mirix.Agent.{self.agent_state.name}] WARNING: Failed to parse topic extraction response: {parse_error}"
                         )
                         continue
 
         except Exception as e:
-            self.logger.info(f"Error in extracting the topic from the messages: {e}")
+            printv(
+                f"[Mirix.Agent.{self.agent_state.name}] INFO: Error in extracting the topic from the messages: {e}"
+            )
 
         return None
 
@@ -2229,7 +2319,7 @@ These keywords have been used to retrieve relevant memories from the database.
         # Step 2: build system prompt with topic
         # Get the raw system prompt
         in_context_messages = self.agent_manager.get_in_context_messages(
-            agent_id=self.agent_state.id, actor=self.user
+            agent_state=self.agent_state, actor=self.actor
         )
         raw_system = (
             in_context_messages[0].content[0].text
@@ -2260,28 +2350,33 @@ These keywords have been used to retrieve relevant memories from the database.
         retrieved_memories: Optional[dict] = None,
         display_intermediate_message: any = None,
         request_user_confirmation: Optional[Callable] = None,
-        put_inner_thoughts_first: bool = True,
         existing_file_uris: Optional[List[str]] = None,
         extra_messages: Optional[List[dict]] = None,
         initial_message_count: Optional[int] = None,
         return_memory_types_without_update: bool = False,
         message_queue: Optional[any] = None,
         chaining: bool = True,
+        llm_client: Optional[LLMClient] = None,
         **kwargs,
     ) -> AgentStepResponse:
         """Runs a single step in the agent loop (generates at most one LLM call)"""
 
         try:
             # Log the start of each reasoning step
-            self.logger.info(
-                f"Starting agent step - step_count: {step_count}, chaining: {chaining}"
+            printv(
+                f"[Mirix.Agent.{self.agent_state.name}] INFO: Starting agent step - step_count: {step_count}, chaining: {chaining}"
             )
             if topics:
-                self.logger.info(f"Step topics: {topics}")
+                printv(
+                    f"[Mirix.Agent.{self.agent_state.name}] INFO: Step topics: {topics}"
+                )
+
+            # previous_in_context_messages = self.agent_state.message_ids
+            # new_message_ids = self.agent_manager.get_agent_by_id(agent_id=self.agent_state.id, actor=self.user).message_ids
 
             # Step 0: get in-context messages and get the raw system prompt
             in_context_messages = self.agent_manager.get_in_context_messages(
-                agent_id=self.agent_state.id, actor=self.user
+                agent_state=self.agent_state, actor=self.actor
             )
 
             assert in_context_messages[0].role == MessageRole.system
@@ -2320,8 +2415,8 @@ These keywords have been used to retrieve relevant memories from the database.
                 len(input_message_sequence) > 1
                 and input_message_sequence[-1].role != "user"
             ):
-                self.logger.warning(
-                    f"{CLI_WARNING_PREFIX}Attempting to run ChatCompletion without user as the last message in the queue"
+                printv(
+                    f"[Mirix.Agent.{self.agent_state.name}] WARNING: {CLI_WARNING_PREFIX}Attempting to run ChatCompletion without user as the last message in the queue"
                 )
 
             # Step 2: send the conversation and available functions to the LLM
@@ -2330,24 +2425,26 @@ These keywords have been used to retrieve relevant memories from the database.
                 first_message=first_message,
                 stream=stream,
                 step_count=step_count,
-                put_inner_thoughts_first=put_inner_thoughts_first,
                 existing_file_uris=existing_file_uris,
+                llm_client=llm_client,
             )
 
             # Log the raw AI response for debugging and analysis
-            self.logger.info(f"AI response received - choices: {len(response.choices)}")
+            printv(
+                f"[Mirix.Agent.{self.agent_state.name}] INFO: AI response received - choices: {len(response.choices)}"
+            )
             for i, choice in enumerate(response.choices):
                 if choice.message.content:
-                    self.logger.info(
-                        f"Choice {i} reasoning content: {choice.message.content}"
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] INFO: Choice {i} reasoning content: {choice.message.content}"
                     )
                 if choice.message.tool_calls:
-                    self.logger.info(
-                        f"Choice {i} has {len(choice.message.tool_calls)} tool calls"
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] INFO: Choice {i} has {len(choice.message.tool_calls)} tool calls"
                     )
                     for j, tool_call in enumerate(choice.message.tool_calls):
-                        self.logger.info(
-                            f"Tool call {j}: {tool_call.function.name} with args: {tool_call.function.arguments}"
+                        printv(
+                            f"[Mirix.Agent.{self.agent_state.name}] INFO: Tool call {j}: {tool_call.function.name} with args: {tool_call.function.arguments}"
                         )
 
             # Step 3: check if LLM wanted to call a function
@@ -2376,9 +2473,32 @@ These keywords have been used to retrieve relevant memories from the database.
                 all_response_messages.extend(tmp_response_messages)
 
             if function_failed:
-                self.logger.info(
-                    f"Function failed with error: {all_response_messages[-1].content[0].text if all_response_messages else 'Unknown error'}"
-                )
+                # Find the actual failed message(s) to log
+                failed_messages = []
+                for msg in all_response_messages:
+                    if msg.role == "tool" and msg.content:
+                        try:
+                            content = (
+                                msg.content[0].text
+                                if isinstance(msg.content, list)
+                                else msg.content
+                            )
+                            response_data = json.loads(content)
+                            if response_data.get("status") == "Failed":
+                                failed_messages.append(f"{msg.name}: {content}")
+                        except (json.JSONDecodeError, AttributeError, KeyError):
+                            pass
+
+                if failed_messages:
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] WARNING: One or more functions failed:\n"
+                        + "\n".join(failed_messages)
+                    )
+                else:
+                    # Fallback if we can't parse the messages
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] WARNING: Function execution encountered errors (see logs above for details)"
+                    )
 
             # if function_failed:
 
@@ -2425,10 +2545,12 @@ These keywords have been used to retrieve relevant memories from the database.
             # We can't do summarize logic properly if context_window is undefined
             if self.agent_state.llm_config.context_window is None:
                 # Fallback if for some reason context_window is missing, just set to the default
-                self.logger.warning(
-                    f"Could not find context_window in config, setting to default {LLM_MAX_TOKENS['DEFAULT']}"
+                printv(
+                    f"[Mirix.Agent.{self.agent_state.name}] WARNING: Could not find context_window in config, setting to default {LLM_MAX_TOKENS['DEFAULT']}"
                 )
-                self.logger.debug(f"Agent state: {self.agent_state}")
+                printv(
+                    f"[Mirix.Agent.{self.agent_state.name}] DEBUG: Agent state: {self.agent_state}"
+                )
                 self.agent_state.llm_config.context_window = (
                     LLM_MAX_TOKENS[self.model]
                     if (self.model is not None and self.model in LLM_MAX_TOKENS)
@@ -2440,8 +2562,8 @@ These keywords have been used to retrieve relevant memories from the database.
                 > summarizer_settings.memory_warning_threshold
                 * int(self.agent_state.llm_config.context_window)
             ):
-                self.logger.info(
-                    f"Memory pressure detected: last response total_tokens ({current_total_tokens}) > {summarizer_settings.memory_warning_threshold * int(self.agent_state.llm_config.context_window)}"
+                printv(
+                    f"[Mirix.Agent.{self.agent_state.name}] INFO: Memory pressure detected: last response total_tokens ({current_total_tokens}) > {summarizer_settings.memory_warning_threshold * int(self.agent_state.llm_config.context_window)}"
                 )
 
                 # Only deliver the alert if we haven't already (this period)
@@ -2455,13 +2577,13 @@ These keywords have been used to retrieve relevant memories from the database.
                 self.summarize_messages_inplace(existing_file_uris=existing_file_uris)
 
             else:
-                self.logger.debug(
-                    f"Memory usage acceptable: last response total_tokens ({current_total_tokens}) < {summarizer_settings.memory_warning_threshold * int(self.agent_state.llm_config.context_window)}"
+                printv(
+                    f"[Mirix.Agent.{self.agent_state.name}] DEBUG: Memory usage acceptable: last response total_tokens ({current_total_tokens}) < {summarizer_settings.memory_warning_threshold * int(self.agent_state.llm_config.context_window)}"
                 )
 
             # Log step - this must happen before messages are persisted
             step = self.step_manager.log_step(
-                actor=self.user,
+                actor=self.actor,
                 provider_name=self.agent_state.llm_config.model_endpoint_type,
                 model=self.agent_state.llm_config.model,
                 context_window_limit=self.agent_state.llm_config.context_window,
@@ -2472,12 +2594,12 @@ These keywords have been used to retrieve relevant memories from the database.
 
             # Persisting into Messages
             self.agent_state = self.agent_manager.append_to_in_context_messages(
-                all_new_messages, agent_id=self.agent_state.id, actor=self.user
+                all_new_messages, agent_id=self.agent_state.id, actor=self.actor
             )
 
             # Log step completion and results
-            self.logger.info(
-                f"Agent step completed - continue_chaining: {continue_chaining}, function_failed: {function_failed}, messages_generated: {len(all_new_messages)}"
+            printv(
+                f"[Mirix.Agent.{self.agent_state.name}] INFO: Agent step completed - continue_chaining: {continue_chaining}, function_failed: {function_failed}, messages_generated: {len(all_new_messages)}"
             )
 
             return AgentStepResponse(
@@ -2489,20 +2611,22 @@ These keywords have been used to retrieve relevant memories from the database.
             )
 
         except Exception as e:
-            self.logger.error(f"step() failed\nmessages = {messages}\nerror = {e}")
+            printv(
+                f"[Mirix.Agent.{self.agent_state.name}] ERROR: step() failed\nmessages = {messages}\nerror = {e}"
+            )
 
             # If we got a context alert, try trimming the messages length, then try again
             if is_context_overflow_error(e):
                 in_context_messages = self.agent_manager.get_in_context_messages(
-                    agent_id=self.agent_state.id, actor=self.user
+                    agent_state=self.agent_state, actor=self.actor
                 )
 
                 if (
                     summarize_attempt_count
                     <= summarizer_settings.max_summarizer_retries
                 ):
-                    self.logger.warning(
-                        f"context window exceeded with limit {self.agent_state.llm_config.context_window}, attempting to summarize ({summarize_attempt_count}/{summarizer_settings.max_summarizer_retries}"
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] WARNING: context window exceeded with limit {self.agent_state.llm_config.context_window}, attempting to summarize ({summarize_attempt_count}/{summarizer_settings.max_summarizer_retries}"
                     )
                     # A separate API call to run a summarizer
                     self.summarize_messages_inplace(
@@ -2529,17 +2653,19 @@ These keywords have been used to retrieve relevant memories from the database.
                         return_memory_types_without_update=return_memory_types_without_update,
                         display_intermediate_message=display_intermediate_message,
                         request_user_confirmation=request_user_confirmation,
-                        put_inner_thoughts_first=put_inner_thoughts_first,
                         existing_file_uris=existing_file_uris,
+                        llm_client=llm_client,
                     )
                 else:
                     err_msg = f"Ran summarizer {summarize_attempt_count - 1} times for agent id={self.agent_state.id}, but messages are still overflowing the context window."
                     token_counts = (get_token_counts_for_messages(in_context_messages),)
-                    self.logger.error(err_msg)
-                    self.logger.error(
-                        f"num_in_context_messages: {len(self.agent_state.message_ids)}"
+                    printv(f"[Mirix.Agent.{self.agent_state.name}] ERROR: {err_msg}")
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] ERROR: num_in_context_messages: {len(self.agent_state.message_ids)}"
                     )
-                    self.logger.error(f"token_counts: {token_counts}")
+                    printv(
+                        f"[Mirix.Agent.{self.agent_state.name}] ERROR: token_counts: {token_counts}"
+                    )
                     raise ContextWindowExceededError(
                         err_msg,
                         details={
@@ -2554,8 +2680,8 @@ These keywords have been used to retrieve relevant memories from the database.
                     )
 
             else:
-                self.logger.error(
-                    f"step() failed with an unrecognized exception: '{str(e)}'"
+                printv(
+                    f"[Mirix.Agent.{self.agent_state.name}] ERROR: step() failed with an unrecognized exception: '{str(e)}'"
                 )
                 raise e
 
@@ -2569,9 +2695,9 @@ These keywords have been used to retrieve relevant memories from the database.
         -> agent.step(messages=[Message(role='user', text=...)])
         """
         # Wrap with metadata, dumps to JSON
-        assert user_message_str and isinstance(user_message_str, str), (
-            f"user_message_str should be a non-empty string, got {type(user_message_str)}"
-        )
+        assert user_message_str and isinstance(
+            user_message_str, str
+        ), f"user_message_str should be a non-empty string, got {type(user_message_str)}"
         user_message_json_str = package_user_message(user_message_str)
 
         # Validate JSON via save/load
@@ -2602,13 +2728,13 @@ These keywords have been used to retrieve relevant memories from the database.
         self, existing_file_uris: Optional[List[str]] = None
     ):
         in_context_messages = self.agent_manager.get_in_context_messages(
-            agent_id=self.agent_state.id, actor=self.user
+            agent_state=self.agent_state, actor=self.actor
         )
         in_context_messages_openai = [m.to_openai_dict() for m in in_context_messages]
         in_context_messages_openai_no_system = in_context_messages_openai[1:]
         token_counts = get_token_counts_for_messages(in_context_messages)
-        self.logger.info(f"System message token count={token_counts[0]}")
-        self.logger.info(f"token_counts_no_system={token_counts[1:]}")
+        logger.info("System message token count=%s", token_counts[0])
+        logger.info("token_counts_no_system=%s", token_counts[1:])
 
         if in_context_messages_openai[0]["role"] != "system":
             raise RuntimeError(
@@ -2655,7 +2781,7 @@ These keywords have been used to retrieve relevant memories from the database.
             message_sequence_to_summarize=message_sequence_to_summarize,
             existing_file_uris=existing_file_uris,
         )
-        self.logger.info(f"Got summary: {summary}")
+        logger.info("Got summary: %s", summary)
 
         # Metadata that's useful for the agent to see
         all_time_message_count = self.message_manager.size(
@@ -2669,7 +2795,7 @@ These keywords have been used to retrieve relevant memories from the database.
         summary_message = package_summarize_message(
             summary, summary_message_count, hidden_message_count, all_time_message_count
         )
-        self.logger.info(f"Packaged into message: {summary_message}")
+        logger.info("Packaged into message: %s", summary_message)
 
         prior_len = len(in_context_messages_openai)
         self.agent_state = self.agent_manager.trim_older_in_context_messages(
@@ -2693,7 +2819,7 @@ These keywords have been used to retrieve relevant memories from the database.
         # reset alert
         self.agent_alerted_about_memory_pressure = False
         curr_in_context_messages = self.agent_manager.get_in_context_messages(
-            agent_id=self.agent_state.id, actor=self.user
+            agent_state=self.agent_state, actor=self.actor
         )
 
         self.logger.info(
@@ -2731,7 +2857,7 @@ These keywords have been used to retrieve relevant memories from the database.
         # Grab the in-context messages
         # conversion of messages to OpenAI dict format, which is passed to the token counter
         in_context_messages = self.agent_manager.get_in_context_messages(
-            agent_id=self.agent_state.id, actor=self.user
+            agent_state=self.agent_state, actor=self.actor
         )
         in_context_messages_openai = [m.to_openai_dict() for m in in_context_messages]
 
@@ -2836,31 +2962,21 @@ These keywords have been used to retrieve relevant memories from the database.
 def save_agent(agent: Agent):
     """Save agent to metadata store"""
     agent_state = agent.agent_state
-    assert isinstance(agent_state.memory, Memory), (
-        f"Memory is not a Memory object: {type(agent_state.memory)}"
-    )
+    assert isinstance(
+        agent_state.memory, Memory
+    ), f"Memory is not a Memory object: {type(agent_state.memory)}"
 
     # TODO: move this to agent manager
     # TODO: Completely strip out metadata
     # convert to persisted model
     agent_manager = AgentManager()
     update_agent = UpdateAgent(
-        name=agent_state.name,
-        tool_ids=[t.id for t in agent_state.tools],
-        block_ids=[b.id for b in agent_state.memory.blocks],
-        tags=agent_state.tags,
-        system=agent_state.system,
-        tool_rules=agent_state.tool_rules,
-        llm_config=agent_state.llm_config,
-        embedding_config=agent_state.embedding_config,
         message_ids=agent_state.message_ids,
-        description=agent_state.description,
-        metadata_=agent_state.metadata_,
         # TODO: Add this back in later
         # tool_exec_environment_variables=agent_state.get_agent_env_vars_as_dict(),
     )
     agent_manager.update_agent(
-        agent_id=agent_state.id, agent_update=update_agent, actor=agent.user
+        agent_id=agent_state.id, agent_update=update_agent, actor=agent.actor
     )
 
 
@@ -2880,7 +2996,7 @@ def strip_name_field_from_user_message(
     except Exception as e:
         # Note: This is a static function, so we'll use a module-level logger
         logger = logging.getLogger("Mirix.Agent.Utils")
-        logger.error(f"Handling of 'name' field failed with: {e}")
+        logger.error("Handling of 'name' field failed with: %s", e)
         raise e
 
 
@@ -2891,7 +3007,9 @@ def validate_json(user_message_text: str) -> str:
         user_message_json_val = json_dumps(user_message_json)
         return user_message_json_val
     except Exception as e:
-        print(f"{CLI_WARNING_PREFIX}couldn't parse user input message as JSON: {e}")
+        logger.debug(
+            "%scouldn't parse user input message as JSON: %s", CLI_WARNING_PREFIX, e
+        )
         raise e
 
 
@@ -2917,7 +3035,6 @@ def convert_message_to_input_message(message: Message) -> Union[str, List[dict]]
         return message.content[0].text
 
     # For multi-modal content, convert to list of dictionaries
-    file_manager = FileManager()
     result = []
 
     for content_part in message.content:

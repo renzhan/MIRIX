@@ -70,6 +70,7 @@ class E2BSandboxConfig(BaseModel):
         Assign a default template value if the template field is not provided.
         """
         if data.get("template") is None:
+            # Use configured template if available
             data["template"] = tool_settings.e2b_sandbox_template_id
         return data
 

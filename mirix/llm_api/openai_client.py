@@ -7,11 +7,6 @@ from openai import AsyncOpenAI, AsyncStream, OpenAI, Stream
 from openai.types.chat.chat_completion import ChatCompletion
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
 
-from mirix.constants import (
-    INNER_THOUGHTS_KWARG,
-    INNER_THOUGHTS_KWARG_DESCRIPTION,
-    INNER_THOUGHTS_KWARG_DESCRIPTION_GO_FIRST,
-)
 from mirix.errors import (
     ErrorCode,
     LLMAuthenticationError,
@@ -23,25 +18,21 @@ from mirix.errors import (
     LLMServerError,
     LLMUnprocessableEntityError,
 )
-from mirix.llm_api.helpers import (
-    add_inner_thoughts_to_functions,
-    convert_to_structured_output,
-    unpack_all_inner_thoughts_from_kwargs,
-)
+from mirix.llm_api.helpers import convert_to_structured_output
 from mirix.llm_api.llm_client_base import LLMClientBase
 from mirix.log import get_logger
 from mirix.schemas.llm_config import LLMConfig
 from mirix.schemas.message import Message as PydanticMessage
-from mirix.schemas.openai.chat_completion_request import (
-    ChatCompletionRequest,
-    FunctionSchema,
-    ToolFunctionChoice,
-    cast_message_to_subtype,
-)
+from mirix.schemas.openai.chat_completion_request import ChatCompletionRequest
 from mirix.schemas.openai.chat_completion_request import (
     FunctionCall as ToolFunctionChoiceFunctionCall,
 )
+from mirix.schemas.openai.chat_completion_request import FunctionSchema
 from mirix.schemas.openai.chat_completion_request import Tool as OpenAITool
+from mirix.schemas.openai.chat_completion_request import (
+    ToolFunctionChoice,
+    cast_message_to_subtype,
+)
 from mirix.schemas.openai.chat_completion_response import ChatCompletionResponse
 from mirix.services.provider_manager import ProviderManager
 from mirix.settings import model_settings
@@ -88,7 +79,38 @@ class OpenAIClient(LLMClientBase):
             )
             # supposedly the openai python client requires a dummy API key
             api_key = api_key or "DUMMY_API_KEY"
+
         kwargs = {"api_key": api_key, "base_url": self.llm_config.model_endpoint}
+
+        headers = {}
+        # Add auth provider headers
+        if hasattr(self.llm_config, "auth_provider") and self.llm_config.auth_provider:
+            from mirix.llm_api.auth_provider import get_auth_provider
+
+            auth_provider = get_auth_provider(self.llm_config.auth_provider)
+            if auth_provider:
+                try:
+                    auth_headers = auth_provider.get_auth_headers()  # Sync call
+                    logger.debug(
+                        f"OpenAI Client - Using auth provider '{self.llm_config.auth_provider}' "
+                        f"to inject {len(auth_headers)} header(s)"
+                    )
+                    headers.update(auth_headers)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to get auth headers from provider '{self.llm_config.auth_provider}': {e}"
+                    )
+                    # Continue without auth headers rather than failing the request
+            else:
+                logger.warning(
+                    f"Auth provider '{self.llm_config.auth_provider}' not found in registry. "
+                    "Make sure to register it before using."
+                )
+
+        # Set headers if any were collected
+        if headers:
+            kwargs["default_headers"] = headers
+
         return kwargs
 
     def build_request_data(
@@ -102,29 +124,16 @@ class OpenAIClient(LLMClientBase):
         """
         Constructs a request object in the expected data format for the OpenAI API.
         """
-        if tools and llm_config.put_inner_thoughts_in_kwargs:
-            # Special case for LM Studio backend since it needs extra guidance to force out the thoughts first
-            # TODO(fix)
-            inner_thoughts_desc = (
-                INNER_THOUGHTS_KWARG_DESCRIPTION_GO_FIRST
-                if ":1234" in llm_config.model_endpoint
-                else INNER_THOUGHTS_KWARG_DESCRIPTION
-            )
-            tools = add_inner_thoughts_to_functions(
-                functions=tools,
-                inner_thoughts_key=INNER_THOUGHTS_KWARG,
-                inner_thoughts_description=inner_thoughts_desc,
-                put_inner_thoughts_first=True,
-            )
 
         use_developer_message = llm_config.model.startswith(
             "o1"
-        ) or llm_config.model.startswith("o3")  # o-series models
+        ) or llm_config.model.startswith(
+            "o3"
+        )  # o-series models
 
         openai_message_list = [
             cast_message_to_subtype(
                 m.to_openai_dict(
-                    put_inner_thoughts_in_kwargs=llm_config.put_inner_thoughts_in_kwargs,
                     use_developer_message=use_developer_message,
                 )
             )
@@ -160,9 +169,11 @@ class OpenAIClient(LLMClientBase):
         data = ChatCompletionRequest(
             model=model,
             messages=self.fill_image_content_in_messages(openai_message_list),
-            tools=[OpenAITool(type="function", function=f) for f in tools]
-            if tools
-            else None,
+            tools=(
+                [OpenAITool(type="function", function=f) for f in tools]
+                if tools
+                else None
+            ),
             tool_choice=tool_choice,
             user=str(),
             max_completion_tokens=llm_config.max_tokens,
@@ -316,7 +327,19 @@ class OpenAIClient(LLMClientBase):
         """
         Performs underlying synchronous request to OpenAI API and returns raw response dict.
         """
-        client = OpenAI(**self._prepare_client_kwargs())
+        client_kwargs = self._prepare_client_kwargs()
+        logger.debug(
+            f"OpenAI Request - Making request to {client_kwargs.get('base_url')}"
+        )
+        logger.debug(
+            f"OpenAI Request - Model: {request_data.get('model')}, Max tokens: {request_data.get('max_completion_tokens')}, Temperature: {request_data.get('temperature')}"
+        )
+        if "default_headers" in client_kwargs:
+            logger.debug(
+                f"OpenAI Request - Custom headers will be included in request (count: {len(client_kwargs['default_headers'])})"
+            )
+
+        client = OpenAI(**client_kwargs)
         response: ChatCompletion = client.chat.completions.create(**request_data)
         if not response.object:
             response.object = "chat.completion"
@@ -326,7 +349,8 @@ class OpenAIClient(LLMClientBase):
         """
         Performs underlying asynchronous request to OpenAI API and returns raw response dict.
         """
-        client = AsyncOpenAI(**self._prepare_client_kwargs())
+        client_kwargs = self._prepare_client_kwargs()
+        client = AsyncOpenAI(**client_kwargs)
         response: ChatCompletion = await client.chat.completions.create(**request_data)
         return response.model_dump()
 
@@ -344,14 +368,6 @@ class OpenAIClient(LLMClientBase):
         # OpenAI's response structure directly maps to ChatCompletionResponse
         # We just need to instantiate the Pydantic model for validation and type safety.
         chat_completion_response = ChatCompletionResponse(**response_data)
-
-        # Unpack inner thoughts if they were embedded in function arguments
-        if self.llm_config.put_inner_thoughts_in_kwargs:
-            chat_completion_response = unpack_all_inner_thoughts_from_kwargs(
-                response=chat_completion_response,
-                inner_thoughts_key=INNER_THOUGHTS_KWARG,
-            )
-
         return chat_completion_response
 
     def stream(self, request_data: dict) -> Stream[ChatCompletionChunk]:
@@ -370,10 +386,11 @@ class OpenAIClient(LLMClientBase):
         """
         Performs underlying asynchronous streaming request to OpenAI and returns the async stream iterator.
         """
-        client = AsyncOpenAI(**self._prepare_client_kwargs())
-        response_stream: AsyncStream[
-            ChatCompletionChunk
-        ] = await client.chat.completions.create(**request_data, stream=True)
+        client_kwargs = self._prepare_client_kwargs()
+        client = AsyncOpenAI(**client_kwargs)
+        response_stream: AsyncStream[ChatCompletionChunk] = (
+            await client.chat.completions.create(**request_data, stream=True)
+        )
         return response_stream
 
     def handle_llm_error(self, e: Exception) -> Exception:
@@ -381,7 +398,7 @@ class OpenAIClient(LLMClientBase):
         Maps OpenAI-specific errors to common LLMError types.
         """
         if isinstance(e, openai.APIConnectionError):
-            logger.warning(f"[OpenAI] API connection error: {e}")
+            logger.warning("[OpenAI] API connection error: %s", e)
             return LLMConnectionError(
                 message=f"Failed to connect to OpenAI: {str(e)}",
                 code=ErrorCode.INTERNAL_SERVER_ERROR,
@@ -389,7 +406,9 @@ class OpenAIClient(LLMClientBase):
             )
 
         if isinstance(e, openai.RateLimitError):
-            logger.warning(f"[OpenAI] Rate limited (429). Consider backoff. Error: {e}")
+            logger.warning(
+                "[OpenAI] Rate limited (429). Consider backoff. Error: %s", e
+            )
             return LLMRateLimitError(
                 message=f"Rate limited by OpenAI: {str(e)}",
                 code=ErrorCode.RATE_LIMIT_EXCEEDED,
@@ -397,7 +416,7 @@ class OpenAIClient(LLMClientBase):
             )
 
         if isinstance(e, openai.BadRequestError):
-            logger.warning(f"[OpenAI] Bad request (400): {str(e)}")
+            logger.warning("[OpenAI] Bad request (400): %s", str(e))
             # BadRequestError can signify different issues (e.g., invalid args, context length)
             # Check message content if finer-grained errors are needed
             # Example: if "context_length_exceeded" in str(e): return LLMContextLengthExceededError(...)
@@ -428,7 +447,7 @@ class OpenAIClient(LLMClientBase):
             )
 
         if isinstance(e, openai.NotFoundError):
-            logger.warning(f"[OpenAI] Resource not found (404): {str(e)}")
+            logger.warning("[OpenAI] Resource not found (404): %s", str(e))
             # Could be invalid model name, etc.
             return LLMNotFoundError(
                 message=f"Resource not found in OpenAI: {str(e)}",
@@ -437,7 +456,7 @@ class OpenAIClient(LLMClientBase):
             )
 
         if isinstance(e, openai.UnprocessableEntityError):
-            logger.warning(f"[OpenAI] Unprocessable entity (422): {str(e)}")
+            logger.warning("[OpenAI] Unprocessable entity (422): %s", str(e))
             return LLMUnprocessableEntityError(
                 message=f"Invalid request content for OpenAI: {str(e)}",
                 code=ErrorCode.INVALID_ARGUMENT,  # Usually validation errors
@@ -446,7 +465,7 @@ class OpenAIClient(LLMClientBase):
 
         # General API error catch-all
         if isinstance(e, openai.APIStatusError):
-            logger.warning(f"[OpenAI] API status error ({e.status_code}): {str(e)}")
+            logger.warning("[OpenAI] API status error (%s): %s", e.status_code, str(e))
             # Map based on status code potentially
             if e.status_code >= 500:
                 error_cls = LLMServerError

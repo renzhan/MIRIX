@@ -328,7 +328,7 @@ def reset_postgresql(
         try:
             run_command(extension_cmd, check=False)
             log_success("Enabled pgvector extension")
-        except:
+        except Exception:
             log_warning(
                 "Could not enable pgvector extension (may need superuser privileges)"
             )
@@ -351,7 +351,7 @@ def reset_postgresql(
         DECLARE
             table_name text;
             tables text[] := ARRAY[
-                'message', 'blocks_agents', 'tools_agents', 'agents_tags',
+                'message', 'tools_agents', 'agents_tags',
                 'episodic_memory', 'semantic_memory', 'procedural_memory',
                 'knowledge_vault', 'resource_memory', 'cloud_file_mapping',
                 'step', 'block', 'tool', 'agent', 'sandbox_config',

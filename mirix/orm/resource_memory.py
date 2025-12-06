@@ -2,7 +2,7 @@ import datetime as dt
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import JSON, Column, String
+from sqlalchemy import JSON, Column, ForeignKey, String
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 
 from mirix.constants import MAX_EMBEDDING_DIM
@@ -15,6 +15,7 @@ from mirix.schemas.resource_memory import (
 from mirix.settings import settings
 
 if TYPE_CHECKING:
+    from mirix.orm.agent import Agent
     from mirix.orm.organization import Organization
     from mirix.orm.user import User
 
@@ -25,7 +26,6 @@ class ResourceMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
 
     title:   A short name/title of the resource (e.g. 'MarketingPlan2025')
     summary:        A brief description or summary of the resource.
-    metadata_:       JSON for storing tags, creation date, personal notes, etc.
     content:         The text/content of the file (can be partial or full)
     resource_type:   Category or type of the resource (e.g. 'doc', 'text', 'markdown', 'spreadsheet')
     """
@@ -38,6 +38,22 @@ class ResourceMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
         String,
         primary_key=True,
         doc="Unique ID for this resource memory entry",
+    )
+
+    # Foreign key to agent
+    agent_id: Mapped[Optional[str]] = mapped_column(
+        String,
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=True,
+        doc="ID of the agent this resource memory item belongs to",
+    )
+
+    # Foreign key to client (for access control and filtering)
+    client_id: Mapped[Optional[str]] = mapped_column(
+        String,
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=True,
+        doc="ID of the client application that created this item",
     )
 
     title: Mapped[str] = mapped_column(
@@ -57,12 +73,12 @@ class ResourceMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
         String, doc="Full text or partial content of this resource"
     )
 
-    # Hierarchical categorization path
-    tree_path: Mapped[list] = mapped_column(
+    # NEW: Filter tags for flexible filtering and categorization
+    filter_tags: Mapped[Optional[dict]] = mapped_column(
         JSON,
-        default=list,
-        nullable=False,
-        doc="Hierarchical categorization path as an array of strings",
+        nullable=True,
+        default=None,
+        doc="Custom filter tags for filtering and categorization"
     )
 
     # When was this item last modified and what operation?
@@ -76,13 +92,6 @@ class ResourceMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
         doc="Last modification info including timestamp and operation type",
     )
 
-    metadata_: Mapped[dict] = mapped_column(
-        JSON,
-        default={},
-        nullable=True,
-        doc="Arbitrary additional metadata as JSON (tags, creation date, personal notes, etc.)",
-    )
-
     embedding_config: Mapped[Optional[dict]] = mapped_column(
         EmbeddingConfigColumn, nullable=True, doc="Embedding configuration"
     )
@@ -94,6 +103,13 @@ class ResourceMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
         summary_embedding = mapped_column(Vector(MAX_EMBEDDING_DIM), nullable=True)
     else:
         summary_embedding = Column(CommonVector, nullable=True)
+
+    @declared_attr
+    def agent(cls) -> Mapped[Optional["Agent"]]:
+        """
+        Relationship to the Agent that owns this resource memory item.
+        """
+        return relationship("Agent", lazy="selectin")
 
     @declared_attr
     def organization(cls) -> Mapped["Organization"]:

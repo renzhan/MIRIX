@@ -13,7 +13,6 @@ from pydantic import BaseModel, Field, field_validator
 from mirix.constants import (
     DEFAULT_MESSAGE_TOOL,
     DEFAULT_MESSAGE_TOOL_KWARG,
-    INNER_THOUGHTS_KWARG,
     TOOL_CALL_ID_MAX_LEN,
 )
 from mirix.helpers.datetime_helpers import get_utc_time, is_utc_datetime
@@ -44,30 +43,7 @@ from mirix.schemas.mirix_message_content import (
 from mirix.schemas.openai.openai import Function as OpenAIFunction
 from mirix.schemas.openai.openai import ToolCall as OpenAIToolCall
 from mirix.system import unpack_message
-from mirix.utils import parse_json
-
-
-def add_inner_thoughts_to_tool_call(
-    tool_call: OpenAIToolCall,
-    inner_thoughts: str,
-    inner_thoughts_key: str,
-) -> OpenAIToolCall:
-    """Add inner thoughts (arg + value) to a tool call"""
-    try:
-        # load the args list
-        func_args = parse_json(tool_call.function.arguments)
-        # create new ordered dict with inner thoughts first
-        ordered_args = OrderedDict({inner_thoughts_key: inner_thoughts})
-        # update with remaining args
-        ordered_args.update(func_args)
-        # create the updated tool call (as a string)
-        updated_tool_call = copy.deepcopy(tool_call)
-        updated_tool_call.function.arguments = json_dumps(ordered_args)
-        return updated_tool_call
-    except json.JSONDecodeError as e:
-        warnings.warn(f"Failed to put inner thoughts in kwargs: {e}")
-        raise e
-
+from mirix.helpers.json_helpers import parse_json
 
 class BaseMessage(OrmMetadataBase):
     __id_prefix__ = "message"
@@ -96,6 +72,10 @@ class MessageCreate(BaseModel):
     )
     group_id: Optional[str] = Field(
         None, description="The multi-agent group that the message was sent in"
+    )
+    filter_tags: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Optional tags for filtering and categorizing this message and related memories"
     )
 
     def model_dump(self, to_orm: bool = False, **kwargs) -> Dict[str, Any]:
@@ -163,6 +143,9 @@ class Message(BaseMessage):
     user_id: Optional[str] = Field(
         None, description="The unique identifier of the user."
     )
+    client_id: Optional[str] = Field(
+        None, description="The unique identifier of the client application."
+    )
     agent_id: Optional[str] = Field(
         None, description="The unique identifier of the agent."
     )
@@ -207,6 +190,20 @@ class Message(BaseMessage):
     created_at: datetime = Field(
         default_factory=get_utc_time,
         description="The timestamp when the object was created.",
+    )
+    
+    # NEW: Filter tags for flexible filtering and categorization
+    filter_tags: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Custom filter tags for filtering and categorization",
+        examples=[
+            {
+                "project_id": "proj-abc",
+                "session_id": "sess-xyz",
+                "tags": ["important", "work"],
+                "priority": "high"
+            }
+        ]
     )
 
     @field_validator("role")
@@ -843,20 +840,9 @@ class Message(BaseMessage):
             }
 
             if self.tool_calls is not None:
-                if put_inner_thoughts_in_kwargs:
-                    # put the inner thoughts inside the tool call before casting to a dict
-                    openai_message["tool_calls"] = [
-                        add_inner_thoughts_to_tool_call(
-                            tool_call,
-                            inner_thoughts=content,
-                            inner_thoughts_key=INNER_THOUGHTS_KWARG,
-                        ).model_dump()
-                        for tool_call in self.tool_calls
-                    ]
-                else:
-                    openai_message["tool_calls"] = [
-                        tool_call.model_dump() for tool_call in self.tool_calls
-                    ]
+                openai_message["tool_calls"] = [
+                    tool_call.model_dump() for tool_call in self.tool_calls
+                ]
                 if max_tool_id_length:
                     for tool_call_dict in openai_message["tool_calls"]:
                         tool_call_dict["id"] = tool_call_dict["id"][:max_tool_id_length]
@@ -1006,14 +992,7 @@ class Message(BaseMessage):
             # Tool calling
             if self.tool_calls is not None:
                 for tool_call in self.tool_calls:
-                    if put_inner_thoughts_in_kwargs:
-                        tool_call_input = add_inner_thoughts_to_tool_call(
-                            tool_call,
-                            inner_thoughts=content,
-                            inner_thoughts_key=INNER_THOUGHTS_KWARG,
-                        ).model_dump()
-                    else:
-                        tool_call_input = parse_json(tool_call.function.arguments)
+                    tool_call_input = parse_json(tool_call.function.arguments)
 
                     content.append(
                         {
@@ -1129,17 +1108,11 @@ class Message(BaseMessage):
                     try:
                         # NOTE: Google AI wants actual JSON objects, not strings
                         function_args = parse_json(function_args)
-                    except:
+                    except Exception:
                         raise UserWarning(
                             f"Failed to parse JSON function args: {function_args}"
                         )
-                        function_args = {"args": function_args}
-
-                    # if put_inner_thoughts_in_kwargs and text_content is not None:
-                    #     assert "inner_thoughts" not in function_args, function_args
-                    #     assert len(self.tool_calls) == 1
-                    #     function_args[INNER_THOUGHTS_KWARG] = text_content
-
+                    
                     parts.append(
                         {
                             "functionCall": {
@@ -1170,7 +1143,7 @@ class Message(BaseMessage):
             # NOTE: Google AI API wants the function response as JSON only, no string
             try:
                 function_response = parse_json(text_content)
-            except:
+            except Exception:
                 function_response = {"function_response": text_content}
 
             google_ai_message = {

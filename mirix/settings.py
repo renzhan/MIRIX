@@ -1,7 +1,14 @@
+import sys
 from pathlib import Path
 from typing import Optional
-from pydantic import Field, model_validator, AliasChoices
+
+from dotenv import load_dotenv
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env file if it exists before initializing settings
+# This ensures environment variables from .env are available when settings are instantiated
+load_dotenv()
 
 
 class ToolSettings(BaseSettings):
@@ -104,19 +111,18 @@ cors_origins = [
 default_pg_uri = None
 
 ## check if --use-file-pg-uri is passed
-import sys
-
 if "--use-file-pg-uri" in sys.argv:
     try:
         with open(Path.home() / ".mirix/pg_uri", "r") as f:
             default_pg_uri = f.read()
+            # Note: Using print instead of logger to avoid circular import with mirix.log
             print("Read pg_uri from ~/.mirix/pg_uri")
     except FileNotFoundError:
         pass
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="mirix_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="mirix_", extra="ignore")
 
     mirix_dir: Optional[Path] = Field(Path.home() / ".mirix", env="MIRIX_DIR")
     # Directory where uploaded/processed images are stored
@@ -142,14 +148,70 @@ class Settings(BaseSettings):
     pg_pool_recycle: int = 1800  # When to recycle connections
     pg_echo: bool = False  # Logging
 
-    # ✅ TASK 1: Redis configuration for temporary message storage (multi-pod user isolation)
-    redis_host: str = Field(default='localhost', validation_alias=AliasChoices('REDIS_HOST', 'mirix_redis_host'))
-    redis_port: int = Field(default=6379, validation_alias=AliasChoices('REDIS_PORT', 'mirix_redis_port'))
-    redis_password: Optional[str] = Field(default='aiop123456', validation_alias=AliasChoices('REDIS_PASSWORD', 'mirix_redis_password'))
-    redis_db: int = 0
-    redis_socket_timeout: float = 5.0
-    redis_max_connections: int = 50
-    redis_key_prefix: str = "aiop"  # Redis key prefix (required by k8s ops)
+    # Redis configuration (optional - for caching and search acceleration)
+    redis_enabled: bool = Field(False, env="MIRIX_REDIS_ENABLED")  # Master switch
+    redis_host: Optional[str] = Field(None, env="MIRIX_REDIS_HOST")
+    redis_port: int = Field(6379, env="MIRIX_REDIS_PORT")
+    redis_db: int = Field(0, env="MIRIX_REDIS_DB")
+    redis_password: Optional[str] = Field(None, env="MIRIX_REDIS_PASSWORD")
+    redis_uri: Optional[str] = Field(None, env="MIRIX_REDIS_URI")  # Full URI override
+
+    # Redis connection pool settings (optimized for production)
+    redis_max_connections: int = Field(
+        50, env="MIRIX_REDIS_MAX_CONNECTIONS"
+    )  # Per container
+    redis_socket_timeout: int = Field(
+        5, env="MIRIX_REDIS_SOCKET_TIMEOUT"
+    )  # Read/write timeout (seconds)
+    redis_socket_connect_timeout: int = Field(
+        5, env="MIRIX_REDIS_SOCKET_CONNECT_TIMEOUT"
+    )  # Connect timeout (seconds)
+    redis_socket_keepalive: bool = Field(
+        True, env="MIRIX_REDIS_SOCKET_KEEPALIVE"
+    )  # Enable TCP keepalive
+    redis_retry_on_timeout: bool = Field(
+        True, env="MIRIX_REDIS_RETRY_ON_TIMEOUT"
+    )  # Retry on timeout errors
+
+    # Redis TTL settings (cache expiration times in seconds)
+    redis_ttl_default: int = Field(
+        3600, env="MIRIX_REDIS_TTL_DEFAULT"
+    )  # 1 hour default TTL
+    redis_ttl_blocks: int = Field(
+        7200, env="MIRIX_REDIS_TTL_BLOCKS"
+    )  # 2 hours for hot data (blocks)
+    redis_ttl_messages: int = Field(
+        7200, env="MIRIX_REDIS_TTL_MESSAGES"
+    )  # 2 hours for messages
+    redis_ttl_organizations: int = Field(
+        43200, env="MIRIX_REDIS_TTL_ORGANIZATIONS"
+    )  # 12 hours for organizations
+    redis_ttl_users: int = Field(
+        43200, env="MIRIX_REDIS_TTL_USERS"
+    )  # 12 hours for users
+    redis_ttl_clients: int = Field(
+        43200, env="MIRIX_REDIS_TTL_CLIENTS"
+    )  # 12 hours for clients
+    redis_ttl_agents: int = Field(
+        43200, env="MIRIX_REDIS_TTL_AGENTS"
+    )  # 12 hours for agents
+    redis_ttl_tools: int = Field(
+        43200, env="MIRIX_REDIS_TTL_TOOLS"
+    )  # 12 hours for tools
+
+    @property
+    def mirix_redis_uri(self) -> Optional[str]:
+        """Construct Redis URI from components or return explicit URI."""
+        if not self.redis_enabled:
+            return None
+
+        if self.redis_uri:
+            return self.redis_uri
+        elif self.redis_host:
+            auth = f":{self.redis_password}@" if self.redis_password else ""
+            return f"redis://{auth}{self.redis_host}:{self.redis_port}/{self.redis_db}"
+        else:
+            return None
 
     # multi agent settings
     multi_agent_send_message_max_retries: int = 3
@@ -174,6 +236,17 @@ class Settings(BaseSettings):
     # experimental toggle
     use_experimental: bool = False
 
+    # logging configuration
+    log_level: str = Field("INFO", env="MIRIX_LOG_LEVEL")
+    log_file: Optional[Path] = Field(
+        None, env="MIRIX_LOG_FILE"
+    )  # If set, enables file logging
+    log_to_console: bool = Field(
+        True, env="MIRIX_LOG_TO_CONSOLE"
+    )  # Console logging is default
+    log_max_bytes: int = Field(10 * 1024 * 1024, env="MIRIX_LOG_MAX_BYTES")  # 10 MB
+    log_backup_count: int = Field(5, env="MIRIX_LOG_BACKUP_COUNT")
+
     # LLM provider client settings
     httpx_max_retries: int = 5
     httpx_timeout_connect: float = 10.0
@@ -188,14 +261,9 @@ class Settings(BaseSettings):
     enable_batch_job_polling: bool = False
     poll_running_llm_batches_interval_seconds: int = 5 * 60
 
-    @model_validator(mode='after')
-    def parse_redis_port(self):
-        # 处理像 'tcp://host:6379' 这样的输入
-        port_str = self.redis_port
-        if isinstance(port_str, str) and ':' in port_str:
-            port_str = port_str.split(':')[-1]
-        self.redis_port = int(port_str)
-        return self
+    # JWT settings for dashboard authentication
+    jwt_secret_key: Optional[str] = Field(None, env="MIRIX_JWT_SECRET_KEY")
+    jwt_expiration_hours: int = Field(24, env="MIRIX_JWT_EXPIRATION_HOURS")
 
     @property
     def mirix_pg_uri(self) -> str:

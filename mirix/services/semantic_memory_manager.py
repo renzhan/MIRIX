@@ -3,19 +3,17 @@ import re
 import string
 from typing import Any, Dict, List, Optional
 
-
-from mirix.log import get_logger
-
-logger = get_logger(__name__)
 from rank_bm25 import BM25Okapi
 from rapidfuzz import fuzz
 from sqlalchemy import func, select, text
 
 from mirix.constants import BUILD_EMBEDDINGS_FOR_MEMORY
 from mirix.embeddings import embedding_model
+from mirix.log import get_logger
 from mirix.orm.errors import NoResultFound
 from mirix.orm.semantic_memory import SemanticMemoryItem
 from mirix.schemas.agent import AgentState
+from mirix.schemas.client import Client as PydanticClient
 from mirix.schemas.semantic_memory import (
     SemanticMemoryItem as PydanticSemanticMemoryItem,
 )
@@ -24,6 +22,8 @@ from mirix.schemas.user import User as PydanticUser
 from mirix.services.utils import build_query, update_timezone
 from mirix.settings import settings
 from mirix.utils import enforce_types, generate_unique_short_id
+
+logger = get_logger(__name__)
 
 
 class SemanticMemoryManager:
@@ -141,7 +141,7 @@ class SemanticMemoryManager:
             return None
 
         except Exception as e:
-            print(f"Warning: Failed to parse embedding field: {e}")
+            logger.debug("Warning: Failed to parse embedding field: %s", e)
             return None
 
     def _count_word_matches(
@@ -193,7 +193,7 @@ class SemanticMemoryManager:
         return word_matches
 
     def _postgresql_fulltext_search(
-        self, session, base_query, query_text, search_field, limit, actor
+        self, session, base_query, query_text, search_field, limit, user_id
     ):
         """
         Efficient PostgreSQL-native full-text search using ts_rank_cd for BM25-like functionality.
@@ -280,9 +280,9 @@ class SemanticMemoryManager:
         try:
             and_query_sql = text(f"""
                 SELECT 
-                    id, created_at, name, summary, details, source, tree_path,
+                    id, created_at, name, summary, details, source,
                     name_embedding, summary_embedding, details_embedding, embedding_config,
-                    organization_id, metadata_, last_modify, user_id,
+                    organization_id, last_modify, user_id,
                     {rank_sql} as rank_score
                 FROM semantic_memory 
                 WHERE {tsvector_sql} @@ to_tsquery('english', :tsquery)
@@ -296,7 +296,7 @@ class SemanticMemoryManager:
                     and_query_sql,
                     {
                         "tsquery": tsquery_string_and,
-                        "user_id": actor.id,
+                        "user_id": user_id,
                         "limit_val": limit or 50,
                     },
                 )
@@ -311,7 +311,7 @@ class SemanticMemoryManager:
                     data.pop("rank_score", None)
 
                     # Parse JSON fields that are returned as strings from raw SQL
-                    json_fields = ["last_modify", "metadata_", "embedding_config"]
+                    json_fields = ["last_modify", "embedding_config"]
                     for field in json_fields:
                         if field in data and isinstance(data[field], str):
                             try:
@@ -334,15 +334,15 @@ class SemanticMemoryManager:
                 return [item.to_pydantic() for item in semantic_items]
 
         except Exception as e:
-            print(f"PostgreSQL AND query error: {e}")
+            logger.debug("PostgreSQL AND query error: %s", e)
 
         # If AND query fails or returns too few results, try OR query
         try:
             or_query_sql = text(f"""
                 SELECT 
-                    id, created_at, name, summary, details, source, tree_path,
+                    id, created_at, name, summary, details, source,
                     name_embedding, summary_embedding, details_embedding, embedding_config,
-                    organization_id, metadata_, last_modify, user_id,
+                    organization_id, last_modify, user_id,
                     {rank_sql} as rank_score
                 FROM semantic_memory 
                 WHERE {tsvector_sql} @@ to_tsquery('english', :tsquery)
@@ -355,7 +355,7 @@ class SemanticMemoryManager:
                 or_query_sql,
                 {
                     "tsquery": tsquery_string_or,
-                    "user_id": actor.id,
+                    "user_id": user_id,
                     "limit_val": limit or 50,
                 },
             )
@@ -367,7 +367,7 @@ class SemanticMemoryManager:
                 data.pop("rank_score", None)
 
                 # Parse JSON fields that are returned as strings from raw SQL
-                json_fields = ["last_modify", "metadata_", "embedding_config"]
+                json_fields = ["last_modify", "embedding_config"]
                 for field in json_fields:
                     if field in data and isinstance(data[field], str):
                         try:
@@ -391,7 +391,7 @@ class SemanticMemoryManager:
 
         except Exception as e:
             # If there's an error with the tsquery, fall back to simpler search
-            print(f"PostgreSQL full-text search error: {e}")
+            logger.debug("PostgreSQL full-text search error: %s", e)
             # Fall back to simple ILIKE search
             fallback_field = (
                 getattr(SemanticMemoryItem, search_field)
@@ -414,15 +414,42 @@ class SemanticMemoryManager:
     @update_timezone
     @enforce_types
     def get_semantic_item_by_id(
-        self, semantic_memory_id: str, actor: PydanticUser, timezone_str: str
+        self, semantic_memory_id: str, user: PydanticUser, timezone_str: str
     ) -> Optional[PydanticSemanticMemoryItem]:
-        """Fetch a semantic memory item by ID."""
+        """Fetch a semantic memory item by ID (with Redis JSON caching)."""
+        # Try Redis cache first (JSON-based for memory tables)
+        try:
+            from mirix.database.redis_client import get_redis_client
+            redis_client = get_redis_client()
+            
+            if redis_client:
+                redis_key = f"{redis_client.SEMANTIC_PREFIX}{semantic_memory_id}"
+                cached_data = redis_client.get_json(redis_key)
+                if cached_data:
+                    logger.debug("✅ Redis cache HIT for semantic memory %s", semantic_memory_id)
+                    return PydanticSemanticMemoryItem(**cached_data)
+        except Exception as e:
+            logger.warning("Redis cache read failed for semantic memory %s: %s", semantic_memory_id, e)
+        
+        # Cache MISS or Redis unavailable - fetch from PostgreSQL
         with self.session_maker() as session:
             try:
                 semantic_memory_item = SemanticMemoryItem.read(
-                    db_session=session, identifier=semantic_memory_id, actor=actor
+                    db_session=session, identifier=semantic_memory_id, actor=user
                 )
-                return semantic_memory_item.to_pydantic()
+                pydantic_item = semantic_memory_item.to_pydantic()
+                
+                # Populate Redis cache for next time
+                try:
+                    if redis_client:
+                        data = pydantic_item.model_dump(mode='json')
+                        # model_dump(mode='json') already converts datetime to ISO format strings
+                        redis_client.set_json(redis_key, data, ttl=settings.redis_ttl_default)
+                        logger.debug("Populated Redis cache for semantic memory %s", semantic_memory_id)
+                except Exception as e:
+                    logger.warning("Failed to populate Redis cache for semantic memory %s: %s", semantic_memory_id, e)
+                
+                return pydantic_item
             except NoResultFound:
                 raise NoResultFound(
                     f"Semantic memory item with id {semantic_memory_id} not found."
@@ -431,7 +458,7 @@ class SemanticMemoryManager:
     @update_timezone
     @enforce_types
     def get_most_recently_updated_item(
-        self, actor: PydanticUser, timezone_str: str = None
+        self, user: PydanticUser, timezone_str: str = None
     ) -> Optional[PydanticSemanticMemoryItem]:
         """
         Fetch the most recently updated semantic memory item based on last_modify timestamp.
@@ -449,7 +476,7 @@ class SemanticMemoryManager:
             )
 
             # Filter by user_id for multi-user support
-            query = query.where(SemanticMemoryItem.user_id == actor.id)
+            query = query.where(SemanticMemoryItem.user_id == user.id)
 
             result = session.execute(query.limit(1))
             item = result.scalar_one_or_none()
@@ -458,9 +485,26 @@ class SemanticMemoryManager:
 
     @enforce_types
     def create_item(
-        self, item_data: PydanticSemanticMemoryItem, actor: PydanticUser
+        self, 
+        item_data: PydanticSemanticMemoryItem, 
+        actor: PydanticClient,
+        client_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        use_cache: bool = True
     ) -> PydanticSemanticMemoryItem:
-        """Create a new semantic memory item."""
+        """Create a new semantic memory item.
+        
+        Args:
+            item_data: The semantic memory data to create
+            actor: Client performing the operation (for audit trail)
+            client_id: Client application identifier (defaults to actor.id)
+            user_id: End-user identifier (optional)
+            use_cache: If True, cache in Redis. If False, skip caching.
+        """
+        
+        # Backward compatibility
+        if client_id is None:
+            client_id = actor.id
 
         # Ensure ID is set before model_dump
         if not item_data.id:
@@ -478,45 +522,51 @@ class SemanticMemoryManager:
                     f"Required field '{field}' missing from semantic memory data"
                 )
 
-        data_dict.setdefault("metadata_", {})
-
-        # Set user_id from actor for multi-user support
-        data_dict["user_id"] = actor.id
+        # Set client_id and user_id on the memory
+        data_dict["client_id"] = client_id
+        data_dict["user_id"] = user_id
+        
+        logger.debug(
+            "create_item: client_id=%s, user_id=%s", 
+            client_id, user_id
+        )
 
         with self.session_maker() as session:
             item = SemanticMemoryItem(**data_dict)
-            item.create(session)
+            item.create_with_redis(session, actor=actor, use_cache=use_cache)
             return item.to_pydantic()
 
     @enforce_types
     def update_item(
-        self, item_update: SemanticMemoryItemUpdate, actor: PydanticUser
+        self, item_update: SemanticMemoryItemUpdate, user: PydanticUser
     ) -> PydanticSemanticMemoryItem:
         """Update an existing semantic memory item."""
         with self.session_maker() as session:
             item = SemanticMemoryItem.read(
-                db_session=session, identifier=item_update.id, actor=actor
+                db_session=session, identifier=item_update.id, actor=user
             )
             update_data = item_update.model_dump(exclude_unset=True)
             for k, v in update_data.items():
-                if k not in ["id", "updated_at"]:
+                if k not in ["id", "updated_at"]:  # Exclude updated_at - handled by update() method
                     setattr(item, k, v)
-            item.updated_at = item_update.updated_at
-            item.update(session, actor=actor)
+            # updated_at is automatically set to current UTC time by item.update()
+            item.update_with_redis(session, actor=user)  # ⭐ Updates Redis JSON cache
             return item.to_pydantic()
 
     @enforce_types
     def create_many_items(
-        self, items: List[PydanticSemanticMemoryItem], actor: PydanticUser
+        self, 
+        items: List[PydanticSemanticMemoryItem], 
+        user: PydanticUser,
     ) -> List[PydanticSemanticMemoryItem]:
         """Create multiple semantic memory items."""
-        return [self.create_item(i, actor) for i in items]
+        return [self.create_item(i, user) for i in items]
 
-    def get_total_number_of_items(self, actor: PydanticUser) -> int:
+    def get_total_number_of_items(self, user: PydanticUser) -> int:
         """Get the total number of items in the semantic memory for the user."""
         with self.session_maker() as session:
             query = select(func.count(SemanticMemoryItem.id)).where(
-                SemanticMemoryItem.user_id == actor.id
+                SemanticMemoryItem.user_id == user.id
             )
             result = session.execute(query)
             return result.scalar_one()
@@ -526,13 +576,15 @@ class SemanticMemoryManager:
     def list_semantic_items(
         self,
         agent_state: AgentState,
-        actor: PydanticUser,
+        user: PydanticUser,
         query: str = "",
         embedded_text: Optional[List[float]] = None,
         search_field: str = "",
         search_method: str = "embedding",
         limit: Optional[int] = 50,
         timezone_str: str = None,
+        filter_tags: Optional[dict] = None,
+        use_cache: bool = True,
     ) -> List[PydanticSemanticMemoryItem]:
         """
         List semantic memory items with various search methods.
@@ -550,6 +602,7 @@ class SemanticMemoryManager:
                 - 'fuzzy_match': Fuzzy string matching (legacy, kept for compatibility)
             limit: Maximum number of results to return
             timezone_str: Timezone string for timestamp conversion
+            use_cache: If True, try Redis cache first. If False, skip cache and query PostgreSQL directly.
 
         Returns:
             List of semantic memory items matching the search criteria
@@ -566,6 +619,88 @@ class SemanticMemoryManager:
             - Fallback 'bm25' (SQLite): In-memory processing, slower for large datasets but still provides
               proper BM25 ranking
         """
+        query = query.strip() if query else ""
+        is_empty_query = not query or query == ""
+        
+        # ⭐ Try Redis Search first (if cache enabled and Redis is available)
+        from mirix.database.redis_client import get_redis_client
+        redis_client = get_redis_client()
+        
+        if use_cache and redis_client:
+            try:
+                # Case 1: No query - get recent items (regardless of search_method)
+                if is_empty_query:
+                    logger.debug("🔍 Searching Redis for recent semantic items with filter_tags=%s", filter_tags)
+                    results = redis_client.search_recent(
+                        index_name=redis_client.SEMANTIC_INDEX,
+                        limit=limit or 50,
+                        user_id=user.id,
+                        sort_by="created_at_ts",
+                        filter_tags=filter_tags
+                    )
+                    logger.debug("🔍 Redis search_recent returned %d results", len(results) if results else 0)
+                    if results:
+                        logger.debug("✅ Redis cache HIT: returned %d recent semantic items", len(results))
+                        # Clean Redis-specific fields before Pydantic validation
+                        results = redis_client.clean_redis_fields(results)
+                        return [PydanticSemanticMemoryItem(**item) for item in results]
+                    # If no results, fall through to PostgreSQL (don't return empty list)
+                
+                # Case 2: Vector similarity search
+                elif search_method == "embedding":
+                    if embedded_text is None:
+                        from mirix.embeddings.embedding_model import embed_and_upload_batch
+                        embedded_text = embed_and_upload_batch(
+                            [query], agent_state.embedding_config
+                        )[0]
+                    
+                    vector_field = f"{search_field}_embedding" if search_field else "summary_embedding"
+                    
+                    results = redis_client.search_vector(
+                        index_name=redis_client.SEMANTIC_INDEX,
+                        embedding=embedded_text,
+                        vector_field=vector_field,
+                        limit=limit or 50,
+                        user_id=user.id,
+                        filter_tags=filter_tags
+                    )
+                    if results:
+                        logger.debug("✅ Redis vector search HIT: found %d semantic items", len(results))
+                        # Clean Redis-specific fields before Pydantic validation
+                        results = redis_client.clean_redis_fields(results)
+                        return [PydanticSemanticMemoryItem(**item) for item in results]
+                
+                # Case 3: Full-text search
+                elif search_method in ["bm25", "string_match"]:
+                    fields = [search_field] if search_field else ["name", "summary", "details"]
+                    
+                    results = redis_client.search_text(
+                        index_name=redis_client.SEMANTIC_INDEX,
+                        query=query,
+                        search_fields=fields,
+                        limit=limit or 50,
+                        user_id=user.id,
+                        filter_tags=filter_tags
+                    )
+                    if results:
+                        logger.debug("✅ Redis text search HIT: found %d semantic items", len(results))
+                        # Clean Redis-specific fields before Pydantic validation
+                        results = redis_client.clean_redis_fields(results)
+                        return [PydanticSemanticMemoryItem(**item) for item in results]
+            
+            except Exception as e:
+                logger.warning("Redis search failed for semantic memory, falling back to PostgreSQL: %s", e)
+                # Fall through to PostgreSQL
+        
+        # Log when bypassing cache or Redis unavailable
+        if not use_cache:
+            logger.debug("⏭️  Bypassing Redis cache (use_cache=False), querying PostgreSQL directly for semantic memory")
+        elif not redis_client:
+            logger.debug("⚠️  Redis unavailable, querying PostgreSQL directly for semantic memory")
+        else:
+            logger.debug("⏭️  Redis returned no results, falling back to PostgreSQL for semantic memory")
+
+        logger.debug("🔍 PostgreSQL fallback: query='%s', filter_tags=%s", query, filter_tags)
         with self.session_maker() as session:
             if query == "":
                 # Use proper PostgreSQL JSON text extraction and casting for ordering
@@ -573,7 +708,7 @@ class SemanticMemoryManager:
 
                 query_stmt = (
                     select(SemanticMemoryItem)
-                    .where(SemanticMemoryItem.user_id == actor.id)
+                    .where(SemanticMemoryItem.user_id == user.id)
                     .order_by(
                         cast(
                             text("semantic_memory.last_modify ->> 'timestamp'"),
@@ -581,10 +716,17 @@ class SemanticMemoryManager:
                         ).desc()
                     )
                 )
+                
+                # Apply filter_tags if provided
+                if filter_tags:
+                    for key, value in filter_tags.items():
+                        query_stmt = query_stmt.where(SemanticMemoryItem.filter_tags[key].as_string() == str(value))
+                
                 if limit:
                     query_stmt = query_stmt.limit(limit)
                 result = session.execute(query_stmt)
                 semantic_items = result.scalars().all()
+                logger.debug("🔍 PostgreSQL returned %d semantic items (filter_tags=%s)", len(semantic_items), filter_tags)
                 return [item.to_pydantic() for item in semantic_items]
 
             else:
@@ -600,11 +742,15 @@ class SemanticMemoryManager:
                     SemanticMemoryItem.details_embedding.label("details_embedding"),
                     SemanticMemoryItem.embedding_config.label("embedding_config"),
                     SemanticMemoryItem.organization_id.label("organization_id"),
-                    SemanticMemoryItem.metadata_.label("metadata_"),
                     SemanticMemoryItem.last_modify.label("last_modify"),
-                    SemanticMemoryItem.tree_path.label("tree_path"),
                     SemanticMemoryItem.user_id.label("user_id"),
-                ).where(SemanticMemoryItem.user_id == actor.id)
+                    SemanticMemoryItem.agent_id.label("agent_id"),
+                ).where(SemanticMemoryItem.user_id == user.id)
+                
+                # Apply filter_tags if provided
+                if filter_tags:
+                    for key, value in filter_tags.items():
+                        base_query = base_query.where(SemanticMemoryItem.filter_tags[key].as_string() == str(value))
 
                 if search_method == "embedding":
                     embed_query = True
@@ -633,14 +779,14 @@ class SemanticMemoryManager:
                     if settings.mirix_pg_uri_no_default:
                         # Use PostgreSQL native full-text search
                         return self._postgresql_fulltext_search(
-                            session, base_query, query, search_field, limit, actor
+                            session, base_query, query, search_field, limit, user.id
                         )
                     else:
                         # Fallback to in-memory BM25 for SQLite (legacy method)
                         # Load all candidate items (memory-intensive, kept for compatibility)
                         result = session.execute(
                             select(SemanticMemoryItem).where(
-                                SemanticMemoryItem.user_id == actor.id
+                                SemanticMemoryItem.user_id == user.id
                             )
                         )
                         all_items = result.scalars().all()
@@ -700,7 +846,7 @@ class SemanticMemoryManager:
                     # Fuzzy matching: load all candidate items into memory and compute a fuzzy match score.
                     result = session.execute(
                         select(SemanticMemoryItem).where(
-                            SemanticMemoryItem.user_id == actor.id
+                            SemanticMemoryItem.user_id == user.id
                         )
                     )
                     all_items = result.scalars().all()
@@ -739,19 +885,31 @@ class SemanticMemoryManager:
     @enforce_types
     def insert_semantic_item(
         self,
-        actor: PydanticUser,
+        actor: PydanticClient,
         agent_state: AgentState,
+        agent_id: str,
         name: str,
         summary: str,
         details: Optional[str],
         source: Optional[str],
-        tree_path: Optional[List[str]],
         organization_id: str,
+        filter_tags: Optional[dict] = None,
+        use_cache: bool = True,
+        client_id: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> PydanticSemanticMemoryItem:
         """
         Create a new semantic memory entry using provided parameters.
         """
         try:
+            # Set defaults for required fields
+            from mirix.services.user_manager import UserManager
+            if client_id is None:
+                client_id = actor.id
+            if user_id is None:
+                user_id = UserManager.ADMIN_USER_ID
+                logger.debug("user_id not provided, using ADMIN_USER_ID: %s", user_id)
+            
             # Conditionally calculate embeddings based on BUILD_EMBEDDINGS_FOR_MEMORY flag
             if BUILD_EMBEDDINGS_FOR_MEMORY:
                 # TODO: need to check if we need to chunk the text
@@ -768,7 +926,9 @@ class SemanticMemoryManager:
 
             semantic_item = self.create_item(
                 item_data=PydanticSemanticMemoryItem(
-                    user_id=actor.id,
+                    client_id=client_id,  # Required field: client app that created this memory
+                    user_id=user_id,  # Required field: end-user who owns this memory
+                    agent_id=agent_id,
                     name=name,
                     summary=summary,
                     details=details,
@@ -778,9 +938,12 @@ class SemanticMemoryManager:
                     name_embedding=name_embedding,
                     summary_embedding=summary_embedding,
                     embedding_config=embedding_config,
-                    tree_path=tree_path,
+                    filter_tags=filter_tags,
                 ),
                 actor=actor,
+                use_cache=use_cache,
+                client_id=client_id,
+                user_id=user_id,
             )
 
             # Note: Item is already added to clustering tree in create_item()
@@ -789,16 +952,201 @@ class SemanticMemoryManager:
             raise e
 
     def delete_semantic_item_by_id(
-        self, semantic_memory_id: str, actor: PydanticUser
+        self, semantic_memory_id: str, actor: PydanticClient
     ) -> None:
-        """Delete a semantic memory item by ID."""
+        """Delete a semantic memory item by ID (removes from Redis cache)."""
         with self.session_maker() as session:
             try:
                 item = SemanticMemoryItem.read(
                     db_session=session, identifier=semantic_memory_id, actor=actor
                 )
+                # Remove from Redis cache before hard delete
+                from mirix.database.redis_client import get_redis_client
+                redis_client = get_redis_client()
+                if redis_client:
+                    redis_key = f"{redis_client.SEMANTIC_PREFIX}{semantic_memory_id}"
+                    redis_client.delete(redis_key)
                 item.hard_delete(session)
             except NoResultFound:
                 raise NoResultFound(
                     f"Semantic memory item with id {semantic_memory_id} not found."
                 )
+
+    @enforce_types
+    def delete_by_client_id(self, actor: PydanticClient) -> int:
+        """
+        Bulk delete all semantic memory records for a client (removes from Redis cache).
+        Optimized with single DB query and batch Redis deletion.
+        
+        Args:
+            actor: Client whose memories to delete (uses actor.id as client_id)
+            
+        Returns:
+            Number of records deleted
+        """
+        from mirix.database.redis_client import get_redis_client
+        
+        with self.session_maker() as session:
+            # Get IDs for Redis cleanup (only fetch IDs, not full objects)
+            item_ids = [row[0] for row in session.query(SemanticMemoryItem.id).filter(
+                SemanticMemoryItem.client_id == actor.id
+            ).all()]
+            
+            count = len(item_ids)
+            if count == 0:
+                return 0
+            
+            # Bulk delete in single query
+            session.query(SemanticMemoryItem).filter(
+                SemanticMemoryItem.client_id == actor.id
+            ).delete(synchronize_session=False)
+            
+            session.commit()
+        
+        # Batch delete from Redis cache (outside of session context)
+        redis_client = get_redis_client()
+        if redis_client and item_ids:
+            redis_keys = [f"{redis_client.SEMANTIC_PREFIX}{item_id}" for item_id in item_ids]
+            
+            # Delete in batches to avoid command size limits
+            BATCH_SIZE = 1000
+            for i in range(0, len(redis_keys), BATCH_SIZE):
+                batch = redis_keys[i:i + BATCH_SIZE]
+                redis_client.client.delete(*batch)
+        
+        return count
+
+    def soft_delete_by_client_id(self, actor: PydanticClient) -> int:
+        """
+        Bulk soft delete all semantic memory records for a client (updates Redis cache).
+        
+        Args:
+            actor: Client whose memories to soft delete (uses actor.id as client_id)
+            
+        Returns:
+            Number of records soft deleted
+        """
+        from mirix.database.redis_client import get_redis_client
+        
+        with self.session_maker() as session:
+            # Query all non-deleted records for this client (use actor.id)
+            items = session.query(SemanticMemoryItem).filter(
+                SemanticMemoryItem.client_id == actor.id,
+                SemanticMemoryItem.is_deleted == False
+            ).all()
+            
+            count = len(items)
+            if count == 0:
+                return 0
+            
+            # Extract IDs BEFORE committing (to avoid detached instance errors)
+            item_ids = [item.id for item in items]
+            
+            # Soft delete from database (set is_deleted = True directly, don't call item.delete())
+            for item in items:
+                item.is_deleted = True
+                item.set_updated_at()
+            
+            session.commit()
+        
+        # Update Redis cache with is_deleted=true (outside session)
+        redis_client = get_redis_client()
+        if redis_client:
+            for item_id in item_ids:
+                redis_key = f"{redis_client.SEMANTIC_PREFIX}{item_id}"
+                try:
+                    redis_client.client.hset(redis_key, "is_deleted", "true")
+                except Exception:
+                    # If update fails, remove from cache
+                    redis_client.delete(redis_key)
+        
+        return count
+
+    def soft_delete_by_user_id(self, user_id: str) -> int:
+        """
+        Bulk soft delete all semantic memory records for a user (updates Redis cache).
+        
+        Args:
+            user_id: ID of the user whose memories to soft delete
+            
+        Returns:
+            Number of records soft deleted
+        """
+        from mirix.database.redis_client import get_redis_client
+        
+        with self.session_maker() as session:
+            # Query all non-deleted records for this user
+            items = session.query(SemanticMemoryItem).filter(
+                SemanticMemoryItem.user_id == user_id,
+                SemanticMemoryItem.is_deleted == False
+            ).all()
+            
+            count = len(items)
+            if count == 0:
+                return 0
+            
+            # Extract IDs BEFORE committing (to avoid detached instance errors)
+            item_ids = [item.id for item in items]
+            
+            # Soft delete from database (set is_deleted = True directly, don't call item.delete())
+            for item in items:
+                item.is_deleted = True
+                item.set_updated_at()
+            
+            session.commit()
+        
+        # Update Redis cache with is_deleted=true (outside session)
+        redis_client = get_redis_client()
+        if redis_client:
+            for item_id in item_ids:
+                redis_key = f"{redis_client.SEMANTIC_PREFIX}{item_id}"
+                try:
+                    redis_client.client.hset(redis_key, "is_deleted", "true")
+                except Exception:
+                    # If update fails, remove from cache
+                    redis_client.delete(redis_key)
+        
+        return count
+
+    def delete_by_user_id(self, user_id: str) -> int:
+        """
+        Bulk hard delete all semantic memory records for a user (removes from Redis cache).
+        Optimized with single DB query and batch Redis deletion.
+        
+        Args:
+            user_id: ID of the user whose memories to delete
+            
+        Returns:
+            Number of records deleted
+        """
+        from mirix.database.redis_client import get_redis_client
+        
+        with self.session_maker() as session:
+            # Get IDs for Redis cleanup (only fetch IDs, not full objects)
+            item_ids = [row[0] for row in session.query(SemanticMemoryItem.id).filter(
+                SemanticMemoryItem.user_id == user_id
+            ).all()]
+            
+            count = len(item_ids)
+            if count == 0:
+                return 0
+            
+            # Bulk delete in single query
+            session.query(SemanticMemoryItem).filter(
+                SemanticMemoryItem.user_id == user_id
+            ).delete(synchronize_session=False)
+            
+            session.commit()
+        
+        # Batch delete from Redis cache (outside of session context)
+        redis_client = get_redis_client()
+        if redis_client and item_ids:
+            redis_keys = [f"{redis_client.SEMANTIC_PREFIX}{item_id}" for item_id in item_ids]
+            
+            # Delete in batches to avoid command size limits
+            BATCH_SIZE = 1000
+            for i in range(0, len(redis_keys), BATCH_SIZE):
+                batch = redis_keys[i:i + BATCH_SIZE]
+                redis_client.client.delete(*batch)
+        
+        return count

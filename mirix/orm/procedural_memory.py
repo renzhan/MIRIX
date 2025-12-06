@@ -2,7 +2,7 @@ import datetime as dt
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import ARRAY, JSON, Column, String
+from sqlalchemy import ARRAY, JSON, Column, ForeignKey, String
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 
 from mirix.constants import MAX_EMBEDDING_DIM
@@ -15,6 +15,7 @@ from mirix.schemas.procedural_memory import (
 from mirix.settings import settings
 
 if TYPE_CHECKING:
+    from mirix.orm.agent import Agent
     from mirix.orm.organization import Organization
     from mirix.orm.user import User
 
@@ -24,9 +25,8 @@ class ProceduralMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
     Stores procedural memory entries, such as workflows, step-by-step guides, or how-to knowledge.
 
     type:        The category or tag of the procedure (e.g. 'workflow', 'guide', 'script')
-    description: Short descriptive text about what this procedure accomplishes
+    summary: Short descriptive text about what this procedure accomplishes
     steps:       Step-by-step instructions or method
-    metadata_:   Additional fields/notes
     """
 
     __tablename__ = "procedural_memory"
@@ -37,6 +37,22 @@ class ProceduralMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
         String,
         primary_key=True,
         doc="Unique ID for this procedural memory entry",
+    )
+
+    # Foreign key to agent
+    agent_id: Mapped[Optional[str]] = mapped_column(
+        String,
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=True,
+        doc="ID of the agent this procedural memory item belongs to",
+    )
+
+    # Foreign key to client (for access control and filtering)
+    client_id: Mapped[Optional[str]] = mapped_column(
+        String,
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=True,
+        doc="ID of the client application that created this item",
     )
 
     # Distinguish the type/category of the procedure
@@ -54,12 +70,12 @@ class ProceduralMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
         JSON, doc="Step-by-step instructions stored as a list of strings"
     )
 
-    # Hierarchical categorization path
-    tree_path: Mapped[list] = mapped_column(
+    # NEW: Filter tags for flexible filtering and categorization
+    filter_tags: Mapped[Optional[dict]] = mapped_column(
         JSON,
-        default=list,
-        nullable=False,
-        doc="Hierarchical categorization path as an array of strings",
+        nullable=True,
+        default=None,
+        doc="Custom filter tags for filtering and categorization"
     )
 
     # When was this item last modified and what operation?
@@ -71,14 +87,6 @@ class ProceduralMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
             "operation": "created",
         },
         doc="Last modification info including timestamp and operation type",
-    )
-
-    # Optional metadata
-    metadata_: Mapped[dict] = mapped_column(
-        JSON,
-        default={},
-        nullable=True,
-        doc="Arbitrary additional metadata as a JSON object",
     )
 
     # Email tags for categorization
@@ -110,6 +118,13 @@ class ProceduralMemoryItem(SqlalchemyBase, OrganizationMixin, UserMixin):
     else:
         summary_embedding = Column(CommonVector, nullable=True)
         steps_embedding = Column(CommonVector, nullable=True)
+
+    @declared_attr
+    def agent(cls) -> Mapped[Optional["Agent"]]:
+        """
+        Relationship to the Agent that owns this procedural memory item.
+        """
+        return relationship("Agent", lazy="selectin")
 
     @declared_attr
     def organization(cls) -> Mapped["Organization"]:

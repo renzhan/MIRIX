@@ -2,7 +2,7 @@ import datetime as dt
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import JSON, Column, DateTime, Index, String, text
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, String, text
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 
 from mirix.constants import MAX_EMBEDDING_DIM
@@ -13,6 +13,7 @@ from mirix.schemas.episodic_memory import EpisodicEvent as PydanticEpisodicEvent
 from mirix.settings import settings
 
 if TYPE_CHECKING:
+    from mirix.orm.agent import Agent
     from mirix.orm.organization import Organization
     from mirix.orm.user import User
 
@@ -32,6 +33,22 @@ class EpisodicEvent(SqlalchemyBase, OrganizationMixin, UserMixin):
         String,
         primary_key=True,
         doc="Unique ID for the episodic event",
+    )
+
+    # Foreign key to agent
+    agent_id: Mapped[Optional[str]] = mapped_column(
+        String,
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=True,
+        doc="ID of the agent this episodic event belongs to",
+    )
+
+    # Foreign key to client (for access control and filtering)
+    client_id: Mapped[Optional[str]] = mapped_column(
+        String,
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=True,
+        doc="ID of the client application that created this event",
     )
 
     # When did this event occur? (You can store creation time or an explicit event time.)
@@ -67,17 +84,12 @@ class EpisodicEvent(SqlalchemyBase, OrganizationMixin, UserMixin):
         String, nullable=False, doc="Detailed description or narrative about this event"
     )
 
-    # Hierarchical categorization path
-    tree_path: Mapped[list] = mapped_column(
+    # NEW: Filter tags for flexible filtering and categorization
+    filter_tags: Mapped[Optional[dict]] = mapped_column(
         JSON,
-        default=list,
-        nullable=False,
-        doc="Hierarchical categorization path as an array of strings",
-    )
-
-    # Arbitrary JSON metadata for extra fields (e.g., references, tags, confidence, etc.)
-    metadata_: Mapped[dict] = mapped_column(
-        JSON, default={}, nullable=True, doc="Additional metadata for flexible storage"
+        nullable=True,
+        default=None,
+        doc="Custom filter tags for filtering and categorization"
     )
 
     embedding_config: Mapped[Optional[dict]] = mapped_column(
@@ -137,6 +149,13 @@ class EpisodicEvent(SqlalchemyBase, OrganizationMixin, UserMixin):
             ],
         )
     )
+
+    @declared_attr
+    def agent(cls) -> Mapped[Optional["Agent"]]:
+        """
+        Relationship to the Agent that owns this episodic event.
+        """
+        return relationship("Agent", lazy="selectin")
 
     @declared_attr
     def organization(cls) -> Mapped["Organization"]:

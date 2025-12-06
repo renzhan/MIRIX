@@ -1,13 +1,12 @@
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
-from mirix.constants import DEFAULT_EMBEDDING_CHUNK_SIZE, CORE_MEMORY_LINE_NUMBER_WARNING
+from mirix.constants import DEFAULT_EMBEDDING_CHUNK_SIZE
 from mirix.helpers import ToolRulesSolver
 from mirix.schemas.block import CreateBlock
 from mirix.schemas.embedding_config import EmbeddingConfig
-from mirix.schemas.environment_variables import AgentEnvironmentVariable
 from mirix.schemas.llm_config import LLMConfig
 from mirix.schemas.memory import Memory
 from mirix.schemas.message import Message, MessageCreate
@@ -15,7 +14,8 @@ from mirix.schemas.mirix_base import OrmMetadataBase
 from mirix.schemas.openai.chat_completion_response import UsageStatistics
 from mirix.schemas.tool import Tool
 from mirix.schemas.tool_rule import ToolRule
-from mirix.utils import create_random_username
+
+# Removed create_random_username import - server generates names if not provided
 
 
 class AgentType(str, Enum):
@@ -30,7 +30,7 @@ class AgentType(str, Enum):
     episodic_memory_agent = "episodic_memory_agent"
     procedural_memory_agent = "procedural_memory_agent"
     resource_memory_agent = "resource_memory_agent"
-    knowledge_vault_agent = "knowledge_vault_agent"
+    knowledge_vault_memory_agent = "knowledge_vault_memory_agent"
     meta_memory_agent = "meta_memory_agent"
     semantic_memory_agent = "semantic_memory_agent"
     core_memory_agent = "core_memory_agent"
@@ -47,11 +47,9 @@ class AgentState(OrmMetadataBase, validate_assignment=True):
         id (str): The unique identifier of the agent.
         name (str): The name of the agent (must be unique to the user).
         created_at (datetime): The datetime the agent was created.
-        message_ids (List[str]): The ids of the messages in the agent's in-context memory.
         memory (Memory): The in-context memory of the agent.
         tools (List[str]): The tools used by the agent. This includes any memory editing functions specified in `memory`.
         system (str): The system prompt used by the agent.
-        topic (str): The current topic between the agent and the user.
         llm_config (LLMConfig): The LLM configuration used by the agent.
         embedding_config (EmbeddingConfig): The embedding configuration used by the agent.
 
@@ -75,9 +73,6 @@ class AgentState(OrmMetadataBase, validate_assignment=True):
 
     # system prompt
     system: str = Field(..., description="The system prompt used by the agent.")
-    topic: str = Field(
-        ..., description="The current topic between the agent and the user."
-    )
 
     # agent configuration
     agent_type: AgentType = Field(..., description="The type of agent.")
@@ -100,35 +95,26 @@ class AgentState(OrmMetadataBase, validate_assignment=True):
     description: Optional[str] = Field(
         None, description="The description of the agent."
     )
-    metadata_: Optional[Dict] = Field(
-        None, description="The metadata of the agent.", alias="metadata_"
+    parent_id: Optional[str] = Field(
+        None, description="The parent agent ID (for sub-agents in a meta-agent)."
+    )
+    children: Optional[List["AgentState"]] = Field(
+        default=None, description="Child agents (sub-agents) if this is a parent agent."
     )
 
     memory: Memory = Field(..., description="The in-context memory of the agent.")
     tools: List[Tool] = Field(..., description="The tools used by the agent.")
-    tags: List[str] = Field(..., description="The tags associated with the agent.")
-    tool_exec_environment_variables: List[AgentEnvironmentVariable] = Field(
-        default_factory=list,
-        description="The environment variables for tool execution specific to this agent.",
-    )
     mcp_tools: Optional[List[str]] = Field(
         default_factory=list,
         description="List of connected MCP server names (e.g., ['gmail-native'])",
     )
 
-    def get_agent_env_vars_as_dict(self) -> Dict[str, str]:
-        # Get environment variables for this agent specifically
-        per_agent_env_vars = {}
-        for agent_env_var_obj in self.tool_exec_environment_variables:
-            per_agent_env_vars[agent_env_var_obj.key] = agent_env_var_obj.value
-        return per_agent_env_vars
-
 
 class CreateAgent(BaseModel, validate_assignment=True):  #
     # all optional as server can generate defaults
-    name: str = Field(
-        default_factory=lambda: create_random_username(),
-        description="The name of the agent.",
+    name: Optional[str] = Field(
+        None,
+        description="The name of the agent. If not provided, server will generate one.",
     )
 
     # memory creation
@@ -141,20 +127,11 @@ class CreateAgent(BaseModel, validate_assignment=True):  #
     tool_ids: Optional[List[str]] = Field(
         None, description="The ids of the tools used by the agent."
     )
-    block_ids: Optional[List[str]] = Field(
-        None, description="The ids of the blocks used by the agent."
-    )
     tool_rules: Optional[List[ToolRule]] = Field(
         None, description="The tool rules governing the agent."
     )
-    tags: Optional[List[str]] = Field(
-        None, description="The tags associated with the agent."
-    )
     system: Optional[str] = Field(
         None, description="The system prompt used by the agent."
-    )
-    topic: Optional[str] = Field(
-        None, description="The current topic between the agent and the user."
     )
     agent_type: AgentType = Field(
         default_factory=lambda: AgentType.chat_agent, description="The type of agent."
@@ -179,11 +156,8 @@ class CreateAgent(BaseModel, validate_assignment=True):  #
         False,
         description="If true, attaches the Mirix multi-agent tools (e.g. sending a message to another agent).",
     )
-    description: Optional[str] = Field(
-        None, description="The description of the agent."
-    )
-    metadata_: Optional[Dict] = Field(
-        None, description="The metadata of the agent.", alias="metadata_"
+    parent_id: Optional[str] = Field(
+        None, description="The parent agent ID (for sub-agents in a meta-agent)."
     )
     model: Optional[str] = Field(
         None,
@@ -281,14 +255,8 @@ class UpdateAgent(BaseModel):
     block_ids: Optional[List[str]] = Field(
         None, description="The ids of the blocks used by the agent."
     )
-    tags: Optional[List[str]] = Field(
-        None, description="The tags associated with the agent."
-    )
     system: Optional[str] = Field(
         None, description="The system prompt used by the agent."
-    )
-    topic: Optional[str] = Field(
-        None, description="The current topic between the agent and the user."
     )
     tool_rules: Optional[List[ToolRule]] = Field(
         None, description="The tool rules governing the agent."
@@ -305,15 +273,73 @@ class UpdateAgent(BaseModel):
     description: Optional[str] = Field(
         None, description="The description of the agent."
     )
-    metadata_: Optional[Dict] = Field(
-        None, description="The metadata of the agent.", alias="metadata_"
-    )
-    tool_exec_environment_variables: Optional[Dict[str, str]] = Field(
-        None,
-        description="The environment variables for tool execution specific to this agent.",
+    parent_id: Optional[str] = Field(
+        None, description="The parent agent ID (for sub-agents in a meta-agent)."
     )
     mcp_tools: Optional[List[str]] = Field(
         None, description="List of MCP server names to connect to this agent."
+    )
+
+    class Config:
+        extra = "ignore"  # Ignores extra fields
+
+
+class CreateMetaAgent(BaseModel):
+    """Request schema for creating a MetaAgent."""
+
+    name: Optional[str] = Field(
+        None,
+        description="Optional name for the MetaAgent. If None, a random name will be generated.",
+    )
+    agents: List[Union[str, Dict[str, Any]]] = Field(
+        default_factory=lambda: [
+            "core_memory_agent",
+            "resource_memory_agent",
+            "semantic_memory_agent",
+            "episodic_memory_agent",
+            "procedural_memory_agent",
+            "knowledge_vault_memory_agent",
+            "meta_memory_agent",
+            "reflexion_agent",
+            "background_agent",
+        ],
+        description="List of memory agent names or dicts with agent configs. Supports both 'agent_name' strings and {'agent_name': {'blocks': [...], ...}} dicts.",
+    )
+    system_prompts: Optional[Dict[str, str]] = Field(
+        None,
+        description="Dictionary mapping agent names to their system prompt text. Takes precedence over system_prompts_folder.",
+    )
+    llm_config: Optional[LLMConfig] = Field(
+        None,
+        description="LLM configuration for memory agents. Required if no default is set.",
+    )
+    embedding_config: Optional[EmbeddingConfig] = Field(
+        None,
+        description="Embedding configuration for memory agents. Required if no default is set.",
+    )
+
+class UpdateMetaAgent(BaseModel):
+    """Request schema for updating a MetaAgent."""
+
+    name: Optional[str] = Field(
+        None,
+        description="Optional new name for the MetaAgent.",
+    )
+    agents: Optional[List[Union[str, Dict[str, Any]]]] = Field(
+        None,
+        description="List of memory agent names or dicts with agent configs. Will be compared with existing agents to determine what to add/remove.",
+    )
+    system_prompts: Optional[Dict[str, str]] = Field(
+        None,
+        description="Dictionary mapping agent names to their system prompt text. Updates only the specified agents.",
+    )
+    llm_config: Optional[LLMConfig] = Field(
+        None,
+        description="LLM configuration for meta agent and its sub-agents.",
+    )
+    embedding_config: Optional[EmbeddingConfig] = Field(
+        None,
+        description="Embedding configuration for meta agent and its sub-agents.",
     )
 
     class Config:
@@ -357,7 +383,6 @@ def get_prompt_template_for_agent_type(agent_type: Optional[AgentType] = None):
         return (
             "{% for block in blocks %}"
             '<{{ block.label }} characters="{{ block.value|length }}/{{ block.limit }}">\n'
-            f"{CORE_MEMORY_LINE_NUMBER_WARNING}"
             "{% for line in block.value.split('\\n') %}"
             "Line {{ loop.index }}: {{ line }}\n"
             "{% endfor %}"
@@ -373,3 +398,7 @@ def get_prompt_template_for_agent_type(agent_type: Optional[AgentType] = None):
         "{% if not loop.last %}\n{% endif %}"
         "{% endfor %}"
     )
+
+
+# Rebuild model to support forward references (children field)
+AgentState.model_rebuild()

@@ -6,13 +6,15 @@ This module extracts the database schema from SQLAlchemy models and generates DD
 import os
 import sys
 
-from sqlalchemy import create_engine
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateTable
 
+from mirix.log import get_logger
+
+logger = get_logger(__name__)
+
 # Add the mirix directory to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
 
 def extract_schema_ddl():
     """Extract DDL statements from SQLAlchemy models for PGlite"""
@@ -20,10 +22,8 @@ def extract_schema_ddl():
     # Import all the ORM models to ensure they're registered
     from mirix.orm.sqlalchemy_base import SqlalchemyBase
 
-    # Create a PostgreSQL engine for DDL generation (PGlite uses PostgreSQL dialect)
-    engine = create_engine("postgresql://user:pass@localhost/db")
-
     # Get all tables from the base metadata
+
     metadata = SqlalchemyBase.metadata
 
     ddl_statements = []
@@ -52,7 +52,6 @@ def extract_schema_ddl():
     ]
 
     return "\n".join(setup_statements + ddl_statements)
-
 
 def clean_ddl_for_pglite(ddl):
     """Clean DDL statements for PGlite compatibility"""
@@ -101,7 +100,6 @@ def clean_ddl_for_pglite(ddl):
         filtered_lines.append(line)
 
     return "\n".join(filtered_lines)
-
 
 def get_basic_schema():
     """Get a basic schema for PGlite with essential tables"""
@@ -190,10 +188,7 @@ CREATE TABLE tools (
 CREATE TABLE blocks (
     id VARCHAR PRIMARY KEY,
     organization_id VARCHAR NOT NULL,
-    template_name VARCHAR,
-    description TEXT,
     label VARCHAR NOT NULL,
-    is_template BOOLEAN DEFAULT FALSE,
     value TEXT NOT NULL,
     char_limit INTEGER DEFAULT 2000,
     metadata_ TEXT,
@@ -255,7 +250,6 @@ CREATE TABLE episodic_memory (
     event_type VARCHAR NOT NULL,
     summary VARCHAR NOT NULL,
     details TEXT NOT NULL,
-    tree_path TEXT NOT NULL,
     metadata_ TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -270,7 +264,6 @@ CREATE TABLE procedural_memory (
     entry_type VARCHAR NOT NULL,
     summary VARCHAR NOT NULL,
     steps TEXT NOT NULL,
-    tree_path TEXT NOT NULL,
     last_modify TEXT NOT NULL,
     metadata_ TEXT,
     email_tag TEXT,
@@ -289,7 +282,6 @@ CREATE TABLE resource_memory (
     summary VARCHAR NOT NULL,
     resource_type VARCHAR NOT NULL,
     content TEXT NOT NULL,
-    tree_path TEXT NOT NULL,
     last_modify TEXT NOT NULL,
     metadata_ TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -341,14 +333,13 @@ VALUES ('default-user', 'default-org', 'Default User', 'UTC')
 ON CONFLICT DO NOTHING;
 """
 
-
 if __name__ == "__main__":
     try:
         # Try to extract full schema from SQLAlchemy models
         schema = extract_schema_ddl()
-        print("Full schema extracted successfully:")
-        print(schema)
+        logger.debug("Full schema extracted successfully:")
+        logger.debug(schema)
     except Exception as e:
-        print(f"Failed to extract full schema: {e}")
-        print("Using basic schema instead:")
-        print(get_basic_schema())
+        logger.debug("Failed to extract full schema: %s", e)
+        logger.debug("Using basic schema instead:")
+        logger.debug(get_basic_schema())

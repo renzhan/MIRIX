@@ -1,14 +1,17 @@
 import random
 import time
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 import requests
 
-from mirix.constants import (
-    CLI_WARNING_PREFIX,
-    INNER_THOUGHTS_KWARG,
-    INNER_THOUGHTS_KWARG_DESCRIPTION,
-)
+from mirix.constants import CLI_WARNING_PREFIX
+from mirix.log import get_logger
+
+logger = get_logger(__name__)
+
+if TYPE_CHECKING:
+    from mirix.interface import AgentChunkStreamingInterface
+
 from mirix.errors import MirixConfigurationError, RateLimitExceededError
 from mirix.llm_api.anthropic import (
     anthropic_bedrock_chat_completions_request,
@@ -19,10 +22,6 @@ from mirix.llm_api.azure_openai import azure_openai_chat_completions_request
 from mirix.llm_api.google_ai import (
     convert_tools_to_google_ai_format,
     google_ai_chat_completions_request,
-)
-from mirix.llm_api.helpers import (
-    add_inner_thoughts_to_functions,
-    unpack_all_inner_thoughts_from_kwargs,
 )
 from mirix.llm_api.openai import (
     build_openai_chat_completions_request,
@@ -95,7 +94,7 @@ def retry_with_exponential_backoff(
 
                     # Sleep for the delay
                     # printd(f"Got a rate limit error ('{http_err}') on LLM backend request, waiting {int(delay)}s then retrying...")
-                    print(
+                    logger.debug(
                         f"{CLI_WARNING_PREFIX}Got a rate limit error ('{http_err}') on LLM backend request, waiting {int(delay)}s then retrying..."
                     )
                     time.sleep(delay)
@@ -222,11 +221,6 @@ def create(
         if get_input_data_for_debugging:
             return response
 
-        if llm_config.put_inner_thoughts_in_kwargs:
-            response = unpack_all_inner_thoughts_from_kwargs(
-                response=response, inner_thoughts_key=INNER_THOUGHTS_KWARG
-            )
-
         return response
 
     # azure
@@ -260,7 +254,6 @@ def create(
         chat_completion_request = build_openai_chat_completions_request(
             llm_config,
             messages,
-            user_id,
             functions,
             function_call,
             use_tool_naming,
@@ -274,10 +267,11 @@ def create(
             chat_completion_request=chat_completion_request,
         )
 
-        if llm_config.put_inner_thoughts_in_kwargs:
-            response = unpack_all_inner_thoughts_from_kwargs(
-                response=response, inner_thoughts_key=INNER_THOUGHTS_KWARG
-            )
+        # TODO: Implement unpack_all_inner_thoughts_from_kwargs if needed
+        # if llm_config.put_inner_thoughts_in_kwargs:
+        #     response = unpack_all_inner_thoughts_from_kwargs(
+        #         response=response
+        #     )
 
         return response
 
@@ -414,9 +408,11 @@ def create(
                 messages=[
                     cast_message_to_subtype(m.to_openai_dict()) for m in messages
                 ],
-                tools=[{"type": "function", "function": f} for f in functions]
-                if functions
-                else None,
+                tools=(
+                    [{"type": "function", "function": f} for f in functions]
+                    if functions
+                    else None
+                ),
                 tool_choice=tool_call,
                 # user=str(user_id),
                 # NOTE: max_tokens is required for Anthropic API
@@ -466,14 +462,6 @@ def create(
                 missing_fields=["groq_api_key"],
             )
 
-        # force to true for groq, since they don't support 'content' is non-null
-        if llm_config.put_inner_thoughts_in_kwargs:
-            functions = add_inner_thoughts_to_functions(
-                functions=functions,
-                inner_thoughts_key=INNER_THOUGHTS_KWARG,
-                inner_thoughts_description=INNER_THOUGHTS_KWARG_DESCRIPTION,
-            )
-
         tools = (
             [{"type": "function", "function": f} for f in functions]
             if functions is not None
@@ -489,14 +477,13 @@ def create(
             ],
             tools=tools,
             tool_choice=function_call,
-            user=str(user_id),
         )
 
         # https://console.groq.com/docs/openai
         # "The following fields are currently not supported and will result in a 400 error (yikes) if they are supplied:"
         assert data.top_logprobs is None
         assert data.logit_bias is None
-        assert data.logprobs == False
+        assert not data.logprobs
         assert data.n == 1
         # They mention that none of the messages can have names, but it seems to not error out (for now)
 
@@ -513,11 +500,6 @@ def create(
         finally:
             if isinstance(stream_interface, AgentChunkStreamingInterface):
                 stream_interface.stream_end()
-
-        if llm_config.put_inner_thoughts_in_kwargs:
-            response = unpack_all_inner_thoughts_from_kwargs(
-                response=response, inner_thoughts_key=INNER_THOUGHTS_KWARG
-            )
 
         return response
 
@@ -549,9 +531,11 @@ def create(
                 messages=[
                     cast_message_to_subtype(m.to_openai_dict()) for m in messages
                 ],
-                tools=[{"type": "function", "function": f} for f in functions]
-                if functions
-                else None,
+                tools=(
+                    [{"type": "function", "function": f} for f in functions]
+                    if functions
+                    else None
+                ),
                 tool_choice=tool_call,
                 # user=str(user_id),
                 # NOTE: max_tokens is required for Anthropic API
@@ -561,24 +545,6 @@ def create(
 
     # local model
     else:
-        if stream:
-            raise NotImplementedError(
-                f"Streaming not yet implemented for {llm_config.model_endpoint_type}"
-            )
-        return get_chat_completion(
-            model=llm_config.model,
-            messages=messages,
-            functions=functions,
-            functions_python=functions_python,
-            function_call=function_call,
-            context_window=llm_config.context_window,
-            endpoint=llm_config.model_endpoint,
-            endpoint_type=llm_config.model_endpoint_type,
-            wrapper=llm_config.model_wrapper,
-            user=str(user_id),
-            # hint
-            first_message=first_message,
-            # auth-related
-            auth_type=model_settings.openllm_auth_type,
-            auth_key=model_settings.openllm_api_key,
+        raise NotImplementedError(
+            f"Model endpoint type '{llm_config.model_endpoint_type}' is not yet supported"
         )

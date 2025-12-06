@@ -1,3 +1,5 @@
+import base64
+import contextvars
 import copy
 import difflib
 import hashlib
@@ -9,23 +11,39 @@ import pickle
 import platform
 import random
 import re
+import shutil
 import string
 import subprocess
 import sys
 import uuid
+import warnings
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from logging import Logger
-from typing import List, Union, _GenericAlias, get_args, get_origin, get_type_hints
+from pathlib import Path
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Union,
+    _GenericAlias,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 from urllib.parse import urljoin, urlparse
 
 import demjson3 as demjson
 import pytz
+import requests
 import tiktoken
 from pathvalidate import sanitize_filename as pathvalidate_sanitize_filename
 
 import mirix
+from mirix.client.utils import get_utc_time, json_dumps  # Re-export from client
 from mirix.constants import (
     CLI_WARNING_PREFIX,
     CORE_MEMORY_HUMAN_CHAR_LIMIT,
@@ -35,13 +53,56 @@ from mirix.constants import (
     MIRIX_DIR,
     TOOL_CALL_ID_MAX_LEN,
 )
+from mirix.log import get_logger
+from mirix.schemas.file import FileMetadata
+from mirix.schemas.message import MessageCreate, MessageRole
+from mirix.schemas.mirix_message_content import (
+    CloudFileContent,
+    FileContent,
+    ImageContent,
+    MessageContentType,
+    TextContent,
+)
 from mirix.schemas.openai.chat_completion_request import Tool, ToolCall
 from mirix.schemas.openai.chat_completion_response import ChatCompletionResponse
+
+if TYPE_CHECKING:
+    from mirix.services.file_manager import FileManager
+
+
+_FILE_MANAGER: Optional["FileManager"] = None
+_DEFAULT_IMAGES_DIR: Optional[Path] = None
+
+logger = get_logger(__name__)
 
 DEBUG = False
 if "LOG_LEVEL" in os.environ:
     if os.environ["LOG_LEVEL"] == "DEBUG":
         DEBUG = True
+
+# Thread-safe verbose flag using contextvars (replaces global VERBOSE)
+# Default value from environment variable
+_default_verbose = True  # Default to True to show logs unless explicitly disabled
+if "MIRIX_VERBOSE" in os.environ:
+    _default_verbose = os.environ["MIRIX_VERBOSE"].lower() in ("true", "1", "yes")
+
+verbose_context = contextvars.ContextVar("verbose", default=_default_verbose)
+
+
+def get_verbose() -> bool:
+    """Get verbose setting for current context (thread-safe)"""
+    return verbose_context.get()
+
+
+def set_verbose(value: bool) -> None:
+    """Set verbose setting for current context (thread-safe)"""
+    verbose_context.set(value)
+
+
+# Keep VERBOSE for backward compatibility (but use contextvars internally)
+VERBOSE = (
+    _default_verbose  # Legacy global variable (deprecated, use get_verbose() instead)
+)
 
 ADJECTIVE_BANK = [
     "beautiful",
@@ -605,7 +666,7 @@ def annotate_message_json_list_with_tool_calls(
             # We should have a new tool call id in the buffer
             if tool_call_id is None:
                 # raise ValueError(
-                print(
+                logger.debug(
                     f"Got a function call role, but did not have a saved tool_call_id ready to use (i={i}, total={len(messages)}):\n{messages[:i]}\n{message}"
                 )
                 # allow a soft fail in this case
@@ -660,7 +721,7 @@ def annotate_message_json_list_with_tool_calls(
             # We should have a new tool call id in the buffer
             if tool_call_id is None:
                 # raise ValueError(
-                print(
+                logger.debug(
                     f"Got a tool call role, but did not have a saved tool_call_id ready to use (i={i}, total={len(messages)}):\n{messages[:i]}\n{message}"
                 )
                 # allow a soft fail in this case
@@ -856,7 +917,13 @@ def count_tokens(s: str, model: str = "gpt-4") -> int:
 
 def printd(*args, **kwargs):
     if DEBUG:
-        print(*args, **kwargs)
+        logger.debug(*args, **kwargs)
+
+
+def printv(*args, **kwargs):
+    """Print verbose logging output. Controlled by context-specific verbose setting (thread-safe)."""
+    if get_verbose():
+        logger.info(*args, **kwargs)
 
 
 def united_diff(str1, str2):
@@ -922,10 +989,7 @@ def get_local_time(timezone=None):
     return time_str.strip()
 
 
-def get_utc_time() -> datetime:
-    """Get the current UTC time"""
-    # return datetime.now(pytz.utc)
-    return datetime.now(timezone.utc)
+# get_utc_time is imported from mirix.client.utils
 
 
 def format_datetime(dt):
@@ -939,13 +1003,13 @@ def parse_json(string) -> dict:
         result = json_loads(string)
         return result
     except Exception as e:
-        print(f"Error parsing json with json package: {e}")
+        logger.error("Error parsing json with json package: %s", e)
 
     try:
         result = demjson.decode(string)
         return result
     except demjson.JSONDecodeError as e:
-        print(f"Error parsing json with demjson package: {e}")
+        logger.error("Error parsing json with demjson package: %s", e)
 
     try:
         from json_repair import repair_json
@@ -955,7 +1019,7 @@ def parse_json(string) -> dict:
         return result
 
     except Exception as e:
-        print(f"Error repairing json with json_repair package: {e}")
+        logger.error("Error repairing json with json_repair package: %s", e)
         raise e
 
 
@@ -985,7 +1049,7 @@ def validate_function_response(
             try:
                 # TODO find a better way to do this that won't result in double escapes
                 function_response_string = json_dumps(function_response_string)
-            except:
+            except Exception:
                 raise ValueError(function_response_string)
 
         else:
@@ -996,13 +1060,13 @@ def validate_function_response(
             # Try to convert to a string, but throw a warning to alert the user
             try:
                 function_response_string = str(function_response_string)
-            except:
+            except Exception:
                 raise ValueError(function_response_string)
 
     # Now check the length and make sure it doesn't go over the limit
     # TODO we should change this to a max token limit that's variable based on tokens remaining (or context-window)
     if truncate and len(function_response_string) > return_char_limit:
-        print(
+        logger.debug(
             f"{CLI_WARNING_PREFIX}function return was over limit ({len(function_response_string)} > {return_char_limit}) and was truncated"
         )
         function_response_string = f"{function_response_string[:return_char_limit]}... [NOTE: function output was truncated since it exceeded the character limit ({len(function_response_string)} > {return_char_limit})]"
@@ -1144,13 +1208,7 @@ def create_uuid_from_string(val: str):
     return uuid.UUID(hex=hex_string)
 
 
-def json_dumps(data, indent=2):
-    def safe_serializer(obj):
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        raise TypeError(f"Type {type(obj)} not serializable")
-
-    return json.dumps(data, indent=indent, default=safe_serializer, ensure_ascii=False)
+# json_dumps is imported from mirix.client.utils
 
 
 def json_loads(data):
@@ -1342,7 +1400,7 @@ def num_tokens_from_tool_calls(
     try:
         encoding = tiktoken.encoding_for_model(model)
     except KeyError:
-        # print("Warning: model not found. Using cl100k_base encoding.")
+        # logger.debug("Warning: model not found. Using cl100k_base encoding.")
         encoding = tiktoken.get_encoding("cl100k_base")
 
     num_tokens = 0
@@ -1389,7 +1447,7 @@ def num_tokens_from_messages(messages: List[dict], model: str = "gpt-4") -> int:
         # Attempt to search for the encoding based on the model string
         encoding = tiktoken.encoding_for_model(model)
     except KeyError:
-        # print("Warning: model not found. Using cl100k_base encoding.")
+        # logger.error("Warning: model not found. Using cl100k_base encoding.")
         encoding = tiktoken.get_encoding("cl100k_base")
     if model in {
         "gpt-3.5-turbo-0613",
@@ -1407,10 +1465,10 @@ def num_tokens_from_messages(messages: List[dict], model: str = "gpt-4") -> int:
         )
         tokens_per_name = -1  # if there's a name, the role is omitted
     elif "gpt-3.5-turbo" in model:
-        # print("Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613.")
+        # logger.debug("Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613.")
         return num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613")
     elif "gpt-4" in model:
-        # print("Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
+        # logger.debug("Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
         return num_tokens_from_messages(messages, model="gpt-4-0613")
     else:
         from mirix.utils import printd
@@ -1452,7 +1510,7 @@ def num_tokens_from_messages(messages: List[dict], model: str = "gpt-4") -> int:
                     num_tokens += tokens_per_name
 
             except TypeError as e:
-                print(f"tiktoken encoding failed on: {value}")
+                logger.error("tiktoken encoding failed on: %s", value)
                 raise e
 
     num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
@@ -1462,7 +1520,7 @@ def num_tokens_from_messages(messages: List[dict], model: str = "gpt-4") -> int:
 def convert_timezone_to_utc(timestamp_str, timezone):
     try:
         timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S.%f")
-    except:
+    except ValueError:
         timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
 
     # timezone is something like "Asia/Shanghai (UTC+08:00)"
@@ -1498,24 +1556,7 @@ def log_telemetry(logger: Logger, event: str, **kwargs):
         extra_data = " | ".join(
             f"{key}={value}" for key, value in kwargs.items() if value is not None
         )
-        logger.info(f"[{timestamp}] EVENT: {event} | {extra_data}")
-
-
-def clean_json_string_extra_backslash(s):
-    """Clean extra backslashes out from stringified JSON
-
-    NOTE: Google AI Gemini API likes to include these
-    """
-    # Strip slashes that are used to escape single quotes and other backslashes
-    # Use json.loads to parse it correctly
-    while "\\\\" in s:
-        s = s.replace("\\\\", "\\")
-    return s
-
-
-def count_tokens(s: str, model: str = "gpt-4") -> int:
-    encoding = tiktoken.encoding_for_model(model)
-    return len(encoding.encode(s))
+        logger.info("[%s] EVENT: %s | %s", timestamp, event, extra_data)
 
 
 def generate_short_id(prefix="id", length=4):
@@ -1578,3 +1619,435 @@ def generate_unique_short_id(
 
     # If we can't find a unique ID after max_attempts, fall back to longer ID
     return generate_short_id(prefix, length + 2)
+
+
+def _get_file_manager_instance() -> "FileManager":
+    """Return a cached FileManager instance to avoid repeated construction."""
+    global _FILE_MANAGER
+    if _FILE_MANAGER is None:
+        from mirix.services.file_manager import FileManager
+
+        _FILE_MANAGER = FileManager()
+    return _FILE_MANAGER
+
+
+def _get_images_directory() -> Path:
+    """Return the configured images directory, ensuring it exists."""
+    global _DEFAULT_IMAGES_DIR
+    if _DEFAULT_IMAGES_DIR is None:
+        from mirix.settings import settings
+
+        images_dir = settings.images_dir or (Path.home() / ".mirix" / "images")
+        images_dir = Path(images_dir)
+        images_dir.mkdir(parents=True, exist_ok=True)
+        _DEFAULT_IMAGES_DIR = images_dir
+    return _DEFAULT_IMAGES_DIR
+
+
+def _generate_file_hash(content: bytes) -> str:
+    """Generate a deterministic short hash for file contents."""
+    return hashlib.sha256(content).hexdigest()[:16]
+
+
+def _save_image_from_base64(
+    base64_data: str,
+    file_manager: "FileManager",
+    org_id: str,
+    images_dir: Path,
+    detail: str = "auto",
+) -> FileMetadata:
+    """Save an image from base64 data and return FileMetadata."""
+    del detail  # detail currently unused but kept for signature parity
+    try:
+        if base64_data.startswith("data:"):
+            header, encoded = base64_data.split(",", 1)
+            mime_type = header.split(":")[1].split(";")[0]
+            file_extension = mime_type.split("/")[-1]
+        else:
+            encoded = base64_data
+            file_extension = "jpg"
+
+        image_data = base64.b64decode(encoded)
+
+        file_hash = _generate_file_hash(image_data)
+        file_name = f"image_{file_hash}.{file_extension}"
+        file_path = images_dir / file_name
+
+        if not file_path.exists():
+            with open(file_path, "wb") as f:
+                f.write(image_data)
+
+        return file_manager.create_file_metadata_from_path(
+            file_path=str(file_path), organization_id=org_id
+        )
+
+    except Exception as e:
+        raise ValueError(f"Failed to save base64 image: {str(e)}") from e
+
+
+def _save_image_from_url(
+    url: str,
+    file_manager: "FileManager",
+    org_id: str,
+    images_dir: Path,
+    detail: str = "auto",
+) -> FileMetadata:
+    """Download and save an image from URL and return FileMetadata."""
+    del detail  # detail currently unused but kept for signature parity
+    try:
+        response = requests.get(url, stream=True, timeout=30)
+        response.raise_for_status()
+
+        content_type = response.headers.get("content-type", "image/jpeg")
+        file_extension = content_type.split("/")[-1]
+        if file_extension not in ["jpg", "jpeg", "png", "gif", "webp"]:
+            file_extension = "jpg"
+
+        image_data = response.content
+
+        file_hash = _generate_file_hash(image_data)
+        file_name = f"image_{file_hash}.{file_extension}"
+        file_path = images_dir / file_name
+
+        if not file_path.exists():
+            with open(file_path, "wb") as f:
+                f.write(image_data)
+
+        return file_manager.create_file_metadata_from_path(
+            file_path=str(file_path), organization_id=org_id
+        )
+
+    except Exception as e:
+        raise ValueError(
+            f"Failed to download and save image from URL {url}: {str(e)}"
+        ) from e
+
+
+def _save_image_from_file_uri(
+    file_uri: str,
+    file_manager: "FileManager",
+    org_id: str,
+    images_dir: Path,
+) -> FileMetadata:
+    """Copy an image from file URI and return FileMetadata."""
+    try:
+        if file_uri.startswith("file://"):
+            source_path = file_uri[7:]
+        else:
+            source_path = file_uri
+
+        source_path = Path(source_path)
+
+        if not source_path.exists():
+            raise FileNotFoundError(f"Source file not found: {source_path}")
+
+        with open(source_path, "rb") as f:
+            image_data = f.read()
+
+        file_hash = _generate_file_hash(image_data)
+        file_extension = source_path.suffix.lstrip(".") or "jpg"
+        file_name = f"image_{file_hash}.{file_extension}"
+        file_path = images_dir / file_name
+
+        if not file_path.exists():
+            shutil.copy2(source_path, file_path)
+
+        return file_manager.create_file_metadata_from_path(
+            file_path=str(file_path), organization_id=org_id
+        )
+
+    except Exception as e:
+        raise ValueError(
+            f"Failed to copy image from file URI {file_uri}: {str(e)}"
+        ) from e
+
+
+def _save_image_from_google_cloud_uri(
+    cloud_uri: str, file_manager: "FileManager", org_id: str
+) -> FileMetadata:
+    """Create FileMetadata from Google Cloud URI without downloading the image."""
+    parsed_uri = urlparse(cloud_uri)
+    file_id = os.path.basename(parsed_uri.path) or "google_cloud_file"
+    file_name = f"google_cloud_{file_id}"
+
+    if not os.path.splitext(file_name)[1]:
+        file_name += ".jpg"
+
+    file_extension = os.path.splitext(file_name)[1].lower()
+    file_type_map = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+        ".bmp": "image/bmp",
+        ".svg": "image/svg+xml",
+    }
+    file_type = file_type_map.get(file_extension, "image/jpeg")
+
+    return file_manager.create_file_metadata(
+        FileMetadata(
+            organization_id=org_id,
+            file_name=file_name,
+            file_path=None,
+            source_url=None,
+            google_cloud_url=cloud_uri,
+            file_type=file_type,
+            file_size=None,
+            file_creation_date=None,
+            file_last_modified_date=None,
+        )
+    )
+
+
+def _save_file_from_path(
+    file_path: str, file_manager: "FileManager", org_id: str
+) -> FileMetadata:
+    """Save a file from local path and return FileMetadata."""
+    try:
+        file_path_obj = Path(file_path)
+
+        if not file_path_obj.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        return file_manager.create_file_metadata_from_path(
+            file_path=str(file_path_obj), organization_id=org_id
+        )
+
+    except Exception as e:
+        raise ValueError(f"Failed to save file from path {file_path}: {str(e)}") from e
+
+
+def _determine_file_type(file_path: str) -> str:
+    """Determine file type from file extension."""
+    file_extension = os.path.splitext(file_path)[1].lower()
+    file_type_map = {
+        # Images
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+        ".bmp": "image/bmp",
+        ".svg": "image/svg+xml",
+        # Documents
+        ".pdf": "application/pdf",
+        ".doc": "application/msword",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".txt": "text/plain",
+        ".rtf": "application/rtf",
+        ".html": "text/html",
+        ".htm": "text/html",
+        # Spreadsheets
+        ".xls": "application/vnd.ms-excel",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".csv": "text/csv",
+        # Presentations
+        ".ppt": "application/vnd.ms-powerpoint",
+        ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        # Other common formats
+        ".json": "application/json",
+        ".xml": "application/xml",
+        ".zip": "application/zip",
+    }
+    return file_type_map.get(file_extension, "application/octet-stream")
+
+
+def _create_file_metadata_from_url(
+    url: str, file_manager: "FileManager", org_id: str, detail: str = "auto"
+) -> FileMetadata:
+    """Create FileMetadata from URL without downloading the image."""
+    del detail  # detail currently unused but kept for signature parity
+    try:
+        parsed_url = urlparse(url)
+        file_name = os.path.basename(parsed_url.path) or "remote_image"
+
+        if not os.path.splitext(file_name)[1]:
+            file_name += ".jpg"
+
+        file_extension = os.path.splitext(file_name)[1].lower()
+        file_type_map = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+            ".bmp": "image/bmp",
+            ".svg": "image/svg+xml",
+        }
+        file_type = file_type_map.get(file_extension, "image/jpeg")
+
+        return file_manager.create_file_metadata(
+            FileMetadata(
+                organization_id=org_id,
+                file_name=file_name,
+                file_path=None,
+                source_url=url,
+                file_type=file_type,
+                file_size=None,
+                file_creation_date=None,
+                file_last_modified_date=None,
+            )
+        )
+
+    except Exception as e:
+        raise ValueError(
+            f"Failed to create file metadata from URL {url}: {str(e)}"
+        ) from e
+
+
+def convert_message_to_mirix_message(
+    message: Union[str, List[dict]],
+    role: str = "user",
+    *,
+    org_id: Optional[str] = None,
+    file_manager: Optional["FileManager"] = None,
+    images_dir: Optional[Path] = None,
+) -> List[MessageCreate]:
+    if isinstance(message, str):
+        content = [TextContent(text=message)]
+        input_messages = [MessageCreate(role=MessageRole(role), content=content)]
+    elif isinstance(message, list):
+        resolved_file_manager = file_manager
+        resolved_images_dir = None
+
+        if images_dir is not None:
+            resolved_images_dir = Path(images_dir)
+            resolved_images_dir.mkdir(parents=True, exist_ok=True)
+
+        def ensure_file_context(
+            needs_images_dir: bool = False,
+        ) -> tuple["FileManager", str, Optional[Path]]:
+            if org_id is None:
+                raise ValueError(
+                    "org_id is required when converting messages containing file or image data."
+                )
+
+            nonlocal resolved_file_manager, resolved_images_dir
+
+            if resolved_file_manager is None:
+                resolved_file_manager = _get_file_manager_instance()
+
+            images_root = resolved_images_dir
+            if needs_images_dir:
+                if images_root is None:
+                    images_root = _get_images_directory()
+                    resolved_images_dir = images_root
+
+            return resolved_file_manager, org_id, images_root
+
+        def convert_message(m):
+            if m["type"] == "text":
+                return TextContent(**m)
+            elif m["type"] == "image_url":
+                url = m["image_url"]["url"]
+                detail = m["image_url"].get("detail", "auto")
+
+                # Handle the image based on URL type
+                if url.startswith("data:"):
+                    fm, resolved_org_id, resolved_images_dir = ensure_file_context(
+                        needs_images_dir=True
+                    )
+                    file_metadata = _save_image_from_base64(
+                        url, fm, resolved_org_id, resolved_images_dir, detail
+                    )
+                else:
+                    fm, resolved_org_id, _ = ensure_file_context()
+                    file_metadata = _create_file_metadata_from_url(
+                        url, fm, resolved_org_id, detail
+                    )
+
+                return ImageContent(
+                    type=MessageContentType.image_url,
+                    image_id=file_metadata.id,
+                    detail=detail,
+                )
+
+            elif m["type"] == "image_data":
+                # Base64 image data (new format)
+                data = m["image_data"]["data"]
+                detail = m["image_data"].get("detail", "auto")
+
+                fm, resolved_org_id, resolved_images_dir = ensure_file_context(
+                    needs_images_dir=True
+                )
+                file_metadata = _save_image_from_base64(
+                    data, fm, resolved_org_id, resolved_images_dir, detail
+                )
+
+                return ImageContent(
+                    type=MessageContentType.image_url,
+                    image_id=file_metadata.id,
+                    detail=detail,
+                )
+            elif m["type"] == "file_uri":
+                # File URI (local file path)
+                file_path = m["file_uri"]
+
+                # Check if it's an image or other file type
+                file_type = _determine_file_type(file_path)
+
+                if file_type.startswith("image/"):
+                    # Handle as image
+                    fm, resolved_org_id, resolved_images_dir = ensure_file_context(
+                        needs_images_dir=True
+                    )
+                    file_metadata = _save_image_from_file_uri(
+                        file_path, fm, resolved_org_id, resolved_images_dir
+                    )
+                    return ImageContent(
+                        type=MessageContentType.image_url,
+                        image_id=file_metadata.id,
+                        detail="auto",
+                    )
+                else:
+                    # Handle as general file (e.g., PDF, DOC, etc.)
+                    fm, resolved_org_id, _ = ensure_file_context()
+                    file_metadata = _save_file_from_path(file_path, fm, resolved_org_id)
+                    return FileContent(
+                        type=MessageContentType.file_uri, file_id=file_metadata.id
+                    )
+
+            elif m["type"] == "google_cloud_file_uri":
+                # Google Cloud file URI
+                # Handle both the typo version and the correct version from the test file
+                file_uri = m.get("google_cloud_file_uri") or m.get("file_uri")
+
+                fm, resolved_org_id, _ = ensure_file_context()
+                file_metadata = _save_image_from_google_cloud_uri(
+                    file_uri, fm, resolved_org_id
+                )
+                return CloudFileContent(
+                    type=MessageContentType.google_cloud_file_uri,
+                    cloud_file_uri=file_metadata.id,
+                )
+
+            elif m["type"] == "database_image_id":
+                return ImageContent(
+                    type=MessageContentType.image_url,
+                    image_id=m["image_id"],
+                    detail="auto",
+                )
+
+            elif m["type"] == "database_file_id":
+                return FileContent(
+                    type=MessageContentType.file_uri,
+                    file_id=m["file_id"],
+                )
+
+            elif m["type"] == "database_google_cloud_file_uri":
+                return CloudFileContent(
+                    type=MessageContentType.google_cloud_file_uri,
+                    cloud_file_uri=m["cloud_file_uri"],
+                )
+
+            else:
+                raise ValueError(f"Unknown message type: {m['type']}")
+
+        content = [convert_message(m) for m in message]
+        input_messages = [MessageCreate(role=MessageRole(role), content=content)]
+
+    else:
+        raise ValueError(f"Invalid message type: {type(message)}")
+
+    return input_messages

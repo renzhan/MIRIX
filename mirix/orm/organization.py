@@ -8,6 +8,7 @@ from mirix.schemas.organization import Organization as PydanticOrganization
 if TYPE_CHECKING:
     from mirix.orm.agent import Agent
     from mirix.orm.block import Block
+    from mirix.orm.client import Client
     from mirix.orm.cloud_file_mapping import CloudFileMapping
     from mirix.orm.episodic_memory import EpisodicEvent
     from mirix.orm.file import FileMetadata
@@ -16,11 +17,6 @@ if TYPE_CHECKING:
     from mirix.orm.procedural_memory import ProceduralMemoryItem
     from mirix.orm.provider import Provider
     from mirix.orm.resource_memory import ResourceMemoryItem
-    from mirix.orm.sandbox_config import (
-        AgentEnvironmentVariable,
-        SandboxConfig,
-        SandboxEnvironmentVariable,
-    )
     from mirix.orm.semantic_memory import SemanticMemoryItem
     from mirix.orm.tool import Tool
     from mirix.orm.user import User
@@ -38,28 +34,14 @@ class Organization(SqlalchemyBase):
     users: Mapped[List["User"]] = relationship(
         "User", back_populates="organization", cascade="all, delete-orphan"
     )
+    clients: Mapped[List["Client"]] = relationship(
+        "Client", back_populates="organization", cascade="all, delete-orphan"
+    )
     tools: Mapped[List["Tool"]] = relationship(
         "Tool", back_populates="organization", cascade="all, delete-orphan"
     )
     blocks: Mapped[List["Block"]] = relationship(
         "Block", back_populates="organization", cascade="all, delete-orphan"
-    )
-    sandbox_configs: Mapped[List["SandboxConfig"]] = relationship(
-        "SandboxConfig", back_populates="organization", cascade="all, delete-orphan"
-    )
-    sandbox_environment_variables: Mapped[List["SandboxEnvironmentVariable"]] = (
-        relationship(
-            "SandboxEnvironmentVariable",
-            back_populates="organization",
-            cascade="all, delete-orphan",
-        )
-    )
-    agent_environment_variables: Mapped[List["AgentEnvironmentVariable"]] = (
-        relationship(
-            "AgentEnvironmentVariable",
-            back_populates="organization",
-            cascade="all, delete-orphan",
-        )
     )
 
     # relationships
