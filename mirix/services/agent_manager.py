@@ -4,7 +4,6 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from mirix import Message
 from mirix.constants import (
     BASE_TOOLS,
     CHAT_AGENT_TOOLS,
@@ -839,7 +838,7 @@ class AgentManager:
         old_agent_state = None
         if agent_update.system:
             old_agent_state = self.get_agent_by_id(agent_id=agent_id, actor=actor)
-
+        
         # Update agent (including system field in database)
         agent_state = self._update_agent(
             agent_id=agent_id, agent_update=agent_update, actor=actor
@@ -1594,7 +1593,7 @@ class AgentManager:
                     cached_data.pop("memory_prompt_template", None)
 
                     agent_state = PydanticAgentState(**cached_data)
-
+                    
                     # SECURITY CHECK: Verify agent belongs to this client
                     # Prevents cross-client access via Redis cache
                     if agent_state.created_by_id != actor.id:
@@ -1602,7 +1601,7 @@ class AgentManager:
                         raise NoResultFound(
                             f"Agent {agent_id} not found or not accessible to client {actor.id}"
                         )
-
+                    
                     return agent_state  # Cache HIT (agent + tools + memory)
         except Exception as e:
             # Log but continue to PostgreSQL on Redis error
@@ -1806,7 +1805,7 @@ class AgentManager:
         # Handle empty message list (e.g., after deletion)
         if not messages:
             return []
-
+        
         # Keep first message (system message) and filter rest by user_id
         messages = [messages[0]] + [
             message for message in messages[1:] if message.user_id == actor.id
@@ -1816,14 +1815,14 @@ class AgentManager:
     @enforce_types
     def get_system_message(
             self, agent_id: str, actor: PydanticClient
-    ) -> Message | None:
+    ) -> PydanticMessage:
         agent_state = self.get_agent_by_id(agent_id=agent_id, actor=actor)
         message_ids = agent_state.message_ids
-
+        
         # Handle empty message_ids (e.g., after deletion)
         if not message_ids:
             return None
-
+        
         return self.message_manager.get_message_by_id(
             message_id=message_ids[0], actor=actor
         )
@@ -1879,7 +1878,7 @@ class AgentManager:
             message_ids[idx] for idx in message_id_indices_belonging_to_actor
         ]
         message_ids_to_keep = [
-            message_ids[idx] for idx in message_id_indices_belonging_to_actor[num - 1:]
+            message_ids[idx] for idx in message_id_indices_belonging_to_actor[num - 1 :]
         ]
 
         message_ids_belonging_to_actor = set(message_ids_belonging_to_actor)

@@ -7,7 +7,15 @@ from typing import Optional
 from dotenv import load_dotenv
 
 # 加载.env文件
-load_dotenv()
+app_env = os.environ.get('APP_ENV', '')
+if app_env in ['dev', 'staging', 'prod']:
+    env_file = f'.env.{app_env}'
+    if os.path.exists(env_file):
+        load_dotenv(env_file)
+    else:
+        load_dotenv()  # 回退到默认 .env
+else:
+    load_dotenv()  # 默认加载 .env
 
 # 尝试从项目配置导入（如果可用）
 try:
